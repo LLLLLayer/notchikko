@@ -42,9 +42,5 @@ struct NotchGeometry {
             height: panelHeight
         )
 
-        print("[NotchGeometry] screen.frame: \(screenFrame)")
-        print("[NotchGeometry] screen.visibleFrame: \(screen.visibleFrame)")
-        print("[NotchGeometry] hasNotch: \(hasPhysicalNotch), notchSize: \(notchSize)")
-        print("[NotchGeometry] panelFrame: \(panelFrame), panelTop: \(panelFrame.maxY), screenTop: \(screenFrame.maxY)")
     }
 }

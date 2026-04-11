@@ -11,19 +11,21 @@ enum NotchikkoState: String, CaseIterable {
     case happy
     case error
     case dragging
+    case approving
 
     var svgName: String {
         switch self {
         case .sleeping: "clawd-sleeping"
         case .idle: "clawd-idle"
-        case .thinking: "clawd-working-thinking"
-        case .reading: "clawd-working-typing"
-        case .typing: "clawd-working-typing"
-        case .building: "clawd-working-building"
-        case .sweeping: "clawd-working-sweeping"
-        case .happy: "clawd-happy"
+        case .thinking: "clawd-prompt"
+        case .reading: "clawd-tool-edit"
+        case .typing: "clawd-tool-edit"
+        case .building: "clawd-tool-bash"
+        case .sweeping: "clawd-compact"
+        case .happy: "clawd-stop"
         case .error: "clawd-error"
-        case .dragging: "clawd-react-drag"
+        case .dragging: "clawd-drag"
+        case .approving: "clawd-idle"  // TODO: clawd-approving
         }
     }
 
@@ -39,12 +41,17 @@ enum NotchikkoState: String, CaseIterable {
         case .happy: 0.60
         case .error: 0.50
         case .dragging: 1.0
+        case .approving: 0.80
         }
     }
+
+    /// 音效映射 key（与 SoundManager.defaultSoundMap 对应）
+    var soundKey: String { rawValue }
 
     var priority: Int {
         switch self {
         case .dragging: 100
+        case .approving: 95
         case .error: 90
         case .happy: 80
         case .building: 70

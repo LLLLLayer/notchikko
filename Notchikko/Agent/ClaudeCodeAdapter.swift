@@ -2,13 +2,29 @@ import Foundation
 
 final class ClaudeCodeAdapter: AgentBridge {
     let agentName = "Claude Code"
-    private let socketServer = SocketServer()
+    let agentIcon = "🤖"
+    let socketServerRef = SocketServer()
     private var continuation: AsyncStream<AgentEvent>.Continuation?
+
+    private var knownSessions: Set<String> = []
 
     lazy var eventStream: AsyncStream<AgentEvent> = {
         AsyncStream { [weak self] continuation in
             self?.continuation = continuation
-            self?.socketServer.onEvent = { hookEvent in
+            self?.socketServerRef.onEvent = { hookEvent in
+                guard let self else { return }
+                // 首次见到的 session，自动补发一个 sessionStart（带 cwd/source）
+                if !self.knownSessions.contains(hookEvent.sessionId) {
+                    self.knownSessions.insert(hookEvent.sessionId)
+                    if hookEvent.event != "SessionStart" {
+                        let syntheticStart = AgentEvent.sessionStart(
+                            sessionId: hookEvent.sessionId,
+                            cwd: hookEvent.cwd,
+                            source: hookEvent.source ?? "claude-code"
+                        )
+                        continuation.yield(syntheticStart)
+                    }
+                }
                 let agentEvent = Self.convert(hookEvent)
                 continuation.yield(agentEvent)
             }
@@ -16,18 +32,18 @@ final class ClaudeCodeAdapter: AgentBridge {
     }()
 
     func start() async throws {
-        socketServer.start()
+        socketServerRef.start()
     }
 
     func stop() async {
-        socketServer.stop()
+        socketServerRef.stop()
         continuation?.finish()
     }
 
     private static func convert(_ hook: HookEvent) -> AgentEvent {
         switch hook.event {
         case "SessionStart":
-            return .sessionStart(sessionId: hook.sessionId, cwd: hook.cwd)
+            return .sessionStart(sessionId: hook.sessionId, cwd: hook.cwd, source: hook.source ?? "claude-code")
         case "SessionEnd":
             return .sessionEnd(sessionId: hook.sessionId)
         case "UserPromptSubmit":

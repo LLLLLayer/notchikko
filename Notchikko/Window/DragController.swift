@@ -6,17 +6,28 @@ final class DragController {
 
     private weak var panel: NotchPanel?
     private var homeFrame: NSRect = .zero
+    private var notchHeight: CGFloat = 0
+    private var petSize: CGFloat = 80
     private var isDragging = false
     private var dragOffset: CGPoint = .zero
+
+    // 单击 vs 拖拽区分
+    private var mouseDownPoint: NSPoint = .zero
+    private var mouseDownInPet = false
+    private static let dragThreshold: CGFloat = 5.0
 
     var onDragStart: (() -> Void)?
     /// 松手回调，参数为鼠标所在屏幕（可能与起始屏幕不同）
     var onDragEnd: ((NSScreen?) -> Void)?
     var onRightClick: ((NSPoint) -> Void)?
+    /// 单击回调（非拖拽的点击）
+    var onClick: (() -> Void)?
 
-    func setup(panel: NotchPanel, homeFrame: NSRect) {
+    func setup(panel: NotchPanel, homeFrame: NSRect, notchHeight: CGFloat = 0, petSize: CGFloat = 80) {
         self.panel = panel
         self.homeFrame = homeFrame
+        self.notchHeight = notchHeight
+        self.petSize = petSize
 
         localMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .rightMouseDown]
@@ -58,16 +69,31 @@ final class DragController {
             let petRect = petScreenRect(panel: panel)
             guard petRect.contains(mouseScreen) else { return }
 
+            mouseDownPoint = mouseScreen
+            mouseDownInPet = true
+            isDragging = false
+
             dragOffset = CGPoint(
                 x: mouseScreen.x - panel.frame.origin.x,
                 y: mouseScreen.y - panel.frame.origin.y
             )
-            isDragging = true
-            onDragStart?()
 
         case .leftMouseDragged:
-            guard isDragging else { return }
+            guard mouseDownInPet else { return }
             let mouseScreen = NSEvent.mouseLocation
+
+            if !isDragging {
+                // 检查是否超过拖拽阈值
+                let dx = mouseScreen.x - mouseDownPoint.x
+                let dy = mouseScreen.y - mouseDownPoint.y
+                let distance = sqrt(dx * dx + dy * dy)
+                guard distance >= Self.dragThreshold else { return }
+
+                // 进入拖拽模式
+                isDragging = true
+                onDragStart?()
+            }
+
             let newOrigin = CGPoint(
                 x: mouseScreen.x - dragOffset.x,
                 y: mouseScreen.y - dragOffset.y
@@ -75,11 +101,18 @@ final class DragController {
             panel.setFrameOrigin(newOrigin)
 
         case .leftMouseUp:
-            guard isDragging else { return }
-            isDragging = false
-            let mouseLocation = NSEvent.mouseLocation
-            let targetScreen = screenContaining(mouseLocation)
-            onDragEnd?(targetScreen)
+            guard mouseDownInPet else { return }
+            mouseDownInPet = false
+
+            if isDragging {
+                isDragging = false
+                let mouseLocation = NSEvent.mouseLocation
+                let targetScreen = screenContaining(mouseLocation)
+                onDragEnd?(targetScreen)
+            } else {
+                // 没有拖拽 → 单击
+                onClick?()
+            }
 
         default:
             break
@@ -93,22 +126,27 @@ final class DragController {
 
     private func petScreenRect(panel: NotchPanel) -> NSRect {
         let panelFrame = panel.frame
-        let petSize: CGFloat = 60
+        // 宠物贴在 panel 顶部，上半身藏在 notch 里
+        // 点击区域 = notch 下沿往下 petSize 高度（覆盖宠物可见部分）
+        let visibleTop = panelFrame.maxY - notchHeight
         return NSRect(
             x: panelFrame.midX - petSize / 2,
-            y: panelFrame.maxY - petSize - 5,
+            y: visibleTop - petSize,
             width: petSize,
             height: petSize
         )
     }
 
-    /// 飞回目标位置
-    func animateToFrame(_ frame: NSRect) {
-        guard let panel else { return }
+    /// 飞回目标位置，动画完成后执行回调
+    func animateToFrame(_ frame: NSRect, completion: (() -> Void)? = nil) {
+        guard let panel else { completion?(); return }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.4
+            context.duration = 0.35
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
+        }, completionHandler: {
+            panel.setFrame(frame, display: false)
+            completion?()
         })
     }
 }

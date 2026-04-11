@@ -3,12 +3,14 @@ import AppKit
 final class MenuBarManager {
     private var statusItem: NSStatusItem?
     private let menu = NSMenu()
+    private weak var sessionManager: SessionManager?
 
-    var onResize: ((CGFloat) -> Void)?
     var onSwitchScreen: ((NSScreen) -> Void)?
     var onQuit: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
 
-    func setup() {
+    func setup(sessionManager: SessionManager) {
+        self.sessionManager = sessionManager
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "ladybug.fill", accessibilityDescription: "Notchikko")
@@ -16,22 +18,33 @@ final class MenuBarManager {
         statusItem?.menu = buildMenu()
     }
 
+    @discardableResult
     func buildMenu() -> NSMenu {
         menu.removeAllItems()
 
-        // 大小
-        let sizeMenu = NSMenu()
-        for (label, scale) in [("小", 0.6), ("中", 1.0), ("大", 1.5)] {
-            let item = NSMenuItem(title: label, action: #selector(sizeSelected(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = Int(scale * 100)
-            sizeMenu.addItem(item)
-        }
-        let sizeItem = NSMenuItem(title: "大小", action: nil, keyEquivalent: "")
-        sizeItem.submenu = sizeMenu
-        menu.addItem(sizeItem)
+        // Section 1: Sessions
+        if let sm = sessionManager {
+            let sessions = sm.activeSessions
+            if !sessions.isEmpty {
+                let header = NSMenuItem(title: "Sessions", action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                menu.addItem(header)
 
-        // 显示器
+                for session in sessions {
+                    let icon = agentIcon(for: session.source)
+                    let title = "\(icon) #\(session.id.prefix(6)) — \(session.phaseDisplayName)  \(session.cwdName)"
+                    let item = NSMenuItem(title: title, action: #selector(pinSession(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = session.id
+                    item.state = (session.id == sm.pinnedSessionId) ? .on : .off
+                    menu.addItem(item)
+                }
+
+                menu.addItem(.separator())
+            }
+        }
+
+        // Section 2: 显示器
         let screens = NSScreen.screens
         if screens.count > 1 {
             let screenMenu = NSMenu()
@@ -50,6 +63,11 @@ final class MenuBarManager {
             menu.addItem(screenItem)
         }
 
+        // 设置
+        let settingsItem = NSMenuItem(title: "设置...", action: #selector(openSettings(_:)), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
         menu.addItem(.separator())
 
         // 退出
@@ -57,12 +75,28 @@ final class MenuBarManager {
         quitItem.target = self
         menu.addItem(quitItem)
 
+        menu.addItem(.separator())
+
+        // 版本号
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2"
+        let versionItem = NSMenuItem(title: "Notchikko v\(version)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+
         return menu
     }
 
-    @objc private func sizeSelected(_ sender: NSMenuItem) {
-        let scale = CGFloat(sender.tag) / 100.0
-        onResize?(scale)
+    // MARK: - Actions
+
+    @objc private func pinSession(_ sender: NSMenuItem) {
+        guard let sessionId = sender.representedObject as? String else { return }
+        guard let sm = sessionManager else { return }
+        // 再次点击已绑定的 session → 取消绑定（回到自动模式）
+        if sm.pinnedSessionId == sessionId {
+            sm.pinSession(nil)
+        } else {
+            sm.pinSession(sessionId)
+        }
     }
 
     @objc private func screenSelected(_ sender: NSMenuItem) {
@@ -71,12 +105,27 @@ final class MenuBarManager {
         onSwitchScreen?(screens[sender.tag])
     }
 
+    @objc private func openSettings(_ sender: NSMenuItem) {
+        onOpenSettings?()
+    }
+
     @objc private func quitApp(_ sender: NSMenuItem) {
         onQuit?()
     }
 
+    // MARK: - Helpers
+
+    private func agentIcon(for source: String) -> String {
+        switch source {
+        case "claude-code": return "🤖"
+        case "codex": return "📦"
+        default: return "🔧"
+        }
+    }
+
     /// 在指定位置弹出右键菜单
     func showContextMenu(in view: NSWindow, at point: NSPoint) {
+        buildMenu()
         menu.popUp(positioning: nil, at: point, in: view.contentView)
     }
 }

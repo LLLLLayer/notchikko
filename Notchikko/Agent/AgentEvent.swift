@@ -1,6 +1,6 @@
 import Foundation
 
-/// Claude Code hook 脚本发来的原始 JSON
+/// Hook 脚本发来的原始 JSON（所有 CLI 共用同一格式）
 struct HookEvent: Decodable {
     let sessionId: String
     let cwd: String
@@ -8,11 +8,14 @@ struct HookEvent: Decodable {
     let status: String
     let tool: String?
     let toolInput: [String: AnyCodableValue]?
+    let source: String?
+    let requestId: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case cwd, event, status, tool
+        case cwd, event, status, tool, source
         case toolInput = "tool_input"
+        case requestId = "request_id"
     }
 }
 
@@ -36,7 +39,7 @@ enum AnyCodableValue: Decodable {
 
 /// 统一事件模型（多 Agent 通用）
 enum AgentEvent {
-    case sessionStart(sessionId: String, cwd: String)
+    case sessionStart(sessionId: String, cwd: String, source: String)
     case sessionEnd(sessionId: String)
     case prompt(sessionId: String)
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)
