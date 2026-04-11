@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -16 18 11" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe-anim {
+        transform-origin: 7.5px -7px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      .eyes-blink {
+        transform-origin: 7.5px -9px;
+        animation: eye-blink 4s infinite ease-in-out;
+      }
+
+      #eyes-js, #body-js {
+        transition: transform 0.2s ease-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, -0.5px); }
+      }
+
+      @keyframes eye-blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+    </style>
+  </defs>
+
+  <!-- 整体翻转: scale(1,-1) 以 y=0 为轴 -->
+  <g transform="scale(1, -1)">
+    <!-- Static Legs (now pointing up = attached to notch) -->
+    <g id="legs" fill="#DE886D">
+      <rect x="3" y="11" width="1" height="4"/>
+      <rect x="5" y="11" width="1" height="4"/>
+      <rect x="9" y="11" width="1" height="4"/>
+      <rect x="11" y="11" width="1" height="4"/>
+    </g>
+
+    <!-- Upper Body (now hanging down) -->
+    <g id="body-js">
+      <g class="breathe-anim">
+        <!-- Torso -->
+        <rect id="torso" x="2" y="6" width="11" height="7" fill="#DE886D"/>
+        <!-- Left Arm -->
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Right Arm -->
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Eyes -->
+        <g id="eyes-js" fill="#000000">
+          <g class="eyes-blink">
+            <rect x="4" y="8" width="1" height="2"/>
+            <rect x="10" y="8" width="1" height="2"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
