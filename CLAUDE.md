@@ -40,7 +40,7 @@ CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → Session
 
 - **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `DragController` handles drag with 5pt threshold, hit area padded +20px. Cross-screen drag rebuilds the window on the target screen; same-screen drag animates back to home position.
 
-- **Approval** — Separate `NSPanel` window (independent of pet panel — doesn't move during drag). `ApprovalManager` manages pending requests. Only Bash/Edit/Write/NotebookEdit require approval. Hook script checks `skipDangerousModePermissionPrompt` to skip when bypass mode is on. "Auto Approve" button writes `skipDangerousModePermissionPrompt: true` to `~/.claude/settings.json`.
+- **Approval** — Separate `NSPanel` window. `ApprovalManager` manages pending requests with 300s stale timer. Only Bash/Edit/Write/NotebookEdit require approval. Hook script checks `permission_mode` from CLI stdin (`bypassPermissions` = `--dangerously-skip-permissions`). Three buttons: Deny / Allow Once / Allow All (session-scoped, in-memory). Session-level auto-approve stored in `autoApprovedSessions` set. Auto-dismisses when CLI-side approval detected (PostToolUse/prompt/stop events).
 
 - **Preferences** — `PreferencesStore` (@Observable) auto-saves on `didSet` with 100ms debounce. Only `petScale` and `themeId` changes trigger window rebuild notification.
 
@@ -54,7 +54,13 @@ CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → Session
 
 Built-in SVGs live in `Resources/themes/clawd/{state}/{state}-default.svg` (e.g. `idle/idle-default.svg`, `building/building-default.svg`). Xcode flattens subdirectories at build time — `ThemeProvider.builtinSVG(for:)` scans the resource bundle for files matching the `{state.rawValue}-` prefix. Each state directory can hold multiple SVG variants — ThemeProvider picks one at random on each transition.
 
-Custom theme packs go in `~/.notchikko/themes/{id}/` with a `theme.json` manifest. Resolution order: custom theme directory → single `{state}.svg` flat file → built-in fallback.
+Custom theme packs go in `~/.notchikko/themes/{id}/` with a `theme.json` manifest. Resolution order: custom theme directory → single `{state}.svg` flat file → built-in fallback. External theme SVGs are sanitized via `SVGSanitizer` (strips `<script>`, event handlers, `javascript:` URLs).
+
+`theme.json` manifest supports optional fields: `sounds` (state→filename mapping), `eyeTracking`, `reactions` (click/drag SVGs), `viewBox`, `workingTiers` (multi-session animations). All optional and backward compatible.
+
+### Sound System
+
+`SoundManager` plays audio on state transitions with 2-second per-state cooldown. Three-tier resolution: user custom sounds (`~/Application Support/notchikko/sounds/`) → theme sounds (`themes/{id}/sounds/`, using manifest `sounds` mapping then directory scan) → built-in sounds (bundle `.wav`). Soundable states: happy, error, thinking, approving, nod, shake. Volume: mute/low/medium/high via PreferencesStore.
 
 ### State Transitions & Priority
 

@@ -107,18 +107,31 @@ final class SoundManager {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// 当前主题的音效（主题目录下 sounds/{stateName}.{ext}）
+    /// 当前主题的音效
+    /// 优先用 theme.json 的 sounds 映射，fallback 到目录扫描 sounds/{stateName}.{ext}
     private func themeSoundURL(for stateName: String) -> URL? {
         let themeId = PreferencesStore.shared.preferences.themeId
-        guard themeId != "clawd" else { return nil }  // 内置主题走 builtin 路径
+        guard themeId != ThemeProvider.builtinThemeId else { return nil }
 
-        let themeDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notchikko/themes/\(themeId)/sounds")
-        guard FileManager.default.fileExists(atPath: themeDir.path) else { return nil }
+        let themeBaseDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".notchikko/themes/\(themeId)")
+        let soundsDir = themeBaseDir.appendingPathComponent("sounds")
 
-        // 搜索 stateName.wav / .mp3 / .aiff / .m4a
+        // 1. manifest.sounds 映射（theme.json 指定的文件名）
+        let manifestURL = themeBaseDir.appendingPathComponent("theme.json")
+        if let data = try? Data(contentsOf: manifestURL),
+           let manifest = try? JSONDecoder().decode(ThemeManifest.self, from: data),
+           let fileName = manifest.sounds?[stateName] {
+            let url = soundsDir.appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+
+        // 2. 目录扫描 fallback（按约定文件名搜索）
+        guard FileManager.default.fileExists(atPath: soundsDir.path) else { return nil }
         for ext in ["wav", "mp3", "aiff", "m4a"] {
-            let url = themeDir.appendingPathComponent("\(stateName).\(ext)")
+            let url = soundsDir.appendingPathComponent("\(stateName).\(ext)")
             if FileManager.default.fileExists(atPath: url.path) {
                 return url
             }
