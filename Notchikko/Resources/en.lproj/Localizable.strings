@@ -2,7 +2,7 @@
 "menu.sessions" = "Sessions";
 "menu.auto" = "🔄 Auto (track latest)";
 "menu.display" = "Display";
-"menu.settings" = "Settings...";
+"menu.settings" = "More Settings...";
 "menu.quit" = "Quit Notchikko";
 
 /* SettingsWindow - Tabs */
@@ -12,18 +12,22 @@
 "settings.cli" = "CLI Integration";
 
 /* SettingsWindow - General */
-"settings.approval_delay" = "Approval card hide delay";
+"settings.approval" = "Approval";
+"settings.approval_card" = "Show approval card";
+"settings.approval_delay" = "Auto-hide delay";
 "settings.seconds_3" = "3 sec";
 "settings.seconds_5" = "5 sec";
 "settings.seconds_10" = "10 sec";
 "settings.never_hide" = "Never hide";
 
 /* SettingsWindow - Display */
-"settings.pet_size" = "Pet size";
-"settings.size_small" = "Small (0.6x)";
-"settings.size_medium" = "Medium (1.0x)";
-"settings.size_large" = "Large (1.5x)";
-"settings.theme" = "Theme";
+"settings.pet_size" = "Notchikko size";
+"settings.size_small" = "Small";
+"settings.size_medium" = "Medium";
+"settings.size_large" = "Large";
+"settings.theme" = "Notchikko theme";
+"settings.sound_theme" = "Sound theme";
+"sound.theme.arcade" = "Arcade";
 "settings.import_theme" = "Import Theme...";
 "settings.import_theme_msg" = "Select a theme folder containing theme.json and SVG files";
 
@@ -44,7 +48,8 @@
 "settings.hook_installed" = "Hook status: ✅ Installed";
 "settings.hook_not_installed" = "Hook status: ❌ Not installed";
 "settings.install_hook" = "Install Hook";
-"settings.uninstall_hook" = "Uninstall Hook";
+"settings.reinstall_hook" = "Reinstall";
+"settings.uninstall_hook" = "Uninstall";
 "settings.bypass_active" = "Auto Approve is ON — all tools auto-approved globally. This was set from the approval card.";
 "settings.disable_bypass" = "Disable";
 "settings.coming_soon" = "Coming Soon";
@@ -56,6 +61,7 @@
 "approval.allow_all" = "Allow All";
 "approval.auto_approve" = "Auto Approve";
 "approval.jump_to_terminal" = "Jump to terminal";
+"approval.submit" = "Submit";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "idle";

@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe-anim {
+        transform-origin: 7.5px -9px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      .lens-glow {
+        animation: lens-pulse 0.8s infinite ease-in-out alternate;
+      }
+
+      .arm-wave-left {
+        transform-origin: 0px -9.5px;
+        animation: arm-wave 2s infinite ease-in-out;
+      }
+
+      .arm-wave-right {
+        transform-origin: 15px -9.5px;
+        animation: arm-wave 2s 0.5s infinite ease-in-out;
+      }
+
+      .particle1 { animation: orbit1 2s infinite linear; }
+      .particle2 { animation: orbit2 2s 0.33s infinite linear; }
+      .particle3 { animation: orbit3 2s 0.66s infinite linear; }
+      .particle4 { animation: orbit4 2s 1s infinite linear; }
+      .particle5 { animation: orbit5 2s 1.33s infinite linear; }
+      .particle6 { animation: orbit6 2s 1.66s infinite linear; }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, -0.5px); }
+      }
+
+      @keyframes lens-pulse {
+        0% { opacity: 0.6; }
+        100% { opacity: 1; }
+      }
+
+      @keyframes arm-wave {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(10deg); }
+        75% { transform: rotate(-10deg); }
+      }
+
+      @keyframes orbit1 {
+        0% { transform: translate(0px, 0px); }
+        25% { transform: translate(3px, -2px); }
+        50% { transform: translate(0px, -4px); }
+        75% { transform: translate(-3px, -2px); }
+        100% { transform: translate(0px, 0px); }
+      }
+      @keyframes orbit2 {
+        0% { transform: translate(2px, -1px); }
+        25% { transform: translate(-1px, -3px); }
+        50% { transform: translate(-3px, 0px); }
+        75% { transform: translate(0px, 2px); }
+        100% { transform: translate(2px, -1px); }
+      }
+      @keyframes orbit3 {
+        0% { transform: translate(-2px, -3px); }
+        25% { transform: translate(1px, -1px); }
+        50% { transform: translate(3px, -3px); }
+        75% { transform: translate(0px, -5px); }
+        100% { transform: translate(-2px, -3px); }
+      }
+      @keyframes orbit4 {
+        0% { transform: translate(3px, -4px); }
+        25% { transform: translate(0px, -1px); }
+        50% { transform: translate(-2px, -4px); }
+        75% { transform: translate(1px, -5px); }
+        100% { transform: translate(3px, -4px); }
+      }
+      @keyframes orbit5 {
+        0% { transform: translate(-1px, 0px); }
+        25% { transform: translate(2px, -3px); }
+        50% { transform: translate(4px, -1px); }
+        75% { transform: translate(1px, 1px); }
+        100% { transform: translate(-1px, 0px); }
+      }
+      @keyframes orbit6 {
+        0% { transform: translate(1px, -2px); }
+        25% { transform: translate(-2px, -4px); }
+        50% { transform: translate(1px, -5px); }
+        75% { transform: translate(3px, -1px); }
+        100% { transform: translate(1px, -2px); }
+      }
+    </style>
+  </defs>
+
+  <g transform="scale(1,-1)">
+    <!-- Shadow -->
+    <rect x="3" y="15" width="9" height="1" fill="#00000030"/>
+
+    <!-- Legs -->
+    <g id="legs" fill="#DE886D">
+      <rect x="3" y="12" width="1" height="3"/>
+      <rect x="5" y="12" width="1" height="3"/>
+      <rect x="9" y="12" width="1" height="3"/>
+      <rect x="11" y="12" width="1" height="3"/>
+    </g>
+
+    <!-- Upper Body -->
+    <g class="breathe-anim">
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+
+      <!-- VR Headset -->
+      <rect x="2" y="6" width="11" height="3" fill="#212121"/>
+
+      <!-- Headset strap -->
+      <rect x="1" y="7" width="1" height="1" fill="#424242"/>
+      <rect x="13" y="7" width="1" height="1" fill="#424242"/>
+
+      <!-- Lens glow -->
+      <rect x="4" y="7" width="2" height="1" fill="#00BCD4" class="lens-glow"/>
+      <rect x="9" y="7" width="2" height="1" fill="#00BCD4" class="lens-glow"/>
+
+      <!-- Virtual data particles -->
+      <rect class="particle1" x="3" y="6" width="0.5" height="0.5" fill="#00BCD4"/>
+      <rect class="particle2" x="6" y="5" width="0.5" height="0.5" fill="#76FF03"/>
+      <rect class="particle3" x="9" y="6" width="0.5" height="0.5" fill="#FF4081"/>
+      <rect class="particle4" x="11" y="5" width="0.5" height="0.5" fill="#00BCD4"/>
+      <rect class="particle5" x="4" y="4" width="0.5" height="0.5" fill="#76FF03"/>
+      <rect class="particle6" x="8" y="4" width="0.5" height="0.5" fill="#FF4081"/>
+
+      <!-- Arms extended (controllers) -->
+      <g class="arm-wave-left">
+        <rect x="-1" y="9" width="2" height="1" fill="#424242"/>
+      </g>
+      <g class="arm-wave-right">
+        <rect x="14" y="9" width="2" height="1" fill="#424242"/>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -173,25 +173,44 @@ try:
 except:
     pass
 
-bypass_permissions = (permission_mode == 'bypassPermissions')
-
-# PreToolUse 阻塞审批 — 仅修改型工具 + 未开启 bypass
+# 审批 / AskUserQuestion 判定
 approval_tools = {'Bash', 'Edit', 'Write', 'NotebookEdit'}
 tool_name = input_data.get('tool_name', '')
+tool_input = input_data.get('tool_input', {})
+bypass = (permission_mode == 'bypassPermissions')
+
+# 读取 app 的审批开关
+approval_enabled = False
+try:
+    prefs_path = os.path.expanduser('~/Library/Application Support/notchikko/preferences.json')
+    with open(prefs_path) as f:
+        prefs = json.load(f)
+    approval_enabled = prefs.get('approvalCardEnabled', False)
+except:
+    pass
+
+# AskUserQuestion 检测：
+# - Claude Code 可能通过 PreToolUse 或 Elicitation 发送
+# - tool_name 可能是 AskUserQuestion 或在 tool_input 中
+# AskUserQuestion 不阻塞（CLI 不支持 updatedInput，用户需在终端操作）
+# 仅正常审批阻塞
 needs_approval = (hook_event == 'PreToolUse'
                   and tool_name in approval_tools
-                  and not bypass_permissions)
+                  and approval_enabled
+                  and not bypass)
 
-if needs_approval:
+needs_blocking = needs_approval
+
+if needs_blocking:
     output['request_id'] = str(uuid.uuid4())
 
 try:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.settimeout(2 if not needs_approval else 300)
+    sock.settimeout(2 if not needs_blocking else 300)
     sock.connect('$SOCKET_PATH')
     sock.sendall(json.dumps(output).encode())
 
-    if needs_approval:
+    if needs_blocking:
         sock.settimeout(300)
         response_data = b''
         while True:
@@ -211,6 +230,6 @@ try:
                 break
     sock.close()
 except:
-    if needs_approval:
+    if needs_blocking:
         print(json.dumps({'decision': 'allow'}))
 " 2>/dev/null

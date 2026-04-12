@@ -2,8 +2,8 @@ import Foundation
 
 @MainActor @Observable
 final class ApprovalManager {
-    private(set) var pendingApproval: ApprovalRequest?
-    private(set) var isCardVisible: Bool = false
+    var pendingApproval: ApprovalRequest?
+    var isCardVisible: Bool = false
 
     private var hideTimer: Task<Void, Never>?
     private var staleTimer: Task<Void, Never>?
@@ -18,6 +18,8 @@ final class ApprovalManager {
         let tool: String
         let input: String
         let sessionId: String
+        let cwdName: String        // 项目名
+        let terminalName: String   // 终端类型
         let timestamp: Date
     }
 
@@ -27,7 +29,7 @@ final class ApprovalManager {
 
     // MARK: - 请求处理
 
-    func handleApprovalRequest(from hookEvent: HookEvent) {
+    func handleApprovalRequest(from hookEvent: HookEvent, session: SessionManager.SessionInfo?) {
         // 如果该 session 已设为"全部允许"，直接放行
         if autoApprovedSessions.contains(hookEvent.sessionId) {
             let requestId = hookEvent.requestId ?? ""
@@ -50,6 +52,8 @@ final class ApprovalManager {
             tool: hookEvent.tool ?? "",
             input: String(toolInput.prefix(500)),
             sessionId: hookEvent.sessionId,
+            cwdName: session?.cwdName ?? "",
+            terminalName: session?.matchedTerminal?.appName ?? "",
             timestamp: Date()
         )
 

@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-origin: 7.5px 8px;
+        animation: blink 4s infinite;
+      }
+      .float-bob {
+        transform-origin: 7.5px 15px;
+        animation: float-bob 2s infinite ease-in-out;
+      }
+      .antenna-blink {
+        animation: antenna-blink 0.5s infinite;
+      }
+      .star1 { animation: twinkle 1.5s 0s infinite; }
+      .star2 { animation: twinkle 1.5s 0.4s infinite; }
+      .star3 { animation: twinkle 1.5s 0.8s infinite; }
+      .star4 { animation: twinkle 1.5s 1.2s infinite; }
+      .star5 { animation: twinkle 2s 0.2s infinite; }
+      .star6 { animation: twinkle 2s 1s infinite; }
+      /* Notification badge pulse */
+      .noti-badge {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: noti-pulse 0.8s infinite ease-in-out;
+      }
+      .noti-ring {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: noti-ring 1.5s infinite ease-out;
+      }
+      /* Exclamation blink */
+      .noti-blink {
+        animation: noti-blink 0.6s infinite;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-float 2s infinite ease-in-out;
+      }
+
+      /* Radio wave arcs emanating from antenna */
+      .wave1 { animation: radio-wave 1.5s 0s infinite ease-out; }
+      .wave2 { animation: radio-wave 1.5s 0.5s infinite ease-out; }
+      .wave3 { animation: radio-wave 1.5s 1.0s infinite ease-out; }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1); }
+        50% { transform: scale(1.02, 0.98); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes float-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+      }
+      @keyframes antenna-blink {
+        0%, 30% { fill: #FF5252; opacity: 1; }
+        40%, 60% { fill: #FF5252; opacity: 0.15; }
+        70%, 100% { fill: #FF5252; opacity: 1; }
+      }
+      @keyframes twinkle {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.1; }
+      }
+      @keyframes shadow-float {
+        0%, 100% { transform: scaleX(1); opacity: 0.5; }
+        50% { transform: scaleX(0.85); opacity: 0.35; }
+      }
+      @keyframes radio-wave {
+        0% { transform: translate(0, 0) scale(0.3); opacity: 0.9; }
+        100% { transform: translate(3px, -3px) scale(1.2); opacity: 0; }
+      }
+      @keyframes noti-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+      }
+      @keyframes noti-ring {
+        0% { transform: scale(1); opacity: 0.8; }
+        100% { transform: scale(2.5); opacity: 0; }
+      }
+      @keyframes noti-blink {
+        0%, 60%, 100% { opacity: 1; }
+        30% { opacity: 0.2; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Stars background -->
+  <rect class="star1" x="-5" y="3" width="0.8" height="0.8" fill="#FFF"/>
+  <rect class="star2" x="20" y="6" width="0.6" height="0.6" fill="#FFF"/>
+  <rect class="star3" x="-3" y="10" width="0.7" height="0.7" fill="#FFF"/>
+  <rect class="star4" x="18" y="2" width="0.5" height="0.5" fill="#FFF"/>
+  <rect class="star5" x="-6" y="7" width="0.6" height="0.6" fill="#FFEB3B"/>
+  <rect class="star6" x="21" y="10" width="0.7" height="0.7" fill="#FFEB3B"/>
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Legs -->
+  <g class="float-bob" fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group: float > breathe -->
+  <g class="float-bob">
+    <g class="breathe">
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Helmet dome -->
+      <rect x="2" y="3" width="11" height="1" fill="#E0E0E0"/>
+      <rect x="1" y="4" width="13" height="1" fill="#E0E0E0"/>
+      <!-- Helmet sides -->
+      <rect x="1" y="5" width="1" height="5" fill="#E0E0E0"/>
+      <rect x="13" y="5" width="1" height="5" fill="#E0E0E0"/>
+      <!-- Helmet bottom -->
+      <rect x="1" y="10" width="13" height="1" fill="#E0E0E0"/>
+      <!-- Visor -->
+      <rect x="3" y="5" width="9" height="4" fill="#BBDEFB" opacity="0.5"/>
+
+      <!-- Antenna -->
+      <rect x="7" y="1" width="1" height="2" fill="#9E9E9E"/>
+      <!-- Antenna light (faster blink) -->
+      <rect class="antenna-blink" x="6" y="0" width="3" height="1" fill="#FF5252"/>
+
+      <!-- Radio wave arcs from antenna -->
+      <g transform="translate(9, 0)">
+        <g class="wave1">
+          <rect x="0" y="-1" width="2" height="0.6" fill="#FF5252" opacity="0.7"/>
+          <rect x="1.5" y="-0.5" width="0.6" height="1.5" fill="#FF5252" opacity="0.5"/>
+        </g>
+        <g class="wave2">
+          <rect x="0.5" y="-1.5" width="2.5" height="0.5" fill="#FF8A80" opacity="0.6"/>
+          <rect x="2" y="-1" width="0.5" height="2" fill="#FF8A80" opacity="0.4"/>
+        </g>
+        <g class="wave3">
+          <rect x="1" y="-2" width="3" height="0.5" fill="#FFCDD2" opacity="0.5"/>
+          <rect x="2.8" y="-1.5" width="0.5" height="2.5" fill="#FFCDD2" opacity="0.3"/>
+        </g>
+      </g>
+
+      <!-- Eyes behind visor -->
+      <g class="blink" fill="#000">
+        <rect x="5" y="8" width="1" height="1"/>
+        <rect x="10" y="8" width="1" height="1"/>
+      </g>
+
+      <!-- Arms -->
+      <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+      <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+
+      <!-- Notification badge (on helmet) -->
+      <g>
+        <!-- Ring expand effect -->
+        <rect class="noti-ring" x="12" y="3" width="3" height="3" rx="1" fill="none" stroke="#FF5252" stroke-width="0.3"/>
+        <!-- Badge -->
+        <rect class="noti-badge" x="12.5" y="3.5" width="2" height="2" rx="1" fill="#FF5252"/>
+        <!-- Exclamation mark -->
+        <rect class="noti-blink" x="13.2" y="3.8" width="0.6" height="0.8" fill="#FFF"/>
+        <rect class="noti-blink" x="13.2" y="4.9" width="0.6" height="0.4" fill="#FFF"/>
+      </g>
+
+    </g>
+  </g>
+
+  </g>
+</svg>

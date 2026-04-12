@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .victory-bounce {
+        transform-origin: 7.5px 15px;
+        animation: victory-bounce 1s infinite ease-in-out;
+      }
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-origin: 7.5px 8px;
+        animation: blink 4s infinite;
+      }
+      .cape-flutter {
+        transform-origin: 7.5px 7px;
+        animation: cape-flutter 1.2s infinite ease-in-out;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-bounce 1s infinite ease-in-out;
+      }
+      .arm-l-raise {
+        transform-box: fill-box;
+        transform-origin: 100% 50%;
+        animation: arm-raise-l 0.3s infinite alternate ease-in-out;
+      }
+      .arm-r-raise {
+        transform-box: fill-box;
+        transform-origin: 0% 50%;
+        animation: arm-raise-r 0.3s infinite alternate ease-in-out;
+      }
+
+      /* Sparkle animations from happy reference */
+      .spark-center {
+        opacity: 0;
+        animation: flash-center 1.5s infinite step-end;
+        animation-delay: var(--delay, 0s);
+      }
+      .spark-outer {
+        opacity: 0;
+        animation: flash-outer 1.5s infinite step-end;
+        animation-delay: var(--delay, 0s);
+      }
+
+      @keyframes victory-bounce {
+        0%, 15%, 100% { transform: translateY(0) scaleY(1); }
+        20% { transform: translateY(0) scaleY(0.88); }
+        40% { transform: translateY(-8px) scaleY(1.04); }
+        50% { transform: translateY(-10px) scaleY(1); }
+        60% { transform: translateY(-8px) scaleY(1.04); }
+        80% { transform: translateY(0) scaleY(0.88); }
+        85% { transform: translateY(0) scaleY(1); }
+      }
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1); }
+        50% { transform: scale(1.02, 0.98); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes cape-flutter {
+        0%, 100% { transform: skewX(0deg) scaleX(1); }
+        25% { transform: skewX(4deg) scaleX(1.06); }
+        75% { transform: skewX(-4deg) scaleX(0.94); }
+      }
+      @keyframes shadow-bounce {
+        0%, 15%, 100% { transform: scaleX(1); opacity: 0.5; }
+        20% { transform: scaleX(1.08); opacity: 0.6; }
+        40% { transform: scaleX(0.65); opacity: 0.25; }
+        50% { transform: scaleX(0.55); opacity: 0.2; }
+        60% { transform: scaleX(0.65); opacity: 0.25; }
+        80% { transform: scaleX(1.08); opacity: 0.6; }
+        85% { transform: scaleX(1); opacity: 0.5; }
+      }
+      @keyframes arm-raise-l {
+        0% { transform: rotate(20deg); }
+        100% { transform: rotate(35deg); }
+      }
+      @keyframes arm-raise-r {
+        0% { transform: rotate(-20deg); }
+        100% { transform: rotate(-35deg); }
+      }
+      @keyframes flash-center {
+        0%  { opacity: 0; }
+        10% { opacity: 1; }
+        30% { opacity: 0; }
+        100%{ opacity: 0; }
+      }
+      @keyframes flash-outer {
+        0%  { opacity: 0; }
+        20% { opacity: 1; }
+        40% { opacity: 0; }
+        100%{ opacity: 0; }
+      }
+    </style>
+
+    <!-- Reusable Pixel Art Sparkle -->
+    <g id="px-sparkle">
+      <rect class="spark-center" x="-0.5" y="-0.5" width="1" height="1" />
+      <path class="spark-outer" d="M -0.5,-1.5 h1 v1 h-1 z
+                                   M -0.5,0.5 h1 v1 h-1 z
+                                   M -1.5,-0.5 h1 v1 h-1 z
+                                   M 0.5,-0.5 h1 v1 h-1 z" />
+    </g>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Victory Sparkles -->
+  <g>
+    <use href="#px-sparkle" x="-4" y="-2" fill="#FBC02D" style="--delay: 0.0s"/>
+    <use href="#px-sparkle" x="18" y="-4" fill="#FFF59D" style="--delay: 0.3s"/>
+    <use href="#px-sparkle" x="20" y="10" fill="#FBC02D" style="--delay: 0.6s"/>
+    <use href="#px-sparkle" x="-6" y="8" fill="#FFF59D" style="--delay: 0.9s"/>
+    <use href="#px-sparkle" x="7" y="-8" fill="#FBC02D" style="--delay: 1.2s"/>
+    <use href="#px-sparkle" x="-2" y="4" fill="#FFF59D" style="--delay: 0.5s"/>
+  </g>
+
+  <!-- Legs -->
+  <g class="victory-bounce" fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group: bounce > breathe -->
+  <g class="victory-bounce">
+    <g class="breathe">
+
+      <!-- Cape BEHIND body (dramatic flutter) -->
+      <g class="cape-flutter">
+        <rect x="3" y="7" width="9" height="8" fill="#E53935"/>
+        <rect x="2" y="8" width="1" height="6" fill="#C62828"/>
+        <rect x="12" y="8" width="1" height="6" fill="#C62828"/>
+        <rect x="4" y="15" width="3" height="1" fill="#E53935"/>
+        <rect x="9" y="15" width="2" height="1" fill="#E53935"/>
+      </g>
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Blue mask -->
+      <rect x="4" y="7" width="3" height="2" fill="#1E88E5"/>
+      <rect x="8" y="7" width="3" height="2" fill="#1E88E5"/>
+
+      <!-- Gold emblem -->
+      <rect x="6" y="9" width="3" height="1" fill="#FBC02D"/>
+
+      <!-- Eyes through mask -->
+      <g class="blink" fill="#FFF">
+        <rect x="5" y="8" width="1" height="1"/>
+        <rect x="10" y="8" width="1" height="1"/>
+      </g>
+
+      <!-- Arms raised in victory -->
+      <g class="arm-l-raise">
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+      <g class="arm-r-raise">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+
+    </g>
+  </g>
+
+  </g>
+</svg>

@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-origin: 7.5px 8px;
+        animation: blink 4s infinite;
+      }
+      .eyes-focus {
+        animation: eyes-focus 4s infinite ease-in-out;
+      }
+      .paint-arm {
+        transform-origin: 14px 10px;
+        animation: paint-stroke 0.8s infinite ease-in-out;
+      }
+      .body-rock {
+        transform-origin: 7.5px 12px;
+        animation: body-rock 0.8s infinite ease-in-out;
+      }
+      /* Code-like text lines appearing on canvas */
+      .code-line1 { opacity: 0; animation: code-appear1 4.8s infinite; }
+      .code-line2 { opacity: 0; animation: code-appear2 4.8s infinite; }
+      .code-line3 { opacity: 0; animation: code-appear3 4.8s infinite; }
+      .code-line4 { opacity: 0; animation: code-appear4 4.8s infinite; }
+      .drip {
+        opacity: 0;
+        animation: paint-drip 2.4s infinite;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-pulse 0.8s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1); }
+        50% { transform: scale(1.02, 0.98); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes eyes-focus {
+        0%, 100% { transform: translate(-0.7px, 0); }
+        50% { transform: translate(-0.5px, 0.2px); }
+      }
+      /* More rhythmic typing-like cadence for the brush */
+      @keyframes paint-stroke {
+        0% { transform: rotate(-20deg); }
+        15% { transform: rotate(30deg); }
+        30% { transform: rotate(-15deg); }
+        45% { transform: rotate(25deg); }
+        60% { transform: rotate(-20deg); }
+        75% { transform: rotate(30deg); }
+        100% { transform: rotate(-20deg); }
+      }
+      @keyframes body-rock {
+        0%, 100% { transform: translateX(-0.5px); }
+        50% { transform: translateX(0.5px); }
+      }
+      /* Code lines grow from left like writing code */
+      @keyframes code-appear1 {
+        0%, 5% { opacity: 0; transform: scaleX(0); }
+        6% { opacity: 1; transform: scaleX(0); }
+        20% { opacity: 1; transform: scaleX(1); }
+        80% { opacity: 1; transform: scaleX(1) translateY(0); }
+        95% { opacity: 0; transform: scaleX(1) translateY(-2px); }
+        100% { opacity: 0; }
+      }
+      @keyframes code-appear2 {
+        0%, 20% { opacity: 0; transform: scaleX(0); }
+        21% { opacity: 1; transform: scaleX(0); }
+        38% { opacity: 1; transform: scaleX(1); }
+        82% { opacity: 1; transform: scaleX(1) translateY(0); }
+        96% { opacity: 0; transform: scaleX(1) translateY(-2px); }
+        100% { opacity: 0; }
+      }
+      @keyframes code-appear3 {
+        0%, 38% { opacity: 0; transform: scaleX(0); }
+        39% { opacity: 1; transform: scaleX(0); }
+        55% { opacity: 1; transform: scaleX(1); }
+        84% { opacity: 1; transform: scaleX(1) translateY(0); }
+        97% { opacity: 0; transform: scaleX(1) translateY(-2px); }
+        100% { opacity: 0; }
+      }
+      @keyframes code-appear4 {
+        0%, 55% { opacity: 0; transform: scaleX(0); }
+        56% { opacity: 1; transform: scaleX(0); }
+        72% { opacity: 1; transform: scaleX(1); }
+        86% { opacity: 1; transform: scaleX(1) translateY(0); }
+        98% { opacity: 0; transform: scaleX(1) translateY(-2px); }
+        100% { opacity: 0; }
+      }
+      @keyframes paint-drip {
+        0%, 30% { opacity: 0; transform: translate(0, 0); }
+        35% { opacity: 0.8; transform: translate(0, 0); }
+        80% { opacity: 0; transform: translate(0, 3px); }
+        100% { opacity: 0; }
+      }
+      @keyframes shadow-pulse {
+        0%, 100% { transform: scaleX(1); opacity: 0.5; }
+        50% { transform: scaleX(1.02); opacity: 0.52; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Easel (behind character) -->
+  <g>
+    <!-- Easel leg -->
+    <rect x="-2" y="11" width="1" height="4" fill="#795548"/>
+    <!-- Canvas frame -->
+    <rect x="-3" y="5" width="4" height="1" fill="#795548"/>
+    <!-- Canvas -->
+    <rect x="-3" y="6" width="4" height="5" fill="#FFF"/>
+    <!-- Code-like text lines appearing on canvas (like writing code) -->
+    <g style="transform-origin: left center;">
+      <rect class="code-line1" x="-2.7" y="6.5" width="2.4" height="0.5" fill="#1A1A2E"/>
+      <rect class="code-line2" x="-2.3" y="7.4" width="3.0" height="0.5" fill="#1A1A2E"/>
+      <rect class="code-line3" x="-2.3" y="8.3" width="1.8" height="0.5" fill="#1A1A2E"/>
+      <rect class="code-line4" x="-2.7" y="9.2" width="2.6" height="0.5" fill="#1A1A2E"/>
+    </g>
+    <!-- Small ink dots that build up -->
+    <rect x="-2.5" y="10" width="0.4" height="0.4" fill="#1A1A2E" opacity="0.5"/>
+    <rect x="-0.8" y="10.2" width="0.4" height="0.4" fill="#1A1A2E" opacity="0.5"/>
+    <rect x="-1.8" y="10.4" width="0.4" height="0.4" fill="#1A1A2E" opacity="0.4"/>
+  </g>
+
+  <!-- Legs -->
+  <g fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group: rock > breathe -->
+  <g class="body-rock">
+    <g class="breathe">
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Red beret -->
+      <rect x="3" y="3" width="9" height="2" fill="#E53935"/>
+      <rect x="2" y="4" width="2" height="1" fill="#C62828"/>
+      <rect x="6" y="2" width="1" height="1" fill="#E53935"/>
+
+      <!-- Eyes: focus > blink -->
+      <g class="eyes-focus">
+        <g class="blink" fill="#000">
+          <rect x="5" y="8" width="1" height="1"/>
+          <rect x="10" y="8" width="1" height="1"/>
+        </g>
+      </g>
+
+      <!-- Left arm with ink palette -->
+      <g>
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Palette (ink tones) -->
+        <rect x="-2" y="9" width="3" height="2" fill="#F5DEB3"/>
+        <rect x="-1.5" y="9.3" width="0.6" height="0.6" fill="#1A1A2E"/>
+        <rect x="-0.5" y="9.5" width="0.6" height="0.6" fill="#37474F"/>
+        <rect x="-1.5" y="10.2" width="0.6" height="0.6" fill="#263238"/>
+        <rect x="-0.5" y="10" width="0.6" height="0.6" fill="#455A64"/>
+      </g>
+
+      <!-- Right arm + brush (typing-like writing cadence) -->
+      <g class="paint-arm">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Brush handle -->
+        <rect x="13.5" y="5" width="1" height="5" fill="#795548"/>
+        <!-- Brush tip (ink) -->
+        <rect x="13.2" y="4" width="1.5" height="1.5" fill="#1A1A2E"/>
+        <!-- Ink drip -->
+        <g class="drip">
+          <rect x="13.5" y="3" width="0.8" height="0.8" fill="#1A1A2E"/>
+        </g>
+      </g>
+
+    </g>
+  </g>
+
+  </g>
+</svg>

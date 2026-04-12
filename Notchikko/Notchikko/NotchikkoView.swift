@@ -34,6 +34,10 @@ final class NotchikkoView: NSView {
     func loadSVG(for state: NotchikkoState) {
         let key = state.rawValue
         guard key != currentSVG else { return }
+        // 状态变化时清除旧状态的缓存，下次进入时重新随机
+        if let oldState = NotchikkoState(rawValue: currentSVG) {
+            ThemeProvider.shared.clearCache(for: oldState)
+        }
         currentSVG = key
 
         guard let url = ThemeProvider.shared.svgURL(for: state) else {

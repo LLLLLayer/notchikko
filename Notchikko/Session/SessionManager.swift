@@ -25,6 +25,7 @@ final class SessionManager {
         var matchedTerminal: TerminalMatch?  // 终端匹配缓存
         var terminalPid: Int?                // 终端进程 PID（hook 进程树检测）
         var terminalTty: String?             // 终端 tty 路径（iTerm2 tab 定位）
+        var isBypassMode: Bool = false       // --dangerously-skip-permissions
 
         var cwdName: String {
             (cwd as NSString).lastPathComponent
@@ -125,6 +126,7 @@ final class SessionManager {
                 lastEvent: Date(), phase: .waitingForInput,
                 terminalPid: terminalPid
             )
+            SoundManager.shared.play(for: "session-start")
             if eventSessionId == activeSessionId || activeSessionId == nil {
                 resetTimers()
                 transition(to: .idle)
@@ -163,6 +165,9 @@ final class SessionManager {
         case .stop(let sid):
             sessions[sid]?.phase = .waitingForInput
             sessions[sid]?.lastEvent = Date()
+            #if DEBUG
+            print("[SessionManager] Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), current=\(currentState)")
+            #endif
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .happy)
@@ -205,8 +210,21 @@ final class SessionManager {
                 transition(to: .sleeping)
             }
 
-        case .notification:
-            break
+        case .notification(let sid, let msg):
+            sessions[sid]?.lastEvent = Date()
+            // bypass 模式下的 PermissionRequest 不触发 approving（权限已自动通过）
+            let isBypass = sessions[sid]?.isBypassMode ?? false
+            if isBypass && msg == "PermissionRequest" {
+                break
+            }
+            // Elicitation / Notification → 等待用户操作
+            sessions[sid]?.phase = .waitingForInput
+            if sid == activeSessionId {
+                idleTimer?.cancel()
+                sleepTimer?.cancel()
+                currentState = .approving
+                SoundManager.shared.play(for: "approving")
+            }
         }
     }
 
@@ -287,6 +305,11 @@ final class SessionManager {
         sessions[sessionId]?.terminalTty = tty
     }
 
+    /// 更新 session 的 bypass 模式
+    func setBypassMode(_ bypass: Bool, for sessionId: String) {
+        sessions[sessionId]?.isBypassMode = bypass
+    }
+
     // MARK: - 内部
 
     /// 确保 session 存在，不存在则自动创建
@@ -350,11 +373,6 @@ final class SessionManager {
 
     private func transition(to newState: NotchikkoState) {
         guard !isDragging else { return }
-        guard newState.priority >= currentState.priority
-            || currentState == .idle
-            || currentState == .sleeping else {
-            return
-        }
         let oldState = currentState
         currentState = newState
         if oldState != newState {

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe-anim {
+        transform-origin: 7.5px -7px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      .eyes-blink {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 4s infinite ease-in-out;
+      }
+
+      .body-tilt {
+        transform-origin: 7.5px -10px;
+        animation: tilt 3s infinite ease-in-out;
+      }
+
+      .question-mark {
+        transform-origin: 8px -3px;
+        animation: bob-pulse 2s infinite ease-in-out;
+      }
+
+      .right-arm-scratch {
+        transform-origin: 13px -9px;
+        animation: scratch 1.5s infinite ease-in-out;
+      }
+
+      .eyes-look-up {
+        animation: look-up 3s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, -0.5px); }
+      }
+
+      @keyframes eye-blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+
+      @keyframes tilt {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(2deg); }
+      }
+
+      @keyframes bob-pulse {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-0.5px) scale(1.1); }
+      }
+
+      @keyframes scratch {
+        0%, 100% { transform: rotate(-40deg); }
+        50% { transform: rotate(-45deg); }
+      }
+
+      @keyframes look-up {
+        0%, 100% { transform: translateY(0.3px); }
+        50% { transform: translateY(0.3px); }
+      }
+    </style>
+  </defs>
+
+  <g transform="scale(1,-1)">
+    <!-- Shadow -->
+    <rect x="3" y="15" width="9" height="1" fill="#00000033"/>
+
+    <!-- Legs -->
+    <g fill="#DE886D">
+      <rect x="3" y="12" width="1" height="3"/>
+      <rect x="5" y="12" width="1" height="3"/>
+      <rect x="9" y="12" width="1" height="3"/>
+      <rect x="11" y="12" width="1" height="3"/>
+    </g>
+
+    <!-- Body group with tilt -->
+    <g class="body-tilt">
+      <g class="breathe-anim">
+        <!-- Head stripe -->
+        <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+        <!-- Body -->
+        <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+        <!-- Left Arm -->
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Right Arm (scratching head) -->
+        <g class="right-arm-scratch">
+          <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        </g>
+        <!-- Eyes looking up -->
+        <g fill="#000" class="eyes-look-up">
+          <g class="eyes-blink">
+            <rect x="5" y="8" width="1" height="1"/>
+            <rect x="10" y="8" width="1" height="1"/>
+          </g>
+        </g>
+      </g>
+    </g>
+
+    <!-- Question mark (above head, bobbing) -->
+    <g class="question-mark" fill="#FFC107">
+      <rect x="7" y="1" width="3" height="1"/>
+      <rect x="9" y="2" width="1" height="1"/>
+      <rect x="8" y="3" width="1" height="1"/>
+      <rect x="7" y="4" width="1" height="1"/>
+      <!-- Dot -->
+      <rect x="7" y="5" width="1" height="1" fill="#FFC107"/>
+    </g>
+  </g>
+</svg>

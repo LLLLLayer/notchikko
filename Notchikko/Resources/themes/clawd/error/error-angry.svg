@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe-anim {
+        transform-origin: 7.5px -7px;
+        animation: breathe-fast 2s infinite ease-in-out;
+      }
+
+      .eyes-blink {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 6s infinite ease-in-out;
+      }
+
+      .stomp {
+        animation: stomp 0.4s infinite ease-in-out;
+      }
+
+      .anger-vein-1 {
+        transform-origin: 4px -4px;
+        animation: vein-pulse 0.6s infinite ease-in-out;
+      }
+
+      .anger-vein-2 {
+        transform-origin: 12px -5px;
+        animation: vein-pulse 0.6s infinite ease-in-out 0.3s;
+      }
+
+      .steam-left {
+        animation: steam-l 1s infinite ease-out;
+      }
+
+      .steam-right {
+        animation: steam-r 1s infinite ease-out 0.5s;
+      }
+
+      @keyframes breathe-fast {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, -0.5px); }
+      }
+
+      @keyframes eye-blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+
+      @keyframes stomp {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(1px); }
+      }
+
+      @keyframes vein-pulse {
+        0%, 100% { transform: scale(0.8); }
+        50% { transform: scale(1.2); }
+      }
+
+      @keyframes steam-l {
+        0% { transform: translate(0, 0); opacity: 0.8; }
+        100% { transform: translate(-2px, -1px); opacity: 0; }
+      }
+
+      @keyframes steam-r {
+        0% { transform: translate(0, 0); opacity: 0.8; }
+        100% { transform: translate(2px, -1px); opacity: 0; }
+      }
+    </style>
+  </defs>
+
+  <g transform="scale(1,-1)">
+    <!-- Shadow -->
+    <rect x="3" y="15" width="9" height="1" fill="#00000033"/>
+
+    <!-- Legs -->
+    <g fill="#DE886D">
+      <rect x="3" y="12" width="1" height="3"/>
+      <rect x="5" y="12" width="1" height="3"/>
+      <rect x="9" y="12" width="1" height="3"/>
+      <rect x="11" y="12" width="1" height="3"/>
+    </g>
+
+    <!-- Body with stomp -->
+    <g class="stomp">
+      <g class="breathe-anim">
+        <!-- Head stripe -->
+        <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+        <!-- Body -->
+        <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+        <!-- Angry face overlay -->
+        <rect x="3" y="7" width="9" height="3" fill="#FF5252" opacity="0.2"/>
+        <!-- Left Arm (rigid outward) -->
+        <g transform="rotate(-10, 2, -9)">
+          <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        </g>
+        <!-- Right Arm (rigid outward) -->
+        <g transform="rotate(10, 13, -9)">
+          <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        </g>
+        <!-- Angry eyebrows -->
+        <g fill="#000">
+          <rect x="4" y="7" width="2" height="0.5" transform="rotate(10, 5, -7.25)"/>
+          <rect x="9" y="7" width="2" height="0.5" transform="rotate(-10, 10, -7.25)"/>
+        </g>
+        <!-- Eyes -->
+        <g fill="#000">
+          <g class="eyes-blink">
+            <rect x="5" y="8" width="1" height="1"/>
+            <rect x="10" y="8" width="1" height="1"/>
+          </g>
+        </g>
+      </g>
+    </g>
+
+    <!-- Anger veins -->
+    <g class="anger-vein-1" fill="#E53935">
+      <rect x="3" y="3" width="2" height="0.5"/>
+      <rect x="3.5" y="2.5" width="0.5" height="1.5"/>
+    </g>
+    <g class="anger-vein-2" fill="#E53935">
+      <rect x="11" y="4" width="2" height="0.5"/>
+      <rect x="11.5" y="3.5" width="0.5" height="1.5"/>
+    </g>
+
+    <!-- Steam puffs -->
+    <g class="steam-left">
+      <rect x="-1" y="6" width="1.5" height="1" fill="#B0BEC5" rx="0.2"/>
+    </g>
+    <g class="steam-right">
+      <rect x="14" y="6" width="1.5" height="1" fill="#B0BEC5" rx="0.2"/>
+    </g>
+  </g>
+</svg>

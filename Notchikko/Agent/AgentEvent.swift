@@ -13,6 +13,8 @@ struct HookEvent: Decodable {
     let prompt: String?          // v0.3: 用户 prompt 文本
     let terminalPid: Int?        // v0.3: 终端进程 PID（hook 进程树检测）
     let terminalTty: String?     // v0.3: 终端 tty 路径（用于 iTerm2 tab 定位）
+    let permissionMode: String?  // "default" / "bypassPermissions" 等
+
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -21,15 +23,18 @@ struct HookEvent: Decodable {
         case requestId = "request_id"
         case terminalPid = "terminal_pid"
         case terminalTty = "terminal_tty"
+        case permissionMode = "permission_mode"
     }
 }
 
-/// JSON 中任意值的包装
+/// JSON 中任意值的包装（支持嵌套数组和对象）
 enum AnyCodableValue: Decodable {
     case string(String)
     case int(Int)
     case double(Double)
     case bool(Bool)
+    case array([AnyCodableValue])
+    case object([String: AnyCodableValue])
     case null
 
     init(from decoder: Decoder) throws {
@@ -38,7 +43,15 @@ enum AnyCodableValue: Decodable {
         else if let v = try? container.decode(Int.self) { self = .int(v) }
         else if let v = try? container.decode(Double.self) { self = .double(v) }
         else if let v = try? container.decode(Bool.self) { self = .bool(v) }
+        else if let v = try? container.decode([AnyCodableValue].self) { self = .array(v) }
+        else if let v = try? container.decode([String: AnyCodableValue].self) { self = .object(v) }
         else { self = .null }
+    }
+
+    /// 提取字符串值
+    var stringValue: String? {
+        if case .string(let s) = self { return s }
+        return nil
     }
 }
 

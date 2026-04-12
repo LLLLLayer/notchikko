@@ -65,12 +65,11 @@ struct GeneralSettingsView: View {
                 VStack(spacing: 12) {
                     settingsRow(String(localized: "settings.pet_size")) {
                         Picker("", selection: scaleBinding) {
-                            Text(String(localized: "settings.size_small")).tag(0.6 as CGFloat)
-                            Text(String(localized: "settings.size_medium")).tag(1.0 as CGFloat)
-                            Text(String(localized: "settings.size_large")).tag(1.5 as CGFloat)
+                            Text(String(localized: "settings.size_small")).tag(1.0 as CGFloat)
+                            Text(String(localized: "settings.size_medium")).tag(1.5 as CGFloat)
+                            Text(String(localized: "settings.size_large")).tag(2.0 as CGFloat)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: controlWidth)
                     }
 
                     Divider()
@@ -81,7 +80,6 @@ struct GeneralSettingsView: View {
                                 Text(theme.name).tag(theme.id)
                             }
                         }
-                        .frame(width: controlWidth)
                     }
                 }
                 .padding(4)
@@ -89,28 +87,51 @@ struct GeneralSettingsView: View {
 
             // 声音
             GroupBox(String(localized: "settings.sound")) {
-                settingsRow(String(localized: "settings.volume")) {
-                    Picker("", selection: volumeBinding) {
-                        ForEach(SoundVolume.allCases, id: \.self) { vol in
-                            Text(vol.displayName).tag(vol)
+                VStack(spacing: 12) {
+                    settingsRow(String(localized: "settings.volume")) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "speaker.fill")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Slider(value: volumeBinding, in: 0...1)
+                            Image(systemName: "speaker.wave.3.fill")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: controlWidth)
+
+                    Divider()
+
+                    settingsRow(String(localized: "settings.sound_theme")) {
+                        Picker("", selection: soundThemeBinding) {
+                            ForEach(SoundThemeRegistry.themes) { theme in
+                                Text(theme.name).tag(theme.id)
+                            }
+                        }
+                    }
                 }
                 .padding(4)
             }
 
             // 审批
-            GroupBox {
-                settingsRow(String(localized: "settings.approval_delay")) {
-                    Picker("", selection: hideDelayBinding) {
-                        Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
-                        Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
-                        Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
-                        Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
+            GroupBox(String(localized: "settings.approval")) {
+                VStack(spacing: 12) {
+                    settingsRow(String(localized: "settings.approval_card")) {
+                        Toggle("", isOn: approvalEnabledBinding)
+                            .toggleStyle(.switch)
                     }
-                    .frame(width: controlWidth)
+
+                    if PreferencesStore.shared.preferences.approvalCardEnabled {
+                        Divider()
+                        settingsRow(String(localized: "settings.approval_delay")) {
+                            Picker("", selection: hideDelayBinding) {
+                                Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
+                                Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
+                                Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
+                                Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
+                            }
+                        }
+                    }
                 }
                 .padding(4)
             }
@@ -120,53 +141,58 @@ struct GeneralSettingsView: View {
         .onAppear { themes = ThemeProvider.shared.availableThemes }
     }
 
-    /// 统一的设置行：左边标签 + 右边控件（固定宽度右对齐）
+    /// 统一的设置行：左边标签 + 右边控件（固定宽度容器右对齐）
     private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
             Text(label)
             Spacer()
-            content()
-                .frame(width: controlWidth, alignment: .trailing)
+            HStack {
+                Spacer()
+                content()
+            }
+            .frame(width: controlWidth)
         }
     }
 
     private var scaleBinding: Binding<CGFloat> {
         Binding(
             get: { PreferencesStore.shared.preferences.petScale },
-            set: {
-                PreferencesStore.shared.preferences.petScale = $0
-                PreferencesStore.shared.save()
-            }
+            set: { PreferencesStore.shared.preferences.petScale = $0 }
         )
     }
 
     private var themeBinding: Binding<String> {
         Binding(
             get: { PreferencesStore.shared.preferences.themeId },
-            set: {
-                PreferencesStore.shared.preferences.themeId = $0
-                PreferencesStore.shared.save()
-            }
+            set: { PreferencesStore.shared.preferences.themeId = $0 }
         )
     }
 
-    private var volumeBinding: Binding<SoundVolume> {
+    private var volumeBinding: Binding<Float> {
         Binding(
             get: { PreferencesStore.shared.preferences.soundVolume },
-            set: {
-                PreferencesStore.shared.preferences.soundVolume = $0
-                PreferencesStore.shared.save()
-            }
+            set: { PreferencesStore.shared.preferences.soundVolume = $0 }
+        )
+    }
+
+    private var soundThemeBinding: Binding<String> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.soundThemeId },
+            set: { PreferencesStore.shared.preferences.soundThemeId = $0 }
+        )
+    }
+
+    private var approvalEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.approvalCardEnabled },
+            set: { PreferencesStore.shared.preferences.approvalCardEnabled = $0 }
         )
     }
 
     private var hideDelayBinding: Binding<TimeInterval> {
         Binding(
             get: { PreferencesStore.shared.preferences.approvalCardHideDelay },
-            set: {
-                PreferencesStore.shared.preferences.approvalCardHideDelay = $0
-                PreferencesStore.shared.save()
-            }
+            set: { PreferencesStore.shared.preferences.approvalCardHideDelay = $0 }
         )
     }
 }
@@ -176,7 +202,6 @@ struct GeneralSettingsView: View {
 struct CLISettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
-    @State private var isBypassOn: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -196,30 +221,10 @@ struct CLISettingsView: View {
                 ComingSoonRow(icon: "💎", name: "Gemini CLI")
             }
 
-            // 自动批准状态提示
-            if isBypassOn {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                    Text(String(localized: "settings.bypass_active"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(String(localized: "settings.disable_bypass")) {
-                        disableBypass()
-                    }
-                    .controlSize(.small)
-                }
-                .padding(10)
-                .background(Color.orange.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
             Spacer()
         }
         .onAppear {
             refreshStatuses()
-            isBypassOn = Self.readBypassStatus()
         }
     }
 
@@ -247,29 +252,6 @@ struct CLISettingsView: View {
         }
     }
 
-    private static func readBypassStatus() -> Bool {
-        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return false
-        }
-        return json["skipDangerousModePermissionPrompt"] as? Bool ?? false
-    }
-
-    private func disableBypass() {
-        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
-        let url = URL(fileURLWithPath: path)
-        var json: [String: Any] = [:]
-        if let data = try? Data(contentsOf: url),
-           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            json = existing
-        }
-        json["skipDangerousModePermissionPrompt"] = false
-        if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: url, options: .atomic)
-        }
-        isBypassOn = false
-    }
 }
 
 // MARK: - 子组件
@@ -293,7 +275,7 @@ private struct CLIRow: View {
             if isInstalled {
                 Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
                     .controlSize(.small)
-                Button(String(localized: "settings.install_hook")) { onInstall() }
+                Button(String(localized: "settings.reinstall_hook")) { onInstall() }
                     .controlSize(.small)
                     .buttonStyle(.borderedProminent)
             } else {

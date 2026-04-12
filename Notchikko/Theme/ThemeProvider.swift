@@ -108,8 +108,30 @@ final class ThemeProvider {
         return themes
     }
 
-    /// 获取指定状态的 SVG 文件 URL（同一状态有多个 SVG 时随机选一个）
+    /// 当前各状态选中的 SVG 缓存（状态切换时才重新随机）
+    private var currentSVGCache: [NotchikkoState: URL] = [:]
+
+    /// 清除全部缓存（主题切换时调用）
+    func invalidateCache() {
+        currentSVGCache.removeAll()
+    }
+
+    /// 清除指定状态的缓存（状态离开时调用，下次进入重新随机）
+    func clearCache(for state: NotchikkoState) {
+        currentSVGCache.removeValue(forKey: state)
+    }
+
+    /// 获取指定状态的 SVG 文件 URL（同一状态复用缓存，不重新随机）
     func svgURL(for state: NotchikkoState) -> URL? {
+        if let cached = currentSVGCache[state] {
+            return cached
+        }
+        let url = resolveSVGURL(for: state)
+        if let url { currentSVGCache[state] = url }
+        return url
+    }
+
+    private func resolveSVGURL(for state: NotchikkoState) -> URL? {
         if currentThemeId == Self.builtinThemeId {
             return builtinSVG(for: state)
         }

@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" width="500" height="500" preserveAspectRatio="xMidYMin meet">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .head-bob {
+        animation: head-bob 0.3s infinite ease-in-out;
+      }
+      /* Fast typing-like arm movements */
+      .arm-type-l {
+        transform-origin: 1px 10px;
+        animation: arm-type-l 0.3s infinite ease-in-out;
+      }
+      .arm-type-r {
+        transform-origin: 14px 10px;
+        animation: arm-type-r 0.25s infinite ease-in-out;
+      }
+      .note1 { animation: note-float-1 2.5s infinite ease-out; }
+      .note2 { animation: note-float-2 2.5s infinite 0.8s ease-out; }
+      .note3 { animation: note-float-3 2.5s infinite 1.6s ease-out; }
+      /* Key press flashes on mixing board */
+      .key-flash { opacity: 0; }
+      .kf1 { animation: kflash 0.5s infinite; }
+      .kf2 { animation: kflash 0.7s infinite; animation-delay: -0.2s; }
+      .kf3 { animation: kflash 0.4s infinite; animation-delay: -0.1s; }
+      .kf4 { animation: kflash 0.6s infinite; animation-delay: -0.35s; }
+      .kf5 { animation: kflash 0.45s infinite; animation-delay: -0.25s; }
+      .kf6 { animation: kflash 0.55s infinite; animation-delay: -0.4s; }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-bob 0.3s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+      @keyframes head-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(0.8px); }
+      }
+      /* Fast typing on mixing board */
+      @keyframes arm-type-l {
+        0% { transform: rotate(0deg); }
+        25% { transform: rotate(-15deg); }
+        50% { transform: rotate(-5deg); }
+        75% { transform: rotate(-12deg); }
+        100% { transform: rotate(0deg); }
+      }
+      @keyframes arm-type-r {
+        0% { transform: rotate(0deg); }
+        25% { transform: rotate(15deg); }
+        50% { transform: rotate(5deg); }
+        75% { transform: rotate(12deg); }
+        100% { transform: rotate(0deg); }
+      }
+      @keyframes note-float-1 {
+        0% { opacity: 0; transform: translate(0,0) scale(0); }
+        10% { opacity: 1; transform: translate(0,0) scale(1); }
+        80% { opacity: 0; transform: translate(-4px,-8px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+      @keyframes note-float-2 {
+        0% { opacity: 0; transform: translate(0,0) scale(0); }
+        10% { opacity: 1; transform: translate(0,0) scale(1); }
+        80% { opacity: 0; transform: translate(3px,-9px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+      @keyframes note-float-3 {
+        0% { opacity: 0; transform: translate(0,0) scale(0); }
+        10% { opacity: 1; transform: translate(0,0) scale(1); }
+        80% { opacity: 0; transform: translate(-2px,-7px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+      @keyframes kflash {
+        0%, 70%, 100% { opacity: 0; }
+        35% { opacity: 0.9; }
+      }
+      @keyframes shadow-bob {
+        0%, 100% { transform: scaleX(1.02); opacity: 0.4; }
+        50% { transform: scaleX(1.05); opacity: 0.45; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+    <!-- Shadow -->
+    <rect class="shadow-anim" x="1" y="15" width="14" height="1" fill="#000" opacity="0.4"/>
+
+    <!-- Legs -->
+    <g fill="#DE886D">
+      <rect x="3" y="12" width="1" height="3"/>
+      <rect x="5" y="12" width="1" height="3"/>
+      <rect x="9" y="12" width="1" height="3"/>
+      <rect x="11" y="12" width="1" height="3"/>
+    </g>
+    <!-- Green shoes -->
+    <g fill="#78B848">
+      <rect x="3" y="14" width="1" height="1"/>
+      <rect x="5" y="14" width="1" height="1"/>
+      <rect x="9" y="14" width="1" height="1"/>
+      <rect x="11" y="14" width="1" height="1"/>
+    </g>
+
+    <!-- Body -->
+    <g class="breathe">
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <g class="head-bob">
+        <!-- White headband -->
+        <rect x="4" y="4" width="7" height="1" fill="#FFF"/>
+
+        <!-- Headphone cups -->
+        <!-- Left -->
+        <rect x="1" y="7" width="2" height="3" fill="#1E3A8A"/>
+        <rect x="0" y="8" width="1" height="1" fill="#1E3A8A"/>
+        <!-- Right -->
+        <rect x="12" y="7" width="2" height="3" fill="#1E3A8A"/>
+        <rect x="14" y="8" width="1" height="1" fill="#1E3A8A"/>
+      </g>
+
+      <!-- Arms typing on mixing board -->
+      <g class="arm-type-l">
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+      <g class="arm-type-r">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+
+      <!-- Happy eyes (closed arcs) -->
+      <rect x="4" y="9" width="2" height="0.5" fill="#000"/>
+      <rect x="9" y="9" width="2" height="0.5" fill="#000"/>
+
+      <!-- Mixing board / keyboard (in front of body) -->
+      <g transform="translate(0, 2.5)">
+        <rect x="2" y="9" width="11" height="2" fill="#37474F" rx="0.2"/>
+        <!-- Buttons/keys row 1 -->
+        <g fill="#546E7A">
+          <rect x="2.5" y="9.3" width="1" height="0.6"/>
+          <rect x="3.8" y="9.3" width="1" height="0.6"/>
+          <rect x="5.1" y="9.3" width="1" height="0.6"/>
+          <rect x="6.4" y="9.3" width="1" height="0.6"/>
+          <rect x="7.7" y="9.3" width="1" height="0.6"/>
+          <rect x="9.0" y="9.3" width="1" height="0.6"/>
+          <rect x="10.3" y="9.3" width="1" height="0.6"/>
+          <rect x="11.6" y="9.3" width="0.9" height="0.6"/>
+        </g>
+        <!-- Buttons/keys row 2 -->
+        <g fill="#546E7A">
+          <rect x="2.8" y="10.1" width="0.8" height="0.6"/>
+          <rect x="3.9" y="10.1" width="0.8" height="0.6"/>
+          <rect x="5.0" y="10.1" width="0.8" height="0.6"/>
+          <rect x="6.1" y="10.1" width="0.8" height="0.6"/>
+          <rect x="7.2" y="10.1" width="0.8" height="0.6"/>
+          <rect x="8.3" y="10.1" width="0.8" height="0.6"/>
+          <rect x="9.4" y="10.1" width="0.8" height="0.6"/>
+          <rect x="10.5" y="10.1" width="0.8" height="0.6"/>
+          <rect x="11.6" y="10.1" width="0.9" height="0.6"/>
+        </g>
+        <!-- Key press highlights -->
+        <g fill="#B0BEC5">
+          <rect class="key-flash kf1" x="3.8" y="9.3" width="1" height="0.6"/>
+          <rect class="key-flash kf2" x="7.7" y="9.3" width="1" height="0.6"/>
+          <rect class="key-flash kf3" x="5.0" y="10.1" width="0.8" height="0.6"/>
+          <rect class="key-flash kf4" x="9.4" y="10.1" width="0.8" height="0.6"/>
+          <rect class="key-flash kf5" x="10.3" y="9.3" width="1" height="0.6"/>
+          <rect class="key-flash kf6" x="7.2" y="10.1" width="0.8" height="0.6"/>
+        </g>
+        <!-- Colored indicator lights -->
+        <rect x="2.3" y="9.1" width="0.3" height="0.15" fill="#4CAF50"/>
+        <rect x="5.5" y="9.1" width="0.3" height="0.15" fill="#FF5252"/>
+        <rect x="8.5" y="9.1" width="0.3" height="0.15" fill="#40C4FF"/>
+        <rect x="11.5" y="9.1" width="0.3" height="0.15" fill="#FFC107"/>
+      </g>
+
+      <!-- Music notes (output being created) -->
+      <rect class="note1" x="-1" y="4" width="1" height="1" fill="#4CAF50"/>
+      <rect class="note2" x="15" y="3" width="1" height="1" fill="#40C4FF"/>
+      <rect class="note3" x="-2" y="2" width="1" height="1" fill="#FFC107"/>
+    </g>
+
+  </g>
+</svg>

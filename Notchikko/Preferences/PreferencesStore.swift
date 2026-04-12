@@ -60,25 +60,32 @@ final class PreferencesStore {
 // MARK: - 数据模型
 
 struct NotchikkoPreferences: Codable, Equatable {
-    var petScale: CGFloat = 1.0
-    var soundVolume: SoundVolume = .medium
+    var petScale: CGFloat = 1.5
+    var soundVolume: Float = 0.3          // 0.0 = 静音, 1.0 = 最大
+    var soundThemeId: String = "arcade"   // 声音主题
     var customSounds: [String: String] = [:]
     var approvalCardHideDelay: TimeInterval = 5
+    var approvalCardEnabled: Bool = true
     var installedHooks: [String: Bool] = [:]
     var themeId: String = "clawd"
 }
 
+/// 声音主题
+struct SoundTheme: Identifiable {
+    let id: String
+    let name: String
+}
+
+/// 内置声音主题列表
+enum SoundThemeRegistry {
+    static let themes: [SoundTheme] = [
+        SoundTheme(id: "arcade", name: String(localized: "sound.theme.arcade")),
+    ]
+}
+
+// 保留 SoundVolume 用于向后兼容旧 preferences.json
 enum SoundVolume: String, Codable, CaseIterable {
     case mute, low, medium, high
-
-    var displayName: String {
-        switch self {
-        case .mute: return String(localized: "sound.volume.mute")
-        case .low: return String(localized: "sound.volume.low")
-        case .medium: return String(localized: "sound.volume.medium")
-        case .high: return String(localized: "sound.volume.high")
-        }
-    }
 
     var floatValue: Float {
         switch self {

@@ -7,17 +7,15 @@ final class SoundManager {
 
     /// 需要播放音效的状态转场
     static let soundableStates: [String] = [
-        "happy", "error", "thinking", "approving", "nod", "shake",
+        "happy", "error", "approving", "session-start",
     ]
 
     /// 内置音效映射: state → bundle 资源名 (不含扩展名)
     private let defaultSoundMap: [String: String] = [
         "happy": "sfx-happy",
         "error": "sfx-error",
-        "thinking": "sfx-thinking",
         "approving": "sfx-approval",
-        "nod": "sfx-approve",
-        "shake": "sfx-deny",
+        "session-start": "sfx-session-start",
     ]
 
     /// 自定义音效目录
@@ -41,7 +39,7 @@ final class SoundManager {
     /// 根据状态名播放对应音效（带冷却 + fallback）
     func play(for stateName: String) {
         let prefs = PreferencesStore.shared.preferences
-        guard prefs.soundVolume != .mute else { return }
+        guard prefs.soundVolume > 0 else { return }
 
         // 冷却检查：同一状态 2 秒内不重复播放
         let now = Date()
@@ -51,7 +49,7 @@ final class SoundManager {
         }
         lastPlayTimes[stateName] = now
 
-        let volume = prefs.soundVolume.floatValue
+        let volume = prefs.soundVolume
 
         // 优先级：自定义音效 → 主题音效 → 内置音效
         if let url = customSoundURL(for: stateName, prefs: prefs) {

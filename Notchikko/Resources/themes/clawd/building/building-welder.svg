@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      /* Breathing */
+      .breathe {
+        transform-origin: 7.5px 13px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      /* Forward lean */
+      .body-lean {
+        transform-origin: 7.5px 15px;
+        transform: rotate(2deg);
+      }
+
+      /* Right arm vibration (arc tremor) */
+      .arm-r-weld {
+        transform-origin: 14px 10px;
+        animation: arm-tremor 0.2s infinite ease-in-out;
+      }
+
+      /* Shadow */
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-pulse 3.2s infinite ease-in-out;
+      }
+
+      /* Weld flash */
+      .weld-flash {
+        animation: weld-flicker 0.3s infinite;
+      }
+
+      /* Sparks */
+      .spark { opacity: 0; }
+      .s1 { animation: spark-burst-1 0.6s infinite; animation-delay: 0s; }
+      .s2 { animation: spark-burst-2 0.6s infinite; animation-delay: 0.1s; }
+      .s3 { animation: spark-burst-3 0.6s infinite; animation-delay: 0.2s; }
+      .s4 { animation: spark-burst-4 0.6s infinite; animation-delay: 0.08s; }
+      .s5 { animation: spark-burst-5 0.6s infinite; animation-delay: 0.15s; }
+      .s6 { animation: spark-burst-6 0.6s infinite; animation-delay: 0.25s; }
+      .s7 { animation: spark-burst-7 0.6s infinite; animation-delay: 0.05s; }
+      .s8 { animation: spark-burst-8 0.6s infinite; animation-delay: 0.3s; }
+
+      /* Hot weld seam extension */
+      .weld-seam {
+        transform-origin: left center;
+        transform-box: fill-box;
+        animation: seam-grow 3s infinite linear;
+      }
+
+      /* ==================== Keyframes ==================== */
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+
+      @keyframes arm-tremor {
+        0%, 100% { transform: rotate(1deg); }
+        50% { transform: rotate(-1deg); }
+      }
+
+      @keyframes shadow-pulse {
+        0%, 100% { transform: scaleX(1); opacity: 0.4; }
+        50% { transform: scaleX(1.03); opacity: 0.45; }
+      }
+
+      @keyframes weld-flicker {
+        0%   { opacity: 0; }
+        15%  { opacity: 1; }
+        35%  { opacity: 0.5; }
+        55%  { opacity: 1; }
+        75%  { opacity: 0.3; }
+        100% { opacity: 0; }
+      }
+
+      @keyframes spark-burst-1 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(-4px, -5px) scale(0.3); }
+      }
+      @keyframes spark-burst-2 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(3px, -6px) scale(0.3); }
+      }
+      @keyframes spark-burst-3 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(-5px, -2px) scale(0.3); }
+      }
+      @keyframes spark-burst-4 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(4px, -3px) scale(0.3); }
+      }
+      @keyframes spark-burst-5 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(-3px, 3px) scale(0.3); }
+      }
+      @keyframes spark-burst-6 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(5px, -1px) scale(0.3); }
+      }
+      @keyframes spark-burst-7 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(-2px, -6px) scale(0.3); }
+      }
+      @keyframes spark-burst-8 {
+        0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+        100% { opacity: 0; transform: translate(3px, 2px) scale(0.3); }
+      }
+
+      @keyframes seam-grow {
+        0%   { transform: scaleX(0); }
+        100% { transform: scaleX(1); }
+      }
+    </style>
+
+    <g id="pixel-spark">
+      <rect x="0" y="0" width="1" height="1"/>
+    </g>
+  </defs>
+  <g transform="scale(1, -1)">
+
+  <!-- Ground Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000000"/>
+
+  <!-- Workpiece (metal plate being welded) -->
+  <rect x="8" y="14" width="8" height="1" fill="#78909C"/>
+  <!-- Hot weld seam (glowing, grows over time) -->
+  <rect class="weld-seam" x="8" y="14" width="4" height="1" fill="#FF6F00" opacity="0.8"/>
+
+  <!-- Welding flash at contact point -->
+  <rect class="weld-flash" x="12" y="13" width="2" height="1" fill="#FFFFFF"/>
+
+  <!-- Welding sparks (burst from weld point) -->
+  <g transform="translate(13, 13)">
+    <use href="#pixel-spark" class="spark s1" fill="#FFC107"/>
+    <use href="#pixel-spark" class="spark s2" fill="#FFEB3B"/>
+    <use href="#pixel-spark" class="spark s3" fill="#FF6F00"/>
+    <use href="#pixel-spark" class="spark s4" fill="#FFC107"/>
+    <use href="#pixel-spark" class="spark s5" fill="#FFEB3B"/>
+    <use href="#pixel-spark" class="spark s6" fill="#FF6F00"/>
+    <use href="#pixel-spark" class="spark s7" fill="#FFC107"/>
+    <use href="#pixel-spark" class="spark s8" fill="#FFEB3B"/>
+  </g>
+
+  <!-- Legs -->
+  <g class="body-lean" fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group [lean > breathe] -->
+  <g class="body-lean">
+    <g class="breathe">
+
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Head stripe (under mask) -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+
+      <!-- Welding Mask (dark, flipped down covering face) -->
+      <rect x="2" y="4" width="11" height="1" fill="#37474F"/>
+      <rect x="1" y="5" width="13" height="6" fill="#263238"/>
+      <!-- Visor (dark tinted glass) -->
+      <rect x="3" y="6" width="9" height="4" fill="#1B5E20" opacity="0.7"/>
+      <!-- No eyes visible (hidden by dark visor) -->
+
+      <!-- Left arm -->
+      <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+
+    </g>
+  </g>
+
+  <!-- Right arm + welding torch [lean > breathe > tremor] -->
+  <g class="body-lean">
+    <g class="breathe">
+      <g class="arm-r-weld">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Welding torch -->
+        <rect x="14" y="9" width="1" height="1" fill="#546E7A"/>
+        <rect x="13" y="10" width="1" height="3" fill="#37474F"/>
+      </g>
+    </g>
+  </g>
+  </g>
+</svg>

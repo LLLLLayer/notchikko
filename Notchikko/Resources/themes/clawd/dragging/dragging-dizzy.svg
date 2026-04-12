@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -2 32 18" width="500" height="500" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <style>
+      /* Erratic body wobble */
+      .body-wobble {
+        transform-origin: 7.5px 2px;
+        animation: wobble 0.8s infinite ease-in-out;
+      }
+
+      /* Limp leg dangle */
+      .leg-limp-1 {
+        animation: limp-1 0.6s infinite linear;
+        transform-origin: top center;
+        transform-box: fill-box;
+      }
+      .leg-limp-2 {
+        animation: limp-2 0.6s infinite linear;
+        transform-origin: top center;
+        transform-box: fill-box;
+      }
+
+      /* Arms hang limp */
+      .arm-limp-l {
+        transform-box: fill-box;
+        transform-origin: 100% 0%;
+        animation: arm-droop-l 2s infinite alternate ease-in-out;
+      }
+      .arm-limp-r {
+        transform-box: fill-box;
+        transform-origin: 0% 0%;
+        animation: arm-droop-r 2s infinite alternate ease-in-out;
+      }
+
+      /* Spiral eyes spinning */
+      .spin-l {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: spin-left 1s infinite linear;
+      }
+      .spin-r {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: spin-right 1.2s infinite linear;
+      }
+
+      /* Shadow wobbles with body */
+      .shadow-wobble {
+        transform-origin: 7.5px 14.5px;
+        animation: shadow-bob 0.8s infinite ease-in-out;
+      }
+
+      /* Stars circling above head */
+      .star-1 {
+        animation: orbit-1 2s infinite linear;
+      }
+      .star-2 {
+        animation: orbit-2 2s 0.66s infinite linear;
+      }
+      .star-3 {
+        animation: orbit-3 2s 1.33s infinite linear;
+      }
+
+      @keyframes wobble {
+        0%   { transform: rotate(-4deg); }
+        25%  { transform: rotate(3deg); }
+        50%  { transform: rotate(-2deg); }
+        75%  { transform: rotate(5deg); }
+        100% { transform: rotate(-4deg); }
+      }
+
+      @keyframes limp-1 {
+        0%, 100% { transform: rotate(0deg) scaleY(1); }
+        50%      { transform: rotate(-10deg) scaleY(0.9); }
+      }
+      @keyframes limp-2 {
+        0%, 100% { transform: rotate(-10deg) scaleY(0.9); }
+        50%      { transform: rotate(0deg) scaleY(1); }
+      }
+
+      @keyframes arm-droop-l {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(5deg); }
+      }
+      @keyframes arm-droop-r {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(-5deg); }
+      }
+
+      @keyframes spin-left {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+      @keyframes spin-right {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(-360deg); }
+      }
+
+      @keyframes shadow-bob {
+        0%   { transform: scaleX(0.7); opacity: 0.1; }
+        25%  { transform: scaleX(0.8); opacity: 0.15; }
+        50%  { transform: scaleX(0.65); opacity: 0.1; }
+        75%  { transform: scaleX(0.75); opacity: 0.2; }
+        100% { transform: scaleX(0.7); opacity: 0.1; }
+      }
+
+      /* Stars orbit in a circle above the head */
+      @keyframes orbit-1 {
+        0%   { transform: translate(0px, 0px); }
+        25%  { transform: translate(3px, -1px); }
+        50%  { transform: translate(0px, -2px); }
+        75%  { transform: translate(-3px, -1px); }
+        100% { transform: translate(0px, 0px); }
+      }
+      @keyframes orbit-2 {
+        0%   { transform: translate(3px, -1px); }
+        25%  { transform: translate(0px, -2px); }
+        50%  { transform: translate(-3px, -1px); }
+        75%  { transform: translate(0px, 0px); }
+        100% { transform: translate(3px, -1px); }
+      }
+      @keyframes orbit-3 {
+        0%   { transform: translate(-3px, -1px); }
+        25%  { transform: translate(0px, 0px); }
+        50%  { transform: translate(3px, -1px); }
+        75%  { transform: translate(0px, -2px); }
+        100% { transform: translate(-3px, -1px); }
+      }
+    </style>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <rect class="shadow-wobble" x="4" y="14" width="7" height="1" fill="#000" opacity="0.15"/>
+
+  <!-- Circling stars above head -->
+  <rect class="star-1" x="5" y="0" width="1" height="1" fill="#FBC02D"/>
+  <rect class="star-2" x="8" y="0" width="1" height="1" fill="#FBC02D"/>
+  <rect class="star-3" x="11" y="0" width="1" height="1" fill="#FBC02D"/>
+
+  <!-- Wobbling body group -->
+  <g class="body-wobble">
+    <!-- Limp dangling legs -->
+    <g fill="#DE886D">
+      <rect class="leg-limp-1" x="3" y="9" width="1" height="3"/>
+      <rect class="leg-limp-2" x="5" y="9" width="1" height="3"/>
+      <rect class="leg-limp-1" x="9" y="9" width="1" height="3"/>
+      <rect class="leg-limp-2" x="11" y="9" width="1" height="3"/>
+    </g>
+
+    <!-- Head stripe -->
+    <rect x="2" y="2" width="11" height="1" fill="#C07050"/>
+    <!-- Body -->
+    <rect x="2" y="3" width="11" height="6" fill="#DE886D"/>
+
+    <!-- Limp arms -->
+    <g class="arm-limp-l">
+      <rect x="0" y="5" width="2" height="2" fill="#DE886D"/>
+    </g>
+    <g class="arm-limp-r">
+      <rect x="13" y="5" width="2" height="2" fill="#DE886D"/>
+    </g>
+
+    <!-- Left spiral eye -->
+    <g class="spin-l">
+      <rect x="4.5" y="4.5" width="2" height="0.5" fill="#000"/>
+      <rect x="5" y="4" width="0.5" height="2" fill="#000"/>
+    </g>
+    <!-- Right spiral eye -->
+    <g class="spin-r">
+      <rect x="9.5" y="4.5" width="2" height="0.5" fill="#000"/>
+      <rect x="10" y="4" width="0.5" height="2" fill="#000"/>
+    </g>
+  </g>
+</svg>

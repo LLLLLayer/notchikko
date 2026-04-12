@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-origin: 7.5px 8px;
+        animation: blink 4s infinite;
+      }
+      .eyes-scan {
+        animation: eyes-scan 2s infinite ease-in-out;
+      }
+      .glass-sweep {
+        transform-origin: 16px 8px;
+        animation: glass-sweep 3s infinite ease-in-out;
+      }
+      .body-lean {
+        transform-origin: 7.5px 12px;
+        animation: body-lean 3s infinite ease-in-out;
+      }
+      .bug-jitter {
+        animation: bug-jitter 0.4s infinite;
+      }
+      .exclaim {
+        opacity: 0;
+        animation: exclaim-pop 3s infinite;
+      }
+      .sweat {
+        opacity: 0;
+        animation: sweat-fly 6s infinite;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-pulse 3s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1); }
+        50% { transform: scale(1.02, 0.98); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      /* Eyes scan left to right like reading lines of code */
+      @keyframes eyes-scan {
+        0%, 100% { transform: translate(-0.5px, 0); }
+        50% { transform: translate(0.5px, 0); }
+      }
+      @keyframes glass-sweep {
+        0%, 100% { transform: rotate(-20deg); }
+        50% { transform: rotate(25deg); }
+      }
+      /* Body leans slightly forward (1-2deg) for focused posture */
+      @keyframes body-lean {
+        0%, 100% { transform: rotate(-2deg); }
+        50% { transform: rotate(2deg); }
+      }
+      @keyframes bug-jitter {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(0.3px, -0.3px); }
+        50% { transform: translate(-0.3px, 0.2px); }
+        75% { transform: translate(0.2px, 0.3px); }
+      }
+      @keyframes exclaim-pop {
+        0%, 40% { opacity: 0; transform: translate(0, 0) scale(0); }
+        45% { opacity: 1; transform: translate(0, 0) scale(1.2); }
+        55% { opacity: 1; transform: translate(0, 0) scale(1); }
+        65% { opacity: 0; transform: translate(0, -2px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+      @keyframes sweat-fly {
+        0%, 55% { opacity: 0; transform: translate(0, 0) scale(0); }
+        60% { opacity: 1; transform: translate(0, 0) scale(1); }
+        80% { opacity: 0; transform: translate(-5px, -5px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+      @keyframes shadow-pulse {
+        0%, 100% { transform: scaleX(1); opacity: 0.5; }
+        50% { transform: scaleX(1.03); opacity: 0.55; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Legs -->
+  <g fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group: lean > breathe -->
+  <g class="body-lean">
+    <g class="breathe">
+
+      <!-- Sweat -->
+      <g transform="translate(1, 6)">
+        <g class="sweat" fill="#40C4FF">
+          <rect x="0" y="1" width="1.5" height="1.5"/>
+          <rect x="0.25" y="0" width="1" height="1"/>
+        </g>
+      </g>
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Eyes: scan left-right > blink -->
+      <g class="eyes-scan">
+        <g class="blink" fill="#000">
+          <rect x="5" y="8" width="1" height="1"/>
+          <rect x="10" y="8" width="1" height="1"/>
+        </g>
+      </g>
+
+      <!-- Left arm -->
+      <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+
+      <!-- Right arm + magnifying glass -->
+      <g class="glass-sweep">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+
+        <!-- Handle -->
+        <rect x="14" y="10" width="1" height="2" fill="#795548"/>
+        <!-- Glass frame -->
+        <rect x="15" y="5" width="3" height="1" fill="#78909C"/>
+        <rect x="14" y="6" width="1" height="3" fill="#78909C"/>
+        <rect x="18" y="6" width="1" height="3" fill="#78909C"/>
+        <rect x="15" y="9" width="3" height="1" fill="#78909C"/>
+        <!-- Glass fill -->
+        <rect x="15" y="6" width="3" height="3" fill="#BBDEFB" opacity="0.4"/>
+
+        <!-- Bug inside glass -->
+        <g class="bug-jitter">
+          <rect x="16" y="7" width="1" height="1" fill="#4CAF50"/>
+          <rect x="15.6" y="7.2" width="0.4" height="0.2" fill="#388E3C"/>
+          <rect x="17" y="7.2" width="0.4" height="0.2" fill="#388E3C"/>
+          <rect x="15.6" y="7.6" width="0.4" height="0.2" fill="#388E3C"/>
+          <rect x="17" y="7.6" width="0.4" height="0.2" fill="#388E3C"/>
+        </g>
+
+        <!-- Exclamation popup -->
+        <g class="exclaim" transform="translate(17, 4)">
+          <rect x="0" y="0" width="1" height="1.5" fill="#FF5252"/>
+          <rect x="0" y="1.8" width="1" height="0.5" fill="#FF5252"/>
+        </g>
+      </g>
+
+    </g>
+  </g>
+
+  </g>
+</svg>

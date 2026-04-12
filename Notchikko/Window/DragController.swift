@@ -147,11 +147,14 @@ final class DragController {
     /// 飞回目标位置，动画完成后执行回调
     func animateToFrame(_ frame: NSRect, completion: (() -> Void)? = nil) {
         guard let panel else { completion?(); return }
+        // 动画期间禁用 frame 约束，避免刘海屏上被系统推到刘海下方
+        panel.disableFrameConstraint = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.35
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
         }, completionHandler: {
+            panel.disableFrameConstraint = false
             panel.setFrame(frame, display: false)
             completion?()
         })

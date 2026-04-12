@@ -4,26 +4,37 @@ struct ApprovalCardView: View {
     let request: ApprovalManager.ApprovalRequest
     let onDeny: () -> Void
     let onApprove: () -> Void
-    let onApproveAll: () -> Void    // 当前 session 全部自动放行
+    let onApproveAll: () -> Void
     var onJump: (() -> Void)? = nil
+    var onClose: (() -> Void)? = nil
+
+    private var agentMeta: (icon: String, displayName: String) {
+        CLIHookConfig.metadata(for: request.source)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // 标题行：Agent · Tool + 跳转按钮
+            // 标题行：关闭按钮 + 项目名 + 跳转按钮
             HStack(spacing: 6) {
-                Text(CLIHookConfig.metadata(for: request.source).icon)
-                    .font(.system(size: 14))
-                Text(CLIHookConfig.metadata(for: request.source).displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Text("·")
-                    .foregroundStyle(.tertiary)
-                Text(request.tool)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Spacer()
+                // macOS 风格关闭按钮
+                if let onClose {
+                    Button(action: onClose) {
+                        Circle()
+                            .fill(Color.red.opacity(0.8))
+                            .frame(width: 12, height: 12)
+                            .overlay(
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 7, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.9))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
 
-                // 右上角跳转按钮
+                Text(request.cwdName.isEmpty ? "Session" : request.cwdName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
                 if let onJump {
                     Button(action: onJump) {
                         Image(systemName: "arrow.up.forward.square")
@@ -35,41 +46,68 @@ struct ApprovalCardView: View {
                 }
             }
 
-            // 操作内容预览（多行展示）
-            if !request.input.isEmpty {
-                Text(request.input)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.primary.opacity(0.7))
-                    .lineLimit(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-                    .background(Color.primary.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            // 信息标签：Agent + Terminal + Tool
+            HStack(spacing: 6) {
+                InfoTag(icon: agentMeta.icon, text: agentMeta.displayName)
+                if !request.terminalName.isEmpty {
+                    InfoTag(icon: "🖥", text: request.terminalName)
+                }
+                InfoTag(icon: "⚙", text: request.tool)
+                Spacer()
             }
 
-            // 按钮行
-            HStack(spacing: 6) {
-                ApprovalButton(
-                    title: String(localized: "approval.deny"),
-                    style: .secondary,
-                    shortcut: "n",
-                    action: onDeny
-                )
+            // 内容预览（可滚动）
+            if !request.input.isEmpty {
+                ScrollView(.vertical, showsIndicators: true) {
+                    Text(request.input)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.primary.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(maxHeight: 120)
+                .padding(8)
+                .background(Color.primary.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
 
-                Spacer()
+            // 按钮行（仅有 requestId 时显示审批按钮）
+            if !request.requestId.isEmpty {
+                HStack(spacing: 6) {
+                    Button(action: onDeny) {
+                        Text(String(localized: "approval.deny"))
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                ApprovalButton(
-                    title: String(localized: "approval.allow_once"),
-                    style: .primary,
-                    shortcut: "y",
-                    action: onApprove
-                )
+                    Spacer()
 
-                ApprovalButton(
-                    title: String(localized: "approval.allow_all"),
-                    style: .danger,
-                    action: onApproveAll
-                )
+                    Button(action: onApprove) {
+                        Text(String(localized: "approval.allow_once"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.accentColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    Button(action: onApproveAll) {
+                        Text(String(localized: "approval.allow_all"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
+                    }
+                    .buttonStyle(.plain)
+                    .background(.red)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
             }
         }
         .padding(12)
@@ -80,58 +118,21 @@ struct ApprovalCardView: View {
     }
 }
 
-// MARK: - 按钮组件
+// MARK: - 信息标签
 
-private enum ButtonStyle {
-    case secondary, primary, danger
-}
-
-private struct ApprovalButton: View {
-    let title: String
-    let style: ButtonStyle
-    var shortcut: String? = nil
-    let action: () -> Void
+private struct InfoTag: View {
+    let icon: String
+    let text: String
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: style == .secondary ? .medium : .semibold))
-                .foregroundStyle(foregroundColor)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
+        HStack(spacing: 3) {
+            Text(icon).font(.system(size: 10))
+            Text(text).font(.system(size: 11, weight: .medium))
         }
-        .buttonStyle(.plain)
-        .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .ifLet(shortcut) { view, key in
-            view.keyboardShortcut(KeyEquivalent(Character(key)), modifiers: .command)
-        }
-    }
-
-    private var foregroundColor: Color {
-        switch style {
-        case .secondary: .primary
-        case .primary: .white
-        case .danger: .white
-        }
-    }
-
-    private var backgroundColor: Color {
-        switch style {
-        case .secondary: Color.primary.opacity(0.08)
-        case .primary: .accentColor
-        case .danger: .red
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func ifLet<T>(_ value: T?, transform: (Self, T) -> some View) -> some View {
-        if let value {
-            transform(self, value)
-        } else {
-            self
-        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.primary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }

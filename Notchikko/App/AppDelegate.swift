@@ -11,8 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBarManager = MenuBarManager()
     private var approvalManager: ApprovalManager?
     private var settingsWindow: NSWindow?
-    private var approvalPanel: NSPanel?
-    private var hotkeyMonitor: Any?
+    private var approvalPanels: [NSPanel] = []
     private let terminalJumper = TerminalJumper()
 
     private var screenObserver: NSObjectProtocol?
@@ -24,14 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotchWindow(on: NSScreen.main)
         startAgentListening()
         observeScreenChanges()
-        setupGlobalHotkeys()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        if let monitor = hotkeyMonitor {
-            NSEvent.removeMonitor(monitor)
-            hotkeyMonitor = nil
-        }
         if let obs = screenObserver {
             NotificationCenter.default.removeObserver(obs)
         }
@@ -181,25 +175,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let adapter = ClaudeCodeAdapter()
         self.adapter = adapter
 
-        // 创建 ApprovalManager 并绑定到 SocketServer
+        // 审批面板（受 Settings 开关控制）
         let approval = ApprovalManager(socketServer: adapter.socketServerRef)
         self.approvalManager = approval
 
-        // 审批请求回调
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
             guard let self else { return }
-            self.approvalManager?.handleApprovalRequest(from: hookEvent)
-
-            // Auto 模式下，自动切到需要审批的 session
-            if self.sessionManager.pinnedSessionId == nil {
-                let approvalSid = hookEvent.sessionId
-                if approvalSid != self.sessionManager.activeSessionId {
-                    self.sessionManager.pinSession(approvalSid)
-                }
-            }
-
+            let session = self.sessionManager.sessions[hookEvent.sessionId]
+            approval.handleApprovalRequest(from: hookEvent, session: session)
             self.sessionManager.overrideState(.approving)
-            self.showApprovalPanel()
+            if PreferencesStore.shared.preferences.approvalCardEnabled {
+                self.showApprovalPanel()
+            }
         }
 
         // 终端 PID/tty 更新回调（每个 hook 事件都可能携带）
@@ -209,96 +196,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         adapter.onTerminalTtyUpdate = { [weak self] sessionId, tty in
             self?.sessionManager.setTerminalTty(tty, for: sessionId)
         }
+        adapter.onPermissionModeUpdate = { [weak self] sessionId, mode in
+            self?.sessionManager.setBypassMode(mode == "bypassPermissions", for: sessionId)
+        }
 
         Task {
             try? await adapter.start()
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)
-                // 收到后续事件时，如果审批卡片还在显示且属于同一 session，自动清理
-                if let approval = self.approvalManager, approval.hasPendingApproval {
-                    let sid: String
-                    switch event {
-                    case .toolUse(let s, _, let phase):
-                        if case .post = phase { sid = s } else { continue }
-                    case .prompt(let s, _): sid = s
-                    case .stop(let s): sid = s
-                    case .error(let s, _): sid = s
-                    default: continue
+
+                // Elicitation/Notification → 也弹审批卡片
+                if case .notification(let sid, let msg) = event,
+                   PreferencesStore.shared.preferences.approvalCardEnabled {
+                    let session = sessionManager.sessions[sid]
+                    let isBypass = session?.isBypassMode ?? false
+                    if !(isBypass && msg == "PermissionRequest") {
+                        let request = ApprovalManager.ApprovalRequest(
+                            requestId: "",
+                            source: session?.source ?? "unknown",
+                            tool: msg.isEmpty ? "AskUserQuestion" : msg,
+                            input: session?.lastPrompt ?? "",
+                            sessionId: sid,
+                            cwdName: session?.cwdName ?? "",
+                            terminalName: session?.matchedTerminal?.appName ?? "",
+                            timestamp: Date()
+                        )
+                        approvalManager?.pendingApproval = request
+                        approvalManager?.isCardVisible = true
+                        showApprovalPanel()
                     }
-                    approval.onSessionEvent(sessionId: sid)
-                    self.hideApprovalPanel()
                 }
             }
         }
     }
 
-    private func setupGlobalHotkeys() {
-        // ⌘Y = approve, ⌘N = deny (仅审批待决时生效)
-        hotkeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let approval = self.approvalManager, approval.hasPendingApproval else {
-                return event
-            }
+    // MARK: - 审批面板（叠加式，新卡片错位堆叠）
 
-            if event.modifierFlags.contains(.command) {
-                switch event.charactersIgnoringModifiers?.lowercased() {
-                case "y":
-                    approval.approve()
-                    return nil  // 消费事件
-                case "n":
-                    approval.deny()
-                    return nil
-                default:
-                    break
-                }
-            }
-            return event
-        }
-    }
-
-    // MARK: - 独立审批窗口
+    /// 每张卡片的错位偏移量
+    private static let cardStackOffset: CGFloat = 8
 
     private func showApprovalPanel() {
         guard let geo = geometry,
               let approval = approvalManager,
               let request = approval.pendingApproval else { return }
 
-        // 已有窗口则刷新内容
-        if let existing = approvalPanel, existing.isVisible {
-            existing.orderFrontRegardless()
-            return
-        }
-
+        let panelRef = NSPanel.self  // capture for closure
         let cardView = ApprovalCardView(
             request: request,
             onDeny: { [weak self] in
                 approval.deny()
-                self?.hideApprovalPanel()
+                self?.removeTopApprovalPanel()
             },
             onApprove: { [weak self] in
                 approval.approve()
-                self?.hideApprovalPanel()
+                self?.removeTopApprovalPanel()
             },
             onApproveAll: { [weak self] in
                 approval.approveAllForSession()
-                self?.hideApprovalPanel()
+                self?.removeAllApprovalPanels()
             },
             onJump: { [weak self] in
                 guard let self,
                       let session = self.sessionManager.sessions[request.sessionId] else { return }
                 self.terminalJumper.jumpToSession(session: session)
+            },
+            onClose: { [weak self] in
+                self?.removeTopApprovalPanel()
             }
         )
 
         let hostingView = NSHostingView(rootView: cardView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
-        // 卡片尺寸
         let cardWidth: CGFloat = 380
         let cardHeight: CGFloat = 220
-        // 定位到 notch 右侧
         guard let screen = currentScreen ?? NSScreen.main else { return }
-        let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8
-        let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4
+
+        // 每张新卡片向右下偏移
+        let stackIndex = CGFloat(approvalPanels.count)
+        let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8 + stackIndex * Self.cardStackOffset
+        let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4 - stackIndex * Self.cardStackOffset
 
         let panel = NSPanel(
             contentRect: NSRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight),
@@ -308,14 +285,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = .statusBar + 1
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1 + approvalPanels.count)
         panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
 
-        let contentBounds = panel.contentView?.bounds ?? panel.frame
-        let wrapper = NSView(frame: contentBounds)
+        let wrapper = NSView(frame: panel.contentView?.bounds ?? panel.frame)
         wrapper.autoresizingMask = [.width, .height]
         wrapper.addSubview(hostingView)
         panel.contentView = wrapper
@@ -328,14 +304,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
 
         panel.orderFrontRegardless()
-        self.approvalPanel = panel
+        approvalPanels.append(panel)
     }
 
-    private func hideApprovalPanel() {
-        approvalPanel?.orderOut(nil)
-        approvalPanel = nil
+    // showQuestionPanel removed — Claude Code doesn't support updatedInput for AskUserQuestion
+    // AskUserQuestion 通过 Notification 事件 → 审批卡片（信息 + 跳转按钮）展示
+
+    /// 移除最顶层的审批面板
+    private func removeTopApprovalPanel() {
+        guard let top = approvalPanels.last else { return }
+        top.close()
+        approvalPanels.removeLast()
     }
 
+    /// 移除所有审批面板（"全部允许"时）
+    private func removeAllApprovalPanels() {
+        for panel in approvalPanels {
+            panel.close()
+        }
+        approvalPanels.removeAll()
+    }
 
     private func observeScreenChanges() {
         screenObserver = NotificationCenter.default.addObserver(

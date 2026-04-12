@@ -13,22 +13,6 @@ enum NotchikkoState: String, CaseIterable {
     case dragging
     case approving
 
-    var svgName: String {
-        switch self {
-        case .sleeping: "clawd-sleeping"
-        case .idle: "clawd-idle"
-        case .thinking: "clawd-prompt"
-        case .reading: "clawd-tool-edit"
-        case .typing: "clawd-tool-edit"
-        case .building: "clawd-tool-bash"
-        case .sweeping: "clawd-compact"
-        case .happy: "clawd-stop"
-        case .error: "clawd-error"
-        case .dragging: "clawd-drag"
-        case .approving: "clawd-idle"  // TODO: clawd-approving
-        }
-    }
-
     var revealAmount: CGFloat {
         switch self {
         case .sleeping: 0.05

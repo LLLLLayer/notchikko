@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .left-blink {
+        transform-origin: 5.5px 8px;
+        animation: left-blink 4s infinite;
+      }
+      .ship-sway {
+        transform-origin: 7.5px 15px;
+        animation: ship-sway 2s infinite ease-in-out;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-sway 2s infinite ease-in-out;
+      }
+      .error-flash {
+        animation: error-flash 0.8s infinite ease-in-out;
+      }
+      .skull-flash {
+        animation: skull-flash 1.2s infinite ease-in-out;
+      }
+      .worried-eye {
+        animation: worried-look 2s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1); }
+        50% { transform: scale(1.02, 0.98); }
+      }
+      @keyframes left-blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes ship-sway {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(2deg); }
+        75% { transform: rotate(-2deg); }
+      }
+      @keyframes shadow-sway {
+        0%, 100% { transform: scaleX(1); opacity: 0.5; }
+        25% { transform: scaleX(1.06); opacity: 0.55; }
+        75% { transform: scaleX(0.94); opacity: 0.45; }
+      }
+      @keyframes error-flash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+      @keyframes skull-flash {
+        0%, 100% { opacity: 0; }
+        30%, 70% { opacity: 1; }
+      }
+      @keyframes worried-look {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(0.5px); }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Flashing red exclamation -->
+  <g class="error-flash">
+    <rect x="17" y="4" width="2" height="3" fill="#FF3B30"/>
+    <rect x="17" y="8" width="2" height="1" fill="#FF3B30"/>
+  </g>
+
+  <!-- Flashing red pixel skull and crossbones above head -->
+  <g class="skull-flash" fill="#FF3B30">
+    <!-- Skull -->
+    <rect x="6" y="-2" width="3" height="2"/>
+    <!-- Eyes -->
+    <rect x="6" y="-1" width="1" height="1" fill="#000"/>
+    <rect x="8" y="-1" width="1" height="1" fill="#000"/>
+    <!-- Crossbones -->
+    <rect x="5" y="1" width="1" height="1"/>
+    <rect x="9" y="1" width="1" height="1"/>
+    <rect x="6" y="0" width="3" height="1"/>
+    <rect x="5" y="-3" width="1" height="1"/>
+    <rect x="9" y="-3" width="1" height="1"/>
+  </g>
+
+  <!-- Legs -->
+  <g fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body group: agitated sway > breathe -->
+  <g class="ship-sway">
+    <g class="breathe">
+
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+      <!-- Tricorn hat -->
+      <rect x="3" y="3" width="9" height="1" fill="#212121"/>
+      <rect x="2" y="4" width="11" height="1" fill="#212121"/>
+      <rect x="1" y="5" width="13" height="1" fill="#212121"/>
+      <!-- Skull on hat -->
+      <rect x="7" y="3" width="1" height="1" fill="#FFF"/>
+
+      <!-- Eye patch (right eye) -->
+      <rect x="9" y="7" width="3" height="2" fill="#212121"/>
+      <!-- Patch strings -->
+      <rect x="8" y="7" width="1" height="1" fill="#212121"/>
+      <rect x="12" y="7" width="1" height="1" fill="#212121"/>
+
+      <!-- Left eye only (worried - looks down) -->
+      <g class="worried-eye">
+        <g class="left-blink" fill="#000">
+          <rect x="5" y="8" width="1" height="1"/>
+        </g>
+      </g>
+
+      <!-- Arms -->
+      <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+      <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+
+    </g>
+  </g>
+
+  </g>
+</svg>
