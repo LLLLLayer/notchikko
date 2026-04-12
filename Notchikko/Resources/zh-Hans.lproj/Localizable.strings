@@ -1,0 +1,65 @@
+/* MenuBarManager */
+"menu.sessions" = "Sessions";
+"menu.auto" = "🔄 Auto（自动跟踪）";
+"menu.display" = "显示器";
+"menu.settings" = "设置...";
+"menu.quit" = "退出 Notchikko";
+
+/* SettingsWindow - Tabs */
+"settings.general" = "通用";
+"settings.display" = "显示";
+"settings.sound" = "声音";
+"settings.cli" = "CLI 集成";
+
+/* SettingsWindow - General */
+"settings.approval_delay" = "审批卡片隐藏延时";
+"settings.seconds_3" = "3 秒";
+"settings.seconds_5" = "5 秒";
+"settings.seconds_10" = "10 秒";
+"settings.never_hide" = "永不隐藏";
+
+/* SettingsWindow - Display */
+"settings.pet_size" = "宠物大小";
+"settings.size_small" = "小 (0.6x)";
+"settings.size_medium" = "中 (1.0x)";
+"settings.size_large" = "大 (1.5x)";
+"settings.theme" = "主题";
+"settings.import_theme" = "导入主题...";
+"settings.import_theme_msg" = "选择包含 theme.json 和 SVG 文件的主题文件夹";
+
+/* SettingsWindow - Sound */
+"settings.volume" = "音量";
+"settings.sound_custom" = "音效自定义";
+"settings.pick_file" = "选择文件...";
+"settings.reset_default" = "恢复默认";
+"settings.custom" = "自定义";
+"settings.default" = "默认";
+
+/* SettingsWindow - CLI */
+"settings.bypass_permissions" = "Bypass Permissions";
+"settings.bypass_on_desc" = "已开启 — 所有工具自动放行，不弹审批卡片";
+"settings.bypass_off_desc" = "关闭中 — 修改型工具会弹出审批卡片";
+"settings.enable" = "开启";
+"settings.disable" = "关闭";
+"settings.hook_installed" = "Hook 状态: ✅ 已安装";
+"settings.hook_not_installed" = "Hook 状态: ❌ 未安装";
+"settings.reinstall" = "重新安装";
+"settings.install_hook" = "一键安装 Hook";
+"settings.coming_soon" = "Coming Soon";
+"settings.title" = "Notchikko 设置";
+
+/* ApprovalCardView */
+"approval.allow" = "允许";
+"approval.deny" = "拒绝";
+
+/* SessionManager - Phase Display Names */
+"session.phase.idle" = "等待中";
+"session.phase.thinking" = "思考中";
+"session.phase.sweeping" = "压缩中";
+"session.phase.ended" = "已结束";
+
+/* PreferencesStore - SoundVolume */
+"sound.volume.mute" = "静音";
+"sound.volume.low" = "小";
+"sound.volume.medium" = "中";
+"sound.volume.high" = "大";

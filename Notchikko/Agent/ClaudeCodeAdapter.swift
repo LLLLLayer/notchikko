@@ -53,16 +53,26 @@ final class ClaudeCodeAdapter: AgentBridge {
         case "PostToolUse":
             let success = hook.status != "error"
             return .toolUse(sessionId: hook.sessionId, tool: hook.tool ?? "", phase: .post(success: success))
+        case "PostToolUseFailure":
+            return .toolUse(sessionId: hook.sessionId, tool: hook.tool ?? "", phase: .post(success: false))
         case "PreCompact":
             return .compact(sessionId: hook.sessionId)
-        case "Stop":
+        case "PostCompact":
+            return .prompt(sessionId: hook.sessionId)
+        case "Stop", "SubagentStop":
             return .stop(sessionId: hook.sessionId)
         case "StopFailure":
             return .error(sessionId: hook.sessionId, message: "Task failed")
+        case "SubagentStart":
+            return .prompt(sessionId: hook.sessionId)
         case "Notification":
             return .notification(sessionId: hook.sessionId, message: "")
-        default:
+        case "Elicitation", "PermissionRequest":
+            return .notification(sessionId: hook.sessionId, message: hook.event)
+        case "WorktreeCreate":
             return .prompt(sessionId: hook.sessionId)
+        default:
+            return .notification(sessionId: hook.sessionId, message: hook.event)
         }
     }
 }

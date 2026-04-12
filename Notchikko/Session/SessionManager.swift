@@ -25,11 +25,11 @@ final class SessionManager {
 
         var phaseDisplayName: String {
             switch phase {
-            case .waitingForInput: return "idle"
-            case .processing: return "thinking"
+            case .waitingForInput: return String(localized: "session.phase.idle")
+            case .processing: return String(localized: "session.phase.thinking")
             case .runningTool(let t): return t.lowercased()
-            case .compacting: return "sweeping"
-            case .ended: return "ended"
+            case .compacting: return String(localized: "session.phase.sweeping")
+            case .ended: return String(localized: "session.phase.ended")
             }
         }
     }
@@ -78,7 +78,9 @@ final class SessionManager {
     // MARK: - 事件处理
 
     func handleEvent(_ event: AgentEvent) {
+        #if DEBUG
         print("[SessionManager] handleEvent: \(event), activeSessionId=\(activeSessionId ?? "nil"), currentState=\(currentState)")
+        #endif
         let eventSessionId = sessionIdOf(event)
 
         // 收到未知 session 的事件时自动创建（应对中途安装 hook 的场景）
@@ -127,7 +129,8 @@ final class SessionManager {
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .happy)
-                scheduleReturn(to: .idle, delay: 3.0)
+                // 庆祝完后，如果绑定了这个 session 且有其他活跃 session，自动切换
+                scheduleAutoSwitch(from: sid, delay: 3.0)
             }
 
         case .error(let sid, _):
@@ -222,7 +225,9 @@ final class SessionManager {
             id: sid, cwd: cwd, source: source,
             lastEvent: Date(), phase: .waitingForInput
         )
+        #if DEBUG
         print("[SessionManager] Auto-created session \(sid.prefix(8))")
+        #endif
     }
 
     private func sessionIdOf(_ event: AgentEvent) -> String {
@@ -274,6 +279,27 @@ final class SessionManager {
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             currentState = state
+        }
+    }
+
+    /// 庆祝完后自动切换到下一个活跃 session
+    private func scheduleAutoSwitch(from sid: String, delay: TimeInterval) {
+        returnTimer?.cancel()
+        returnTimer = Task {
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+
+            // 如果绑定的就是这个 session，自动解绑
+            if pinnedSessionId == sid {
+                pinnedSessionId = nil
+            }
+
+            // 切换到下一个活跃 session 的状态
+            if let nextId = activeSessionId, let next = sessions[nextId] {
+                currentState = stateForPhase(next.phase)
+            } else {
+                currentState = .idle
+            }
         }
     }
 }

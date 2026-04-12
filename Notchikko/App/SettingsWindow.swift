@@ -4,10 +4,16 @@ import UniformTypeIdentifiers
 // MARK: - 设置面板主窗口（侧边栏导航）
 
 enum SettingsTab: String, CaseIterable {
-    case general = "通用"
-    case display = "显示"
-    case sound = "声音"
-    case cli = "CLI 集成"
+    case general, display, sound, cli
+
+    var displayName: String {
+        switch self {
+        case .general: return String(localized: "settings.general")
+        case .display: return String(localized: "settings.display")
+        case .sound: return String(localized: "settings.sound")
+        case .cli: return String(localized: "settings.cli")
+        }
+    }
 
     var icon: String {
         switch self {
@@ -25,7 +31,7 @@ struct SettingsWindowView: View {
     var body: some View {
         NavigationSplitView {
             List(SettingsTab.allCases, id: \.self, selection: $selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.icon)
+                Label(tab.displayName, systemImage: tab.icon)
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 200)
@@ -55,19 +61,19 @@ struct SettingsWindowView: View {
 struct GeneralSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("通用")
+            Text(String(localized: "settings.general"))
                 .font(.title2.bold())
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("审批卡片隐藏延时")
+                        Text(String(localized: "settings.approval_delay"))
                         Spacer()
                         Picker("", selection: hideDelayBinding) {
-                            Text("3 秒").tag(3.0 as TimeInterval)
-                            Text("5 秒").tag(5.0 as TimeInterval)
-                            Text("10 秒").tag(10.0 as TimeInterval)
-                            Text("永不隐藏").tag(0.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
+                            Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
                         }
                         .frame(width: 140)
                     }
@@ -93,28 +99,56 @@ struct GeneralSettingsView: View {
 // MARK: - 显示
 
 struct DisplaySettingsView: View {
+    @State private var themes: [ThemeInfo] = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("显示")
+            Text(String(localized: "settings.display"))
                 .font(.title2.bold())
 
             GroupBox {
-                HStack {
-                    Text("宠物大小")
-                    Spacer()
-                    Picker("", selection: scaleBinding) {
-                        Text("小 (0.6x)").tag(0.6 as CGFloat)
-                        Text("中 (1.0x)").tag(1.0 as CGFloat)
-                        Text("大 (1.5x)").tag(1.5 as CGFloat)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(String(localized: "settings.pet_size"))
+                        Spacer()
+                        Picker("", selection: scaleBinding) {
+                            Text(String(localized: "settings.size_small")).tag(0.6 as CGFloat)
+                            Text(String(localized: "settings.size_medium")).tag(1.0 as CGFloat)
+                            Text(String(localized: "settings.size_large")).tag(1.5 as CGFloat)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 220)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 220)
+
+                    Divider()
+
+                    // 主题选择
+                    HStack {
+                        Text(String(localized: "settings.theme"))
+                        Spacer()
+                        Picker("", selection: themeBinding) {
+                            ForEach(themes) { theme in
+                                Text(theme.name).tag(theme.id)
+                            }
+                        }
+                        .frame(width: 160)
+                    }
+
+                    // 导入主题
+                    HStack {
+                        Spacer()
+                        Button(String(localized: "settings.import_theme")) {
+                            importTheme()
+                        }
+                        .controlSize(.small)
+                    }
                 }
                 .padding(4)
             }
 
             Spacer()
         }
+        .onAppear { themes = ThemeProvider.shared.availableThemes }
     }
 
     private var scaleBinding: Binding<CGFloat> {
@@ -126,6 +160,30 @@ struct DisplaySettingsView: View {
             }
         )
     }
+
+    private var themeBinding: Binding<String> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.themeId },
+            set: {
+                PreferencesStore.shared.preferences.themeId = $0
+                PreferencesStore.shared.save()
+            }
+        )
+    }
+
+    private func importTheme() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.message = String(localized: "settings.import_theme_msg")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let themeId = try ThemeProvider.shared.importTheme(from: url)
+            PreferencesStore.shared.preferences.themeId = themeId
+            PreferencesStore.shared.save()
+            themes = ThemeProvider.shared.availableThemes
+        } catch {}
+    }
 }
 
 // MARK: - 声音
@@ -133,14 +191,14 @@ struct DisplaySettingsView: View {
 struct SoundSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("声音")
+            Text(String(localized: "settings.sound"))
                 .font(.title2.bold())
 
             // 总开关 + 音量
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("音量")
+                        Text(String(localized: "settings.volume"))
                         Spacer()
                         Picker("", selection: volumeBinding) {
                             ForEach(SoundVolume.allCases, id: \.self) { vol in
@@ -155,7 +213,7 @@ struct SoundSettingsView: View {
             }
 
             // 各状态音效自定义
-            GroupBox("音效自定义") {
+            GroupBox(String(localized: "settings.sound_custom")) {
                 VStack(spacing: 0) {
                     ForEach(Array(SoundManager.soundableStates.enumerated()), id: \.element) { index, state in
                         if index > 0 { Divider() }
@@ -186,10 +244,11 @@ struct SoundSettingsView: View {
 struct CLISettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
+    @State private var isBypassOn: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("CLI 集成")
+            Text(String(localized: "settings.cli"))
                 .font(.title2.bold())
 
             VStack(spacing: 12) {
@@ -206,9 +265,39 @@ struct CLISettingsView: View {
                 ComingSoonRow(icon: "💎", name: "Gemini CLI")
             }
 
+            // Bypass Permissions
+            GroupBox {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.shield")
+                                .foregroundStyle(.red)
+                            Text(String(localized: "settings.bypass_permissions"))
+                                .font(.body.bold())
+                        }
+                        Text(isBypassOn
+                             ? String(localized: "settings.bypass_on_desc")
+                             : String(localized: "settings.bypass_off_desc"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(isBypassOn ? String(localized: "settings.disable") : String(localized: "settings.enable")) {
+                        toggleBypass()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isBypassOn ? .gray : .red)
+                    .controlSize(.small)
+                }
+                .padding(4)
+            }
+
             Spacer()
         }
-        .onAppear { refreshStatuses() }
+        .onAppear {
+            refreshStatuses()
+            isBypassOn = readBypassStatus()
+        }
     }
 
     private func installHook(_ cli: CLIHookConfig) {
@@ -225,6 +314,35 @@ struct CLISettingsView: View {
             hookStatuses[cli.name] = hookInstaller.isInstalled(for: cli)
         }
     }
+
+    private func readBypassStatus() -> Bool {
+        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return json["skipDangerousModePermissionPrompt"] as? Bool ?? false
+    }
+
+    private func toggleBypass() {
+        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
+        let url = URL(fileURLWithPath: path)
+        var json: [String: Any] = [:]
+
+        if let data = try? Data(contentsOf: url),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            json = existing
+        }
+
+        let newValue = !(json["skipDangerousModePermissionPrompt"] as? Bool ?? false)
+        json["skipDangerousModePermissionPrompt"] = newValue
+
+        if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: url, options: .atomic)
+        }
+
+        isBypassOn = newValue
+    }
 }
 
 // MARK: - 子组件
@@ -240,16 +358,16 @@ private struct CLIRow: View {
             Text(cli.icon).font(.title2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(cli.displayName).font(.body.bold())
-                Text(isInstalled ? "Hook 状态: ✅ 已安装" : "Hook 状态: ❌ 未安装")
+                Text(isInstalled ? String(localized: "settings.hook_installed") : String(localized: "settings.hook_not_installed"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             if isInstalled {
-                Button("重新安装") { onReinstall() }
+                Button(String(localized: "settings.reinstall")) { onReinstall() }
                     .controlSize(.small)
             } else {
-                Button("一键安装 Hook") { onInstall() }
+                Button(String(localized: "settings.install_hook")) { onInstall() }
                     .controlSize(.small)
                     .buttonStyle(.borderedProminent)
             }
@@ -269,7 +387,7 @@ private struct ComingSoonRow: View {
             Text(icon).font(.title2)
             Text(name).font(.body.bold())
             Spacer()
-            Text("Coming Soon")
+            Text(String(localized: "settings.coming_soon"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -288,15 +406,15 @@ private struct SoundCustomRow: View {
             Text(stateName)
                 .frame(width: 80, alignment: .leading)
             if hasCustom {
-                Text("自定义").font(.caption).foregroundStyle(.blue)
+                Text(String(localized: "settings.custom")).font(.caption).foregroundStyle(.blue)
             } else {
-                Text("默认").font(.caption).foregroundStyle(.secondary)
+                Text(String(localized: "settings.default")).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("选择文件...") { pickFile() }
+            Button(String(localized: "settings.pick_file")) { pickFile() }
                 .controlSize(.small)
             if hasCustom {
-                Button("恢复默认") { resetToDefault() }
+                Button(String(localized: "settings.reset_default")) { resetToDefault() }
                     .controlSize(.small)
             }
         }

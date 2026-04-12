@@ -26,9 +26,16 @@ final class MenuBarManager {
         if let sm = sessionManager {
             let sessions = sm.activeSessions
             if !sessions.isEmpty {
-                let header = NSMenuItem(title: "Sessions", action: nil, keyEquivalent: "")
+                let header = NSMenuItem(title: NSLocalizedString("menu.sessions", comment: ""), action: nil, keyEquivalent: "")
                 header.isEnabled = false
                 menu.addItem(header)
+
+                // Auto 选项（自动跟踪最新活跃 session）
+                let autoItem = NSMenuItem(title: NSLocalizedString("menu.auto", comment: ""), action: #selector(pinSession(_:)), keyEquivalent: "")
+                autoItem.target = self
+                autoItem.representedObject = nil
+                autoItem.state = (sm.pinnedSessionId == nil) ? .on : .off
+                menu.addItem(autoItem)
 
                 for session in sessions {
                     let icon = agentIcon(for: session.source)
@@ -58,20 +65,20 @@ final class MenuBarManager {
                 }
                 screenMenu.addItem(item)
             }
-            let screenItem = NSMenuItem(title: "显示器", action: nil, keyEquivalent: "")
+            let screenItem = NSMenuItem(title: NSLocalizedString("menu.display", comment: ""), action: nil, keyEquivalent: "")
             screenItem.submenu = screenMenu
             menu.addItem(screenItem)
         }
 
         // 设置
-        let settingsItem = NSMenuItem(title: "设置...", action: #selector(openSettings(_:)), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: NSLocalizedString("menu.settings", comment: ""), action: #selector(openSettings(_:)), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
         // 退出
-        let quitItem = NSMenuItem(title: "退出 Notchikko", action: #selector(quitApp(_:)), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: NSLocalizedString("menu.quit", comment: ""), action: #selector(quitApp(_:)), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
@@ -89,13 +96,17 @@ final class MenuBarManager {
     // MARK: - Actions
 
     @objc private func pinSession(_ sender: NSMenuItem) {
-        guard let sessionId = sender.representedObject as? String else { return }
         guard let sm = sessionManager else { return }
-        // 再次点击已绑定的 session → 取消绑定（回到自动模式）
-        if sm.pinnedSessionId == sessionId {
-            sm.pinSession(nil)
+        if let sessionId = sender.representedObject as? String {
+            // 点击具体 session → 绑定（再次点击同一个 → 取消）
+            if sm.pinnedSessionId == sessionId {
+                sm.pinSession(nil)
+            } else {
+                sm.pinSession(sessionId)
+            }
         } else {
-            sm.pinSession(sessionId)
+            // 点击 Auto → 取消绑定，回到自动模式
+            sm.pinSession(nil)
         }
     }
 

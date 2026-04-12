@@ -1,0 +1,65 @@
+/* MenuBarManager */
+"menu.sessions" = "Sessions";
+"menu.auto" = "🔄 Auto (track latest)";
+"menu.display" = "Display";
+"menu.settings" = "Settings...";
+"menu.quit" = "Quit Notchikko";
+
+/* SettingsWindow - Tabs */
+"settings.general" = "General";
+"settings.display" = "Display";
+"settings.sound" = "Sound";
+"settings.cli" = "CLI Integration";
+
+/* SettingsWindow - General */
+"settings.approval_delay" = "Approval card hide delay";
+"settings.seconds_3" = "3 sec";
+"settings.seconds_5" = "5 sec";
+"settings.seconds_10" = "10 sec";
+"settings.never_hide" = "Never hide";
+
+/* SettingsWindow - Display */
+"settings.pet_size" = "Pet size";
+"settings.size_small" = "Small (0.6x)";
+"settings.size_medium" = "Medium (1.0x)";
+"settings.size_large" = "Large (1.5x)";
+"settings.theme" = "Theme";
+"settings.import_theme" = "Import Theme...";
+"settings.import_theme_msg" = "Select a theme folder containing theme.json and SVG files";
+
+/* SettingsWindow - Sound */
+"settings.volume" = "Volume";
+"settings.sound_custom" = "Sound Customization";
+"settings.pick_file" = "Pick File...";
+"settings.reset_default" = "Reset Default";
+"settings.custom" = "Custom";
+"settings.default" = "Default";
+
+/* SettingsWindow - CLI */
+"settings.bypass_permissions" = "Bypass Permissions";
+"settings.bypass_on_desc" = "Enabled — all tools auto-approved, no approval card";
+"settings.bypass_off_desc" = "Disabled — destructive tools will show approval card";
+"settings.enable" = "Enable";
+"settings.disable" = "Disable";
+"settings.hook_installed" = "Hook status: ✅ Installed";
+"settings.hook_not_installed" = "Hook status: ❌ Not installed";
+"settings.reinstall" = "Reinstall";
+"settings.install_hook" = "Install Hook";
+"settings.coming_soon" = "Coming Soon";
+"settings.title" = "Notchikko Settings";
+
+/* ApprovalCardView */
+"approval.allow" = "Allow";
+"approval.deny" = "Deny";
+
+/* SessionManager - Phase Display Names */
+"session.phase.idle" = "idle";
+"session.phase.thinking" = "thinking";
+"session.phase.sweeping" = "sweeping";
+"session.phase.ended" = "ended";
+
+/* PreferencesStore - SoundVolume */
+"sound.volume.mute" = "Mute";
+"sound.volume.low" = "Low";
+"sound.volume.medium" = "Medium";
+"sound.volume.high" = "High";

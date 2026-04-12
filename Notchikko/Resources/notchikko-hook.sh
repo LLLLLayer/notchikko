@@ -9,7 +9,7 @@ SOURCE="${1:-unknown}"
 [ -S "$SOCKET_PATH" ] || exit 0
 
 /usr/bin/python3 -c "
-import json, socket, sys, uuid
+import json, socket, sys, uuid, os
 
 try:
     input_data = json.load(sys.stdin)
@@ -22,14 +22,23 @@ status_map = {
     'UserPromptSubmit': 'processing',
     'PreToolUse': 'running_tool',
     'PostToolUse': 'processing',
+    'PostToolUseFailure': 'error',
     'PreCompact': 'compacting',
+    'PostCompact': 'processing',
     'SessionStart': 'waiting_for_input',
     'SessionEnd': 'ended',
     'Stop': 'waiting_for_input',
     'StopFailure': 'error',
-    'SubagentStop': 'waiting_for_input',
+    'SubagentStart': 'subagent_start',
+    'SubagentStop': 'subagent_stop',
     'Notification': 'notification',
+    'Elicitation': 'elicitation',
+    'WorktreeCreate': 'worktree_create',
+    'PermissionRequest': 'permission_request',
 }
+
+if hook_event not in status_map:
+    sys.exit(0)
 
 output = {
     'session_id': input_data.get('session_id', ''),
@@ -41,22 +50,33 @@ output = {
     'source': '$SOURCE',
 }
 
-# PreToolUse 阻塞模式 — 仅对修改型工具发起审批
+# 检查是否开启了 bypass permissions（dangerously skip permissions）
+bypass_permissions = False
+try:
+    settings_path = os.path.expanduser('~/.claude/settings.json')
+    with open(settings_path) as f:
+        settings = json.load(f)
+    bypass_permissions = settings.get('skipDangerousModePermissionPrompt', False)
+except:
+    pass
+
+# PreToolUse 阻塞审批 — 仅修改型工具 + 未开启 bypass
 approval_tools = {'Bash', 'Edit', 'Write', 'NotebookEdit'}
 tool_name = input_data.get('tool_name', '')
-needs_approval = hook_event == 'PreToolUse' and tool_name in approval_tools
+needs_approval = (hook_event == 'PreToolUse'
+                  and tool_name in approval_tools
+                  and not bypass_permissions)
 
 if needs_approval:
     output['request_id'] = str(uuid.uuid4())
 
 try:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.settimeout(2 if not needs_approval else 300)  # 审批最长等 5 分钟
+    sock.settimeout(2 if not needs_approval else 300)
     sock.connect('$SOCKET_PATH')
     sock.sendall(json.dumps(output).encode())
 
     if needs_approval:
-        # 等待 app 回写审批结果
         sock.settimeout(300)
         response_data = b''
         while True:
@@ -65,21 +85,17 @@ try:
                 if not chunk:
                     break
                 response_data += chunk
-                # 收到完整 JSON 就退出
                 try:
                     result = json.loads(response_data.decode())
-                    # 输出到 stdout 供 CLI 读取
                     print(json.dumps(result))
                     break
                 except json.JSONDecodeError:
                     continue
             except socket.timeout:
-                # 超时 — 默认放行
                 print(json.dumps({'decision': 'allow'}))
                 break
     sock.close()
 except:
     if needs_approval:
-        # 连接失败 — 默认放行（不阻塞 CLI）
         print(json.dumps({'decision': 'allow'}))
 " 2>/dev/null

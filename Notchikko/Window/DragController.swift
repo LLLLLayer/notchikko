@@ -127,13 +127,14 @@ final class DragController {
     private func petScreenRect(panel: NotchPanel) -> NSRect {
         let panelFrame = panel.frame
         // 宠物贴在 panel 顶部，上半身藏在 notch 里
-        // 点击区域 = notch 下沿往下 petSize 高度（覆盖宠物可见部分）
+        // 热区比实际宠物大一圈（上下左右各扩 20px），更容易点到
+        let padding: CGFloat = 20
         let visibleTop = panelFrame.maxY - notchHeight
         return NSRect(
-            x: panelFrame.midX - petSize / 2,
-            y: visibleTop - petSize,
-            width: petSize,
-            height: petSize
+            x: panelFrame.midX - petSize / 2 - padding,
+            y: visibleTop - petSize - padding,
+            width: petSize + padding * 2,
+            height: petSize + padding * 2
         )
     }
 

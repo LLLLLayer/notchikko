@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var approvalManager: ApprovalManager?
     private var stateBeforeDrag: NotchikkoState?
     private var settingsWindow: NSWindow?
+    private var approvalPanel: NSPanel?
     private var hotkeyMonitor: Any?
     private let terminalJumper = TerminalJumper()
 
@@ -62,7 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let contentView = NotchContentView(
             notchHeight: geo.notchSize.height,
             sessionManager: sessionManager,
-            approvalManager: approvalManager,
             petSize: petSize
         )
         let hostingView = NSHostingView(rootView: contentView)
@@ -148,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Notchikko 设置"
+        window.title = NSLocalizedString("settings.title", comment: "")
         window.contentView = NSHostingView(rootView: settingsView)
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -167,8 +167,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 审批请求回调
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
-            self?.approvalManager?.handleApprovalRequest(from: hookEvent)
-            self?.sessionManager.overrideState(.approving)
+            guard let self else { return }
+            self.approvalManager?.handleApprovalRequest(from: hookEvent)
+            self.sessionManager.overrideState(.approving)
+            self.showApprovalPanel()
         }
 
         Task {
@@ -200,6 +202,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return event
         }
+    }
+
+    // MARK: - 独立审批窗口
+
+    private func showApprovalPanel() {
+        guard let geo = geometry, let approval = approvalManager else { return }
+
+        // 已有窗口则刷新内容
+        if let existing = approvalPanel, existing.isVisible {
+            existing.orderFrontRegardless()
+            return
+        }
+
+        let cardView = ApprovalCardView(
+            request: approval.pendingApproval!,
+            onApprove: { [weak self] in
+                approval.approve()
+                self?.hideApprovalPanel()
+            },
+            onDeny: { [weak self] in
+                approval.deny()
+                self?.hideApprovalPanel()
+            }
+        )
+
+        let hostingView = NSHostingView(rootView: cardView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        // 卡片尺寸
+        let cardWidth: CGFloat = 260
+        let cardHeight: CGFloat = 140
+        // 定位到 notch 右侧
+        let screen = currentScreen ?? NSScreen.main!
+        let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8
+        let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.level = .statusBar + 1
+        panel.hasShadow = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isMovableByWindowBackground = false
+
+        let wrapper = NSView(frame: panel.contentView!.bounds)
+        wrapper.autoresizingMask = [.width, .height]
+        wrapper.addSubview(hostingView)
+        panel.contentView = wrapper
+
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: wrapper.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+        ])
+
+        panel.orderFrontRegardless()
+        self.approvalPanel = panel
+    }
+
+    private func hideApprovalPanel() {
+        approvalPanel?.orderOut(nil)
+        approvalPanel = nil
     }
 
     private func observeScreenChanges() {

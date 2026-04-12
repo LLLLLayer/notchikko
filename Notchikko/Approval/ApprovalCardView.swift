@@ -36,7 +36,7 @@ struct ApprovalCardView: View {
                 Spacer()
 
                 Button(action: onDeny) {
-                    Text("Deny")
+                    Text(String(localized: "approval.deny"))
                         .font(.system(size: 12, weight: .medium))
                         .frame(width: 56, height: 26)
                 }
@@ -46,7 +46,7 @@ struct ApprovalCardView: View {
                 .keyboardShortcut("n", modifiers: .command)
 
                 Button(action: onApprove) {
-                    Text("Allow")
+                    Text(String(localized: "approval.allow"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 56, height: 26)

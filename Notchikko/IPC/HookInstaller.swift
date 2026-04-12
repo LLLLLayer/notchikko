@@ -18,9 +18,14 @@ final class HookInstaller {
             icon: "🤖",
             settingsPath: "~/.claude/settings.json",
             hookEvents: [
-                "UserPromptSubmit", "SessionStart", "SessionEnd",
-                "PreToolUse", "PostToolUse",
-                "Stop", "PreCompact", "Notification",
+                "SessionStart", "SessionEnd",
+                "UserPromptSubmit",
+                "PreToolUse", "PostToolUse", "PostToolUseFailure",
+                "PreCompact", "PostCompact",
+                "Stop", "StopFailure",
+                "SubagentStart", "SubagentStop",
+                "Notification", "Elicitation",
+                "WorktreeCreate", "PermissionRequest",
             ]
         ),
         CLIHookConfig(

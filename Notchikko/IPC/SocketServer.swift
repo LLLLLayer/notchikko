@@ -62,14 +62,18 @@ final class SocketServer {
 
     private func startServer() {
         if isSocketActive(Self.socketPath) {
+            #if DEBUG
             print("[SocketServer] Another instance is already listening")
+            #endif
             return
         }
         unlink(Self.socketPath)
 
         serverSocket = socket(AF_UNIX, SOCK_STREAM, 0)
         guard serverSocket >= 0 else {
+            #if DEBUG
             print("[SocketServer] Failed to create socket: \(errno)")
+            #endif
             return
         }
 
@@ -92,7 +96,6 @@ final class SocketServer {
         }
 
         guard bindResult == 0 else {
-            print("[SocketServer] Failed to bind: \(errno)")
             close(serverSocket)
             serverSocket = -1
             return
@@ -101,13 +104,10 @@ final class SocketServer {
         chmod(Self.socketPath, 0o600)
 
         guard listen(serverSocket, 10) == 0 else {
-            print("[SocketServer] Failed to listen: \(errno)")
             close(serverSocket)
             serverSocket = -1
             return
         }
-
-        print("[SocketServer] Listening on \(Self.socketPath)")
 
         acceptSource = DispatchSource.makeReadSource(fileDescriptor: serverSocket, queue: serverQueue)
         acceptSource?.setEventHandler { [weak self] in
@@ -148,20 +148,14 @@ final class SocketServer {
         }
 
         guard !data.isEmpty else {
-            print("[SocketServer] Empty data from client")
             close(clientSocket)
             return
         }
-
-        print("[SocketServer] Received \(data.count) bytes: \(String(data: data, encoding: .utf8) ?? "?")")
 
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: data) else {
-            print("[SocketServer] Failed to parse event, raw: \(String(data: data, encoding: .utf8) ?? "?")")
             close(clientSocket)
             return
         }
-
-        print("[SocketServer] Parsed event: \(event.event) session=\(event.sessionId) tool=\(event.tool ?? "") hasRequestId=\(event.requestId != nil)")
 
         // 如果有 request_id，说明是审批请求 — 保持连接等待回写
         if let requestId = event.requestId, !requestId.isEmpty {

@@ -7,8 +7,9 @@ final class PreferencesStore {
 
     var preferences: NotchikkoPreferences {
         didSet {
-            let scaleChanged = oldValue.petScale != preferences.petScale
-            scheduleSave(notifyUI: scaleChanged)
+            let needsRefresh = oldValue.petScale != preferences.petScale
+                || oldValue.themeId != preferences.themeId
+            scheduleSave(notifyUI: needsRefresh)
         }
     }
 
@@ -64,6 +65,7 @@ struct NotchikkoPreferences: Codable, Equatable {
     var customSounds: [String: String] = [:]
     var approvalCardHideDelay: TimeInterval = 5
     var installedHooks: [String: Bool] = [:]
+    var themeId: String = "clawd"
 }
 
 enum SoundVolume: String, Codable, CaseIterable {
@@ -71,10 +73,10 @@ enum SoundVolume: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .mute: return "静音"
-        case .low: return "小"
-        case .medium: return "中"
-        case .high: return "大"
+        case .mute: return String(localized: "sound.volume.mute")
+        case .low: return String(localized: "sound.volume.low")
+        case .medium: return String(localized: "sound.volume.medium")
+        case .high: return String(localized: "sound.volume.high")
         }
     }
 

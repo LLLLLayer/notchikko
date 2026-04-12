@@ -29,13 +29,16 @@ final class NotchikkoView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// 加载 SVG — SVG 文件本身已经是最终朝向，代码不做任何翻转
-    func loadSVG(named name: String) {
-        guard name != currentSVG else { return }
-        currentSVG = name
+    /// 通过状态加载 SVG（经 ThemeProvider 解析主题）
+    func loadSVG(for state: NotchikkoState) {
+        let key = state.rawValue
+        guard key != currentSVG else { return }
+        currentSVG = key
 
-        guard let url = Bundle.main.url(forResource: name, withExtension: "svg") else {
-            print("[NotchikkoView] SVG not found: \(name)")
+        guard let url = ThemeProvider.shared.svgURL(for: state) else {
+            #if DEBUG
+            print("[NotchikkoView] SVG not found for state: \(state)")
+            #endif
             return
         }
 
