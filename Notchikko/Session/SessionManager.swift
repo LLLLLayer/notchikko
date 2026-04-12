@@ -15,12 +15,33 @@ final class SessionManager {
     struct SessionInfo {
         let id: String
         let cwd: String
-        let source: String       // CLI 来源: "claude-code", "codex"
+        let source: String       // CLI 来源: "claude-code", "codex", "trae-cli"
         var lastEvent: Date
         var phase: SessionPhase
 
+        // v0.3: 上下文信息
+        var lastPrompt: String?              // 用户最近 prompt
+        var lastToolSummary: String?         // "Bash: xcodebuild ..." / "Edit: file.swift"
+        var matchedTerminal: TerminalMatch?  // 终端匹配缓存
+        var terminalPid: Int?                // 终端进程 PID（hook 进程树检测）
+        var terminalTty: String?             // 终端 tty 路径（iTerm2 tab 定位）
+
         var cwdName: String {
             (cwd as NSString).lastPathComponent
+        }
+
+        /// 副标题：prompt → tool summary → cwd（降级链）
+        var subtitle: String {
+            if let prompt = lastPrompt, !prompt.isEmpty {
+                // 去除换行，截断到 50 字符
+                let cleaned = prompt.components(separatedBy: .newlines).joined(separator: " ")
+                let trimmed = cleaned.prefix(50)
+                return trimmed.count < cleaned.count ? "\(trimmed)..." : String(trimmed)
+            }
+            if let tool = lastToolSummary, !tool.isEmpty {
+                return tool
+            }
+            return cwdName
         }
 
         var phaseDisplayName: String {
@@ -32,6 +53,11 @@ final class SessionManager {
             case .ended: return String(localized: "session.phase.ended")
             }
         }
+    }
+
+    struct TerminalMatch {
+        let bundleId: String
+        let appName: String      // "iTerm2", "Ghostty", "VSCode"
     }
 
     enum SessionPhase: Equatable {
@@ -86,20 +112,30 @@ final class SessionManager {
         // 收到未知 session 的事件时自动创建（应对中途安装 hook 的场景）
         ensureSession(event)
 
+        // 每个事件都可能携带 terminalPid，更新到 session（首次检测到时生效）
+        if case .sessionStart(_, _, _, let tPid) = event, let tPid,
+           sessions[eventSessionId]?.terminalPid == nil {
+            sessions[eventSessionId]?.terminalPid = tPid
+        }
+
         switch event {
-        case .sessionStart(let sid, let cwd, let source):
+        case .sessionStart(let sid, let cwd, let source, let terminalPid):
             sessions[sid] = SessionInfo(
                 id: sid, cwd: cwd, source: source,
-                lastEvent: Date(), phase: .waitingForInput
+                lastEvent: Date(), phase: .waitingForInput,
+                terminalPid: terminalPid
             )
             if eventSessionId == activeSessionId || activeSessionId == nil {
                 resetTimers()
                 transition(to: .idle)
             }
 
-        case .prompt(let sid):
+        case .prompt(let sid, let text):
             sessions[sid]?.phase = .processing
             sessions[sid]?.lastEvent = Date()
+            if let text, !text.isEmpty {
+                sessions[sid]?.lastPrompt = text
+            }
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .thinking)
@@ -110,6 +146,7 @@ final class SessionManager {
             case .pre:
                 sessions[sid]?.phase = .runningTool(tool)
                 sessions[sid]?.lastEvent = Date()
+                sessions[sid]?.lastToolSummary = tool
                 if sid == activeSessionId {
                     resetTimers()
                     transition(to: stateForTool(tool))
@@ -184,6 +221,9 @@ final class SessionManager {
         case "Bash":
             return .building
         default:
+            #if DEBUG
+            print("[SessionManager] Unknown tool '\(tool)', defaulting to .typing")
+            #endif
             return .typing
         }
     }
@@ -200,41 +240,106 @@ final class SessionManager {
 
     // MARK: - 外部控制
 
-    /// 直接设置状态（拖拽等外部控制用）
+    /// 拖拽期间冻结所有状态变更
+    private(set) var isDragging = false
+
+    /// 进入拖拽状态：冻结定时器和状态变更
+    func beginDrag() {
+        isDragging = true
+        idleTimer?.cancel()
+        sleepTimer?.cancel()
+        returnTimer?.cancel()
+        currentState = .dragging
+    }
+
+    /// 结束拖拽状态：解冻并恢复到当前 session 的实际状态
+    func endDrag() {
+        isDragging = false
+        // 从活跃 session 的当前 phase 计算正确状态，而非使用拖拽前的快照
+        if let sid = activeSessionId, let session = sessions[sid] {
+            currentState = stateForPhase(session.phase)
+        } else {
+            currentState = .idle
+        }
+        resetTimers()
+    }
+
+    /// 直接设置状态（外部控制用，拖拽期间被阻止）
     func overrideState(_ state: NotchikkoState) {
+        guard !isDragging else { return }
         currentState = state
+    }
+
+    /// 缓存 session 匹配到的终端信息
+    func setTerminalMatch(_ match: TerminalMatch, for sessionId: String) {
+        sessions[sessionId]?.matchedTerminal = match
+    }
+
+    /// 更新 session 的终端 PID
+    func setTerminalPid(_ pid: Int, for sessionId: String) {
+        guard sessions[sessionId]?.terminalPid == nil else { return }
+        sessions[sessionId]?.terminalPid = pid
+    }
+
+    /// 更新 session 的终端 tty
+    func setTerminalTty(_ tty: String, for sessionId: String) {
+        guard sessions[sessionId]?.terminalTty == nil else { return }
+        sessions[sessionId]?.terminalTty = tty
     }
 
     // MARK: - 内部
 
     /// 确保 session 存在，不存在则自动创建
+    /// 最大 session 数量，超过时淘汰最旧的已结束 session
+    private static let maxSessions = 32
+
     private func ensureSession(_ event: AgentEvent) {
         let sid = sessionIdOf(event)
         if case .sessionEnd = event { return }
         if sessions[sid] != nil { return }
 
-        // 从 sessionStart 中提取 cwd 和 source
+        // 超过上限时淘汰最旧的 ended session，再淘汰最旧的非活跃 session
+        if sessions.count >= Self.maxSessions {
+            evictOldestSession()
+        }
+
+        // 从 sessionStart 中提取 cwd、source、terminalPid
         var cwd = ""
         var source = "unknown"
-        if case .sessionStart(_, let c, let s) = event {
+        var tPid: Int? = nil
+        if case .sessionStart(_, let c, let s, let tp) = event {
             cwd = c
             source = s
+            tPid = tp
         }
 
         sessions[sid] = SessionInfo(
             id: sid, cwd: cwd, source: source,
-            lastEvent: Date(), phase: .waitingForInput
+            lastEvent: Date(), phase: .waitingForInput,
+            terminalPid: tPid
         )
         #if DEBUG
-        print("[SessionManager] Auto-created session \(sid.prefix(8))")
+        print("[SessionManager] Auto-created session \(sid.prefix(8)), total: \(sessions.count)")
         #endif
+    }
+
+    private func evictOldestSession() {
+        // 优先淘汰已结束的 session
+        if let oldest = sessions.values.filter({ $0.phase == .ended }).min(by: { $0.lastEvent < $1.lastEvent }) {
+            sessions.removeValue(forKey: oldest.id)
+            return
+        }
+        // 没有 ended session，淘汰最旧的 idle session
+        if let oldest = sessions.values.filter({ $0.phase == .waitingForInput }).min(by: { $0.lastEvent < $1.lastEvent }) {
+            sessions.removeValue(forKey: oldest.id)
+        }
     }
 
     private func sessionIdOf(_ event: AgentEvent) -> String {
         switch event {
-        case .sessionStart(let sid, _, _): return sid
+        case .sessionStart(let sid, _, _, _): return sid
         case .sessionEnd(let sid): return sid
-        case .prompt(let sid): return sid
+        case .prompt(let sid, _): return sid
         case .toolUse(let sid, _, _): return sid
         case .notification(let sid, _): return sid
         case .compact(let sid): return sid
@@ -244,6 +349,7 @@ final class SessionManager {
     }
 
     private func transition(to newState: NotchikkoState) {
+        guard !isDragging else { return }
         guard newState.priority >= currentState.priority
             || currentState == .idle
             || currentState == .sleeping else {
@@ -277,7 +383,7 @@ final class SessionManager {
         returnTimer?.cancel()
         returnTimer = Task {
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !isDragging else { return }
             currentState = state
         }
     }
@@ -287,7 +393,7 @@ final class SessionManager {
         returnTimer?.cancel()
         returnTimer = Task {
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !isDragging else { return }
 
             // 如果绑定的就是这个 session，自动解绑
             if pinnedSessionId == sid {

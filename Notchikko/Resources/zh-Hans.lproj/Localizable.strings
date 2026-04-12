@@ -43,14 +43,19 @@
 "settings.disable" = "关闭";
 "settings.hook_installed" = "Hook 状态: ✅ 已安装";
 "settings.hook_not_installed" = "Hook 状态: ❌ 未安装";
-"settings.reinstall" = "重新安装";
-"settings.install_hook" = "一键安装 Hook";
+"settings.install_hook" = "安装 Hook";
+"settings.uninstall_hook" = "卸载 Hook";
+"settings.bypass_active" = "已开启自动批准 — 所有工具全局自动放行，此设置来自审批卡片";
+"settings.disable_bypass" = "关闭";
 "settings.coming_soon" = "Coming Soon";
 "settings.title" = "Notchikko 设置";
 
 /* ApprovalCardView */
-"approval.allow" = "允许";
 "approval.deny" = "拒绝";
+"approval.allow_once" = "允许一次";
+"approval.allow_all" = "全部允许";
+"approval.auto_approve" = "自动批准";
+"approval.jump_to_terminal" = "跳转到终端";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "等待中";

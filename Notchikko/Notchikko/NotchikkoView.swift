@@ -4,6 +4,7 @@ import WebKit
 final class NotchikkoView: NSView {
     private let webView: WKWebView
     private var currentSVG: String = ""
+    private var hasLoadedInitialHTML = false
 
     override init(frame: NSRect) {
         let config = WKWebViewConfiguration()
@@ -44,6 +45,41 @@ final class NotchikkoView: NSView {
 
         guard let svgContent = try? String(contentsOf: url, encoding: .utf8) else { return }
 
+        // 已加载过 HTML → 用 JS 注入新 SVG 并做 crossfade
+        if hasLoadedInitialHTML {
+            let escaped = svgContent
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "`", with: "\\`")
+                .replacingOccurrences(of: "$", with: "\\$")
+            // 快速连续切换时，先清除所有残留的过渡层，只保留最新的
+            let js = """
+            (function() {
+                var layers = document.querySelectorAll('.svg-layer');
+                var next = document.createElement('div');
+                next.id = 'svg-current';
+                next.className = 'svg-layer';
+                next.style.opacity = '0';
+                next.innerHTML = `\(escaped)`;
+                document.body.appendChild(next);
+                requestAnimationFrame(function() {
+                    for (var i = 0; i < layers.length; i++) {
+                        layers[i].style.opacity = '0';
+                    }
+                    next.style.opacity = '1';
+                    setTimeout(function() {
+                        for (var i = 0; i < layers.length; i++) {
+                            layers[i].remove();
+                        }
+                    }, 350);
+                });
+            })();
+            """
+            webView.evaluateJavaScript(js)
+            return
+        }
+
+        // 首次加载：用完整 HTML 初始化页面结构
+        hasLoadedInitialHTML = true
         let html = """
         <!DOCTYPE html>
         <html>
@@ -56,6 +92,11 @@ final class NotchikkoView: NSView {
                 background: transparent;
                 overflow: hidden;
             }
+            .svg-layer {
+                position: absolute;
+                inset: 0;
+                transition: opacity 0.3s ease;
+            }
             svg {
                 width: 100%;
                 height: 100%;
@@ -63,7 +104,9 @@ final class NotchikkoView: NSView {
             }
         </style>
         </head>
-        <body>\(svgContent)</body>
+        <body>
+            <div id="svg-current" class="svg-layer">\(svgContent)</div>
+        </body>
         </html>
         """
 

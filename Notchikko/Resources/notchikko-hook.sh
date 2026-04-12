@@ -1,7 +1,7 @@
 #!/bin/bash
 # Notchikko Hook — forwards CLI agent events via Unix socket
 # Usage: notchikko-hook.sh [source]
-#   source: "claude-code", "codex", etc. (default: "unknown")
+#   source: "claude-code", "codex", "trae-cli", etc. (default: "unknown")
 SOCKET_PATH="/tmp/notchikko.sock"
 SOURCE="${1:-unknown}"
 
@@ -9,13 +9,118 @@ SOURCE="${1:-unknown}"
 [ -S "$SOCKET_PATH" ] || exit 0
 
 /usr/bin/python3 -c "
-import json, socket, sys, uuid, os
+import json, socket, sys, uuid, os, subprocess
+
+# 已知终端进程名 → 可匹配的关键词
+KNOWN_TERMINALS = {
+    'iTerm2', 'iTermServer', 'Terminal', 'Ghostty', 'ghostty',
+    'Alacritty', 'alacritty', 'kitty', 'WezTerm', 'wezterm-gui',
+    'Warp', 'Hyper',
+    'Code Helper', 'Cursor Helper',  # VSCode/Cursor 的终端进程
+}
+
+def detect_terminal_pid():
+    \"\"\"沿进程树向上查找终端应用的 PID\"\"\"
+    try:
+        pid = os.getppid()
+        for _ in range(15):
+            if pid <= 1:
+                break
+            # 获取进程名和父 PID
+            result = subprocess.run(
+                ['ps', '-o', 'ppid=,comm=', '-p', str(pid)],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode != 0:
+                break
+            parts = result.stdout.strip().split(None, 1)
+            if len(parts) < 2:
+                break
+            ppid_str, comm = parts
+            proc_name = comm.rsplit('/', 1)[-1]  # 取最后一段路径
+            # 检查是否是已知终端
+            for term in KNOWN_TERMINALS:
+                if term in proc_name:
+                    return pid
+            pid = int(ppid_str)
+    except:
+        pass
+    return None
 
 try:
     input_data = json.load(sys.stdin)
 except:
     sys.exit(0)
 
+source = '$SOURCE'
+terminal_pid = detect_terminal_pid()
+
+# ============================================================
+# Trae CLI (Coco) 适配
+# Trae CLI 的 JSON 格式与 Claude Code 不同：
+#   {'event_type': 'pre_tool_use', 'pre_tool_use': {'cwd': '...', 'tool_name': '...', ...}}
+# 需要转换为 Notchikko 统一格式
+# ============================================================
+if source == 'trae-cli':
+    event_type = input_data.get('event_type', '')
+    event_body = input_data.get(event_type, {})
+
+    TRAE_EVENT_MAP = {
+        'user_prompt_submit': ('UserPromptSubmit', 'processing'),
+        'pre_tool_use':       ('PreToolUse',       'running_tool'),
+        'post_tool_use':      ('PostToolUse',       'processing'),
+        'stop':               ('Stop',              'waiting_for_input'),
+        'subagent_stop':      ('SubagentStop',      'subagent_stop'),
+    }
+
+    if event_type not in TRAE_EVENT_MAP:
+        sys.exit(0)
+
+    mapped_event, mapped_status = TRAE_EVENT_MAP[event_type]
+
+    # Trae CLI 没有 session_id，用 PPID 作为稳定标识
+    session_id = 'trae-' + str(os.getppid())
+    # cwd 仅 tool 事件有，其余用 os.getcwd() fallback
+    cwd = event_body.get('cwd', '') or os.getcwd()
+
+    output = {
+        'session_id': session_id,
+        'cwd': cwd,
+        'event': mapped_event,
+        'status': mapped_status,
+        'tool': event_body.get('tool_name', ''),
+        'tool_input': event_body.get('tool_input', {}),
+        'source': source,
+    }
+
+    # Trae CLI 的 user_prompt_submit 包含 prompt 文本
+    prompt = event_body.get('prompt', '')
+    if prompt:
+        output['prompt'] = prompt[:200]
+    if terminal_pid:
+        output['terminal_pid'] = terminal_pid
+    try:
+        tty = os.ttyname(0)
+        if tty:
+            output['terminal_tty'] = tty
+    except:
+        pass
+
+    # Trae CLI 不支持审批阻塞，直接发送
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        sock.connect('$SOCKET_PATH')
+        sock.sendall(json.dumps(output).encode())
+        sock.close()
+    except:
+        pass
+
+    sys.exit(0)
+
+# ============================================================
+# Claude Code / Codex 标准格式
+# ============================================================
 hook_event = input_data.get('hook_event_name', '')
 
 status_map = {
@@ -40,6 +145,9 @@ status_map = {
 if hook_event not in status_map:
     sys.exit(0)
 
+# 检查 permission_mode（CLI stdin 携带，bypassPermissions = --dangerously-skip-permissions）
+permission_mode = input_data.get('permission_mode', 'default')
+
 output = {
     'session_id': input_data.get('session_id', ''),
     'cwd': input_data.get('cwd', ''),
@@ -47,18 +155,25 @@ output = {
     'status': status_map.get(hook_event, 'unknown'),
     'tool': input_data.get('tool_name', ''),
     'tool_input': input_data.get('tool_input', {}),
-    'source': '$SOURCE',
+    'source': source,
+    'permission_mode': permission_mode,
 }
 
-# 检查是否开启了 bypass permissions（dangerously skip permissions）
-bypass_permissions = False
+# UserPromptSubmit 事件包含用户 prompt 文本
+prompt_text = input_data.get('prompt', '')
+if prompt_text:
+    output['prompt'] = prompt_text[:200]
+if terminal_pid:
+    output['terminal_pid'] = terminal_pid
+# 获取当前 tty（用于 iTerm2 多 tab 定位）
 try:
-    settings_path = os.path.expanduser('~/.claude/settings.json')
-    with open(settings_path) as f:
-        settings = json.load(f)
-    bypass_permissions = settings.get('skipDangerousModePermissionPrompt', False)
+    tty = os.ttyname(0)
+    if tty:
+        output['terminal_tty'] = tty
 except:
     pass
+
+bypass_permissions = (permission_mode == 'bypassPermissions')
 
 # PreToolUse 阻塞审批 — 仅修改型工具 + 未开启 bypass
 approval_tools = {'Bash', 'Edit', 'Write', 'NotebookEdit'}

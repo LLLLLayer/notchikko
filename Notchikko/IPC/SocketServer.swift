@@ -97,10 +97,22 @@ final class SocketServer {
             }
         }
 
-        guard bindResult == 0 else {
-            close(serverSocket)
-            serverSocket = -1
-            return
+        if bindResult != 0 {
+            // bind 失败可能是旧 socket 文件残留，尝试 unlink 后重试
+            unlink(Self.socketPath)
+            let retryResult = withUnsafePointer(to: &addr) { ptr in
+                ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
+                    bind(serverSocket, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+                }
+            }
+            guard retryResult == 0 else {
+                #if DEBUG
+                print("[SocketServer] Bind failed after retry: \(errno)")
+                #endif
+                close(serverSocket)
+                serverSocket = -1
+                return
+            }
         }
 
         chmod(Self.socketPath, 0o600)
@@ -185,10 +197,11 @@ final class SocketServer {
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
+        let pathSize = MemoryLayout.size(ofValue: addr.sun_path)
         path.withCString { ptr in
             withUnsafeMutablePointer(to: &addr.sun_path) { pathPtr in
                 let buf = UnsafeMutableRawPointer(pathPtr).assumingMemoryBound(to: CChar.self)
-                strcpy(buf, ptr)
+                _ = strlcpy(buf, ptr, pathSize)
             }
         }
 

@@ -56,6 +56,8 @@ final class DragController {
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
         localMonitor = nil
         globalMonitor = nil
+        isDragging = false
+        mouseDownInPet = false
     }
 
     private func handleEvent(_ event: NSEvent) {

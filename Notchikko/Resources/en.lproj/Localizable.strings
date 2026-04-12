@@ -43,14 +43,19 @@
 "settings.disable" = "Disable";
 "settings.hook_installed" = "Hook status: ✅ Installed";
 "settings.hook_not_installed" = "Hook status: ❌ Not installed";
-"settings.reinstall" = "Reinstall";
 "settings.install_hook" = "Install Hook";
+"settings.uninstall_hook" = "Uninstall Hook";
+"settings.bypass_active" = "Auto Approve is ON — all tools auto-approved globally. This was set from the approval card.";
+"settings.disable_bypass" = "Disable";
 "settings.coming_soon" = "Coming Soon";
 "settings.title" = "Notchikko Settings";
 
 /* ApprovalCardView */
-"approval.allow" = "Allow";
 "approval.deny" = "Deny";
+"approval.allow_once" = "Allow Once";
+"approval.allow_all" = "Allow All";
+"approval.auto_approve" = "Auto Approve";
+"approval.jump_to_terminal" = "Jump to terminal";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "idle";

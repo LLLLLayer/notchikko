@@ -10,12 +10,17 @@ struct HookEvent: Decodable {
     let toolInput: [String: AnyCodableValue]?
     let source: String?
     let requestId: String?
+    let prompt: String?          // v0.3: 用户 prompt 文本
+    let terminalPid: Int?        // v0.3: 终端进程 PID（hook 进程树检测）
+    let terminalTty: String?     // v0.3: 终端 tty 路径（用于 iTerm2 tab 定位）
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case cwd, event, status, tool, source
+        case cwd, event, status, tool, source, prompt
         case toolInput = "tool_input"
         case requestId = "request_id"
+        case terminalPid = "terminal_pid"
+        case terminalTty = "terminal_tty"
     }
 }
 
@@ -39,9 +44,9 @@ enum AnyCodableValue: Decodable {
 
 /// 统一事件模型（多 Agent 通用）
 enum AgentEvent {
-    case sessionStart(sessionId: String, cwd: String, source: String)
+    case sessionStart(sessionId: String, cwd: String, source: String, terminalPid: Int?)
     case sessionEnd(sessionId: String)
-    case prompt(sessionId: String)
+    case prompt(sessionId: String, text: String?)
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)
     case notification(sessionId: String, message: String)
     case compact(sessionId: String)

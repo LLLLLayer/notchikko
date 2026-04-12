@@ -53,6 +53,8 @@ struct SettingsWindowView: View {
 struct GeneralSettingsView: View {
     @State private var themes: [ThemeInfo] = []
 
+    private let controlWidth: CGFloat = 220
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(String(localized: "settings.general"))
@@ -60,30 +62,26 @@ struct GeneralSettingsView: View {
 
             // 外观
             GroupBox(String(localized: "settings.display")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(String(localized: "settings.pet_size"))
-                        Spacer()
+                VStack(spacing: 12) {
+                    settingsRow(String(localized: "settings.pet_size")) {
                         Picker("", selection: scaleBinding) {
                             Text(String(localized: "settings.size_small")).tag(0.6 as CGFloat)
                             Text(String(localized: "settings.size_medium")).tag(1.0 as CGFloat)
                             Text(String(localized: "settings.size_large")).tag(1.5 as CGFloat)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 220)
+                        .frame(width: controlWidth)
                     }
 
                     Divider()
 
-                    HStack {
-                        Text(String(localized: "settings.theme"))
-                        Spacer()
+                    settingsRow(String(localized: "settings.theme")) {
                         Picker("", selection: themeBinding) {
                             ForEach(themes) { theme in
                                 Text(theme.name).tag(theme.id)
                             }
                         }
-                        .frame(width: 160)
+                        .frame(width: controlWidth)
                     }
                 }
                 .padding(4)
@@ -91,32 +89,28 @@ struct GeneralSettingsView: View {
 
             // 声音
             GroupBox(String(localized: "settings.sound")) {
-                HStack {
-                    Text(String(localized: "settings.volume"))
-                    Spacer()
+                settingsRow(String(localized: "settings.volume")) {
                     Picker("", selection: volumeBinding) {
                         ForEach(SoundVolume.allCases, id: \.self) { vol in
                             Text(vol.displayName).tag(vol)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 220)
+                    .frame(width: controlWidth)
                 }
                 .padding(4)
             }
 
             // 审批
             GroupBox {
-                HStack {
-                    Text(String(localized: "settings.approval_delay"))
-                    Spacer()
+                settingsRow(String(localized: "settings.approval_delay")) {
                     Picker("", selection: hideDelayBinding) {
                         Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
                         Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
                         Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
                         Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
                     }
-                    .frame(width: 140)
+                    .frame(width: controlWidth)
                 }
                 .padding(4)
             }
@@ -124,6 +118,16 @@ struct GeneralSettingsView: View {
             Spacer()
         }
         .onAppear { themes = ThemeProvider.shared.availableThemes }
+    }
+
+    /// 统一的设置行：左边标签 + 右边控件（固定宽度右对齐）
+    private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            content()
+                .frame(width: controlWidth, alignment: .trailing)
+        }
     }
 
     private var scaleBinding: Binding<CGFloat> {
@@ -185,46 +189,37 @@ struct CLISettingsView: View {
                         cli: cli,
                         isInstalled: hookStatuses[cli.name] ?? false,
                         onInstall: { installHook(cli) },
-                        onReinstall: { installHook(cli) }
+                        onUninstall: { uninstallHook(cli) }
                     )
                 }
 
-                ComingSoonRow(icon: "🔮", name: "Cursor")
                 ComingSoonRow(icon: "💎", name: "Gemini CLI")
             }
 
-            // Bypass Permissions
-            GroupBox {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.shield")
-                                .foregroundStyle(.red)
-                            Text(String(localized: "settings.bypass_permissions"))
-                                .font(.body.bold())
-                        }
-                        Text(isBypassOn
-                             ? String(localized: "settings.bypass_on_desc")
-                             : String(localized: "settings.bypass_off_desc"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            // 自动批准状态提示
+            if isBypassOn {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(String(localized: "settings.bypass_active"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Spacer()
-                    Button(isBypassOn ? String(localized: "settings.disable") : String(localized: "settings.enable")) {
-                        toggleBypass()
+                    Button(String(localized: "settings.disable_bypass")) {
+                        disableBypass()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(isBypassOn ? .gray : .red)
                     .controlSize(.small)
                 }
-                .padding(4)
+                .padding(10)
+                .background(Color.orange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
             Spacer()
         }
         .onAppear {
             refreshStatuses()
-            isBypassOn = readBypassStatus()
+            isBypassOn = Self.readBypassStatus()
         }
     }
 
@@ -237,13 +232,22 @@ struct CLISettingsView: View {
         }
     }
 
+    private func uninstallHook(_ cli: CLIHookConfig) {
+        do {
+            try hookInstaller.uninstall(for: cli)
+            refreshStatuses()
+        } catch {
+            // TODO: error alert
+        }
+    }
+
     private func refreshStatuses() {
         for cli in HookInstaller.supportedCLIs {
             hookStatuses[cli.name] = hookInstaller.isInstalled(for: cli)
         }
     }
 
-    private func readBypassStatus() -> Bool {
+    private static func readBypassStatus() -> Bool {
         let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -252,24 +256,19 @@ struct CLISettingsView: View {
         return json["skipDangerousModePermissionPrompt"] as? Bool ?? false
     }
 
-    private func toggleBypass() {
+    private func disableBypass() {
         let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
         let url = URL(fileURLWithPath: path)
         var json: [String: Any] = [:]
-
         if let data = try? Data(contentsOf: url),
            let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             json = existing
         }
-
-        let newValue = !(json["skipDangerousModePermissionPrompt"] as? Bool ?? false)
-        json["skipDangerousModePermissionPrompt"] = newValue
-
+        json["skipDangerousModePermissionPrompt"] = false
         if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: url, options: .atomic)
         }
-
-        isBypassOn = newValue
+        isBypassOn = false
     }
 }
 
@@ -279,7 +278,7 @@ private struct CLIRow: View {
     let cli: CLIHookConfig
     let isInstalled: Bool
     let onInstall: () -> Void
-    let onReinstall: () -> Void
+    let onUninstall: () -> Void
 
     var body: some View {
         HStack {
@@ -292,8 +291,11 @@ private struct CLIRow: View {
             }
             Spacer()
             if isInstalled {
-                Button(String(localized: "settings.reinstall")) { onReinstall() }
+                Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
                     .controlSize(.small)
+                Button(String(localized: "settings.install_hook")) { onInstall() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
             } else {
                 Button(String(localized: "settings.install_hook")) { onInstall() }
                     .controlSize(.small)

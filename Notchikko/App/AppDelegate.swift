@@ -10,7 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let dragController = DragController()
     private let menuBarManager = MenuBarManager()
     private var approvalManager: ApprovalManager?
-    private var stateBeforeDrag: NotchikkoState?
     private var settingsWindow: NSWindow?
     private var approvalPanel: NSPanel?
     private var hotkeyMonitor: Any?
@@ -59,15 +58,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshNotchWindow() {
+        // 拖拽期间不重建窗口，���免产生重复 panel
+        guard !sessionManager.isDragging else { return }
         setupNotchWindow(on: currentScreen)
     }
 
     private func setupNotchWindow(on screen: NSScreen?) {
         guard let screen = screen ?? NSScreen.main else { return }
         self.currentScreen = screen
+        menuBarManager.currentScreen = screen
 
         dragController.teardown()
-        notchPanel?.orderOut(nil)
+        notchPanel?.close()
+        notchPanel = nil
 
         let geo = NotchGeometry(screen: screen)
         self.geometry = geo
@@ -113,39 +116,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         dragController.onClick = { [weak self] in
             guard let self else { return }
-            if let sid = self.sessionManager.activeSessionId,
-               let session = self.sessionManager.sessions[sid] {
-                self.terminalJumper.jumpToSession(cwd: session.cwd)
+            guard let sid = self.sessionManager.activeSessionId,
+                  let session = self.sessionManager.sessions[sid] else {
+                #if DEBUG
+                print("[Click] no active session")
+                #endif
+                return
             }
+            #if DEBUG
+            print("[Click] sid=\(sid.prefix(8)), cwd=\(session.cwdName), terminalPid=\(session.terminalPid ?? -1)")
+            #endif
+            self.terminalJumper.jumpToSession(session: session)
         }
 
         dragController.onDragStart = { [weak self] in
             guard let self else { return }
-            self.stateBeforeDrag = self.sessionManager.currentState
-            self.sessionManager.overrideState(.dragging)
+            self.sessionManager.beginDrag()
         }
         dragController.onDragEnd = { [weak self] targetScreen in
             guard let self else { return }
-            let prevState = self.stateBeforeDrag
-            self.stateBeforeDrag = nil
 
             let landingScreen = targetScreen ?? self.currentScreen ?? NSScreen.main
             guard let landingScreen else { return }
             let isSameScreen = (landingScreen == self.currentScreen)
 
             if isSameScreen {
-                // 同屏：先动画回原位，动画完成后再恢复状态（避免状态切换导致布局跳动）
+                // 同屏：解冻状态（恢复为当前 session 实际 phase），同时飞回原位
                 guard let geo = self.geometry else { return }
-                self.dragController.animateToFrame(geo.panelFrame) {
-                    if let prev = prevState {
-                        self.sessionManager.overrideState(prev)
-                    }
-                }
+                self.sessionManager.endDrag()
+                self.dragController.animateToFrame(geo.panelFrame) {}
             } else {
-                // 跨屏：直接重建到目标屏幕（不做飞行动画，避免闪烁）
-                if let prev = prevState {
-                    self.sessionManager.overrideState(prev)
-                }
+                // 跨屏：解冻状态，重建到目标屏幕
+                self.sessionManager.endDrag()
                 self.setupNotchWindow(on: landingScreen)
             }
         }
@@ -187,14 +189,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
             guard let self else { return }
             self.approvalManager?.handleApprovalRequest(from: hookEvent)
+
+            // Auto 模式下，自动切到需要审批的 session
+            if self.sessionManager.pinnedSessionId == nil {
+                let approvalSid = hookEvent.sessionId
+                if approvalSid != self.sessionManager.activeSessionId {
+                    self.sessionManager.pinSession(approvalSid)
+                }
+            }
+
             self.sessionManager.overrideState(.approving)
             self.showApprovalPanel()
+        }
+
+        // 终端 PID/tty 更新回调（每个 hook 事件都可能携带）
+        adapter.onTerminalPidUpdate = { [weak self] sessionId, pid in
+            self?.sessionManager.setTerminalPid(pid, for: sessionId)
+        }
+        adapter.onTerminalTtyUpdate = { [weak self] sessionId, tty in
+            self?.sessionManager.setTerminalTty(tty, for: sessionId)
         }
 
         Task {
             try? await adapter.start()
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)
+                // 收到后续事件时，如果审批卡片还在显示且属于同一 session，自动清理
+                if let approval = self.approvalManager, approval.hasPendingApproval {
+                    let sid: String
+                    switch event {
+                    case .toolUse(let s, _, let phase):
+                        if case .post = phase { sid = s } else { continue }
+                    case .prompt(let s, _): sid = s
+                    case .stop(let s): sid = s
+                    case .error(let s, _): sid = s
+                    default: continue
+                    }
+                    approval.onSessionEvent(sessionId: sid)
+                    self.hideApprovalPanel()
+                }
             }
         }
     }
@@ -237,19 +270,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let cardView = ApprovalCardView(
             request: request,
-            onApprove: { [weak self] in
-                approval.approve()
-                self?.hideApprovalPanel()
-            },
             onDeny: { [weak self] in
                 approval.deny()
                 self?.hideApprovalPanel()
             },
-            onBypass: { [weak self] in
-                // 开启 bypass permissions 并放行当前请求
-                Self.enableBypassPermissions()
+            onApprove: { [weak self] in
                 approval.approve()
                 self?.hideApprovalPanel()
+            },
+            onApproveAll: { [weak self] in
+                approval.approveAllForSession()
+                self?.hideApprovalPanel()
+            },
+            onJump: { [weak self] in
+                guard let self,
+                      let session = self.sessionManager.sessions[request.sessionId] else { return }
+                self.terminalJumper.jumpToSession(session: session)
             }
         )
 
@@ -257,8 +293,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
         // 卡片尺寸
-        let cardWidth: CGFloat = 260
-        let cardHeight: CGFloat = 140
+        let cardWidth: CGFloat = 380
+        let cardHeight: CGFloat = 220
         // 定位到 notch 右侧
         guard let screen = currentScreen ?? NSScreen.main else { return }
         let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8
@@ -300,19 +336,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         approvalPanel = nil
     }
 
-    private static func enableBypassPermissions() {
-        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
-        let url = URL(fileURLWithPath: path)
-        var json: [String: Any] = [:]
-        if let data = try? Data(contentsOf: url),
-           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            json = existing
-        }
-        json["skipDangerousModePermissionPrompt"] = true
-        if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: url, options: .atomic)
-        }
-    }
 
     private func observeScreenChanges() {
         screenObserver = NotificationCenter.default.addObserver(
