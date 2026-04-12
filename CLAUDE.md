@@ -8,7 +8,7 @@ Notchikko is a macOS app that displays an animated pixel crab ("Clawd") hanging 
 
 ## Build & Run
 
-Standard Xcode project — zero external dependencies.
+Standard Xcode project — zero external dependencies. Targets macOS 14.0+, Swift 5.
 
 ```bash
 xcodebuild -scheme Notchikko -configuration Debug build
@@ -52,10 +52,18 @@ CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → Session
 
 Built-in SVGs live in `Resources/themes/clawd/`, named `clawd-{hook-event}.svg` (e.g. `clawd-idle`, `clawd-prompt`, `clawd-tool-bash`). Custom theme packs go in `~/.notchikko/themes/{id}/` with a `theme.json` manifest — see `docs/public/theme-guide.md`.
 
+### State Transitions & Priority
+
+States have numeric priorities (sleeping=10 up to dragging=100). `SessionManager.transition(to:)` only moves to a higher-priority state unless current state is idle/sleeping. Tool→State mapping: Read/Grep/Glob→reading, Edit/Write/NotebookEdit→typing, Bash→building, others→typing. Error states auto-return to idle after 5s; happy (task complete) triggers 3s celebration then auto-switches session.
+
+### Global Hotkeys
+
+⌘Y = approve, ⌘N = deny (only active when an approval is pending). Registered as local NSEvent monitor in AppDelegate.
+
 ### Key Patterns
 
 - **@Observable** for SwiftUI reactivity (SessionManager, PreferencesStore, ApprovalManager)
 - **AsyncStream** for event listening from SocketServer
 - **Callback closures** wired in AppDelegate for cross-module communication
 - SVG files are pre-oriented (hanging upside-down) — no code flipping
-- `docs/internal/competitive-analysis/` contains reference implementations — not part of build
+- All source files are in `Notchikko/` subdirectories; `docs/internal/competitive-analysis/` contains reference implementations — not part of build

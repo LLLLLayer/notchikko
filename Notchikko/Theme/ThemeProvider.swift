@@ -59,37 +59,69 @@ final class ThemeProvider {
         return themes
     }
 
-    /// 获取指定状态的 SVG 文件 URL
+    /// 获取指定状态的 SVG 文件 URL（同一状态有多个 SVG 时随机选一个）
     func svgURL(for state: NotchikkoState) -> URL? {
-        let fileName = svgFileName(for: state)
-
         if currentThemeId == Self.builtinThemeId {
-            // 内置主题：从 Bundle 加载
-            return Bundle.main.url(forResource: fileName, withExtension: "svg")
+            return builtinSVG(for: state)
         }
 
-        // 自定义主题：从主题目录加载
+        // 自定义主题
         let themeDir = Self.customThemesDir.appendingPathComponent(currentThemeId)
-        let svgURL = themeDir.appendingPathComponent("\(fileName).svg")
-        if FileManager.default.fileExists(atPath: svgURL.path) {
-            return svgURL
+        let dirName = customDirName(for: state)
+
+        // 1. 目录模式：扫描子目录内所有 SVG 随机选取
+        if let url = randomSVG(in: themeDir.appendingPathComponent(dirName)) {
+            return url
         }
 
-        // 回退到内置主题
-        return Bundle.main.url(forResource: fileName, withExtension: "svg")
+        // 2. 单文件模式（向后兼容）
+        let flatURL = themeDir.appendingPathComponent("\(dirName).svg")
+        if FileManager.default.fileExists(atPath: flatURL.path) {
+            return flatURL
+        }
+
+        // 3. 回退到内置主题
+        return builtinSVG(for: state)
     }
 
-    /// 获取状态对应的 SVG 文件名（不含扩展名）
-    private func svgFileName(for state: NotchikkoState) -> String {
-        // 先检查自定义主题的 manifest 映射
-        if currentThemeId != Self.builtinThemeId,
-           let mapping = loadManifest(for: currentThemeId)?.animations,
+    /// 内置主题：Bundle 内 SVG 按 "{state}-" 前缀命名，随机选取
+    /// 源文件结构: themes/clawd/{state}/{state}-xxx.svg
+    /// Xcode 打包后展平为: {state}-xxx.svg（文件名全局唯一）
+    private func builtinSVG(for state: NotchikkoState) -> URL? {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let prefix = "\(state.rawValue)-"
+        guard let all = try? FileManager.default.contentsOfDirectory(
+            at: resourceURL, includingPropertiesForKeys: nil
+        ) else { return nil }
+        let candidates = all.filter {
+            $0.pathExtension.lowercased() == "svg" && $0.lastPathComponent.hasPrefix(prefix)
+        }
+        return candidates.randomElement()
+    }
+
+    /// 自定义主题的目录/文件名（manifest 映射优先，否则用 state 名）
+    private func customDirName(for state: NotchikkoState) -> String {
+        if let mapping = loadManifest(for: currentThemeId)?.animations,
            let custom = mapping[state.rawValue] {
             return custom
         }
+        return state.rawValue
+    }
 
-        // 默认映射（内置 clawd 主题）
-        return state.svgName
+    /// 扫描目录内所有 .svg 文件，随机返回一个
+    private func randomSVG(in dir: URL) -> URL? {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: dir.path, isDirectory: &isDir),
+              isDir.boolValue else {
+            return nil
+        }
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        ).filter({ $0.pathExtension.lowercased() == "svg" }),
+              let picked = contents.randomElement() else {
+            return nil
+        }
+        return picked
     }
 
     private func loadManifest(for themeId: String) -> ThemeManifest? {

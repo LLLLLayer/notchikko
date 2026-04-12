@@ -48,14 +48,15 @@ final class SocketServer {
         }
         pendingLock.unlock()
 
+        // fd 已从 pendingResponses 移除，stop() 不会再 close 它
+        // 这里是唯一持有者，安全写入后关闭
+        let dataCopy = json
         clientQueue.async {
-            json.withUnsafeBytes { ptr in
-                _ = write(fd, ptr.baseAddress!, json.count)
+            dataCopy.withUnsafeBytes { ptr in
+                guard let base = ptr.baseAddress else { return }
+                _ = write(fd, base, dataCopy.count)
             }
-            // 写完后加换行符确保 Python 能读完
-            "\n".withCString { ptr in
-                _ = write(fd, ptr, 1)
-            }
+            _ = write(fd, "\n", 1)
             close(fd)
         }
     }
@@ -82,10 +83,11 @@ final class SocketServer {
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
+        let pathSize = MemoryLayout.size(ofValue: addr.sun_path)
         Self.socketPath.withCString { ptr in
             withUnsafeMutablePointer(to: &addr.sun_path) { pathPtr in
                 let buf = UnsafeMutableRawPointer(pathPtr).assumingMemoryBound(to: CChar.self)
-                strcpy(buf, ptr)
+                _ = strlcpy(buf, ptr, pathSize)
             }
         }
 

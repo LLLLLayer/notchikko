@@ -23,6 +23,10 @@ final class DragController {
     /// 单击回调（非拖拽的点击）
     var onClick: (() -> Void)?
 
+    deinit {
+        teardown()
+    }
+
     func setup(panel: NotchPanel, homeFrame: NSRect, notchHeight: CGFloat = 0, petSize: CGFloat = 80) {
         self.panel = panel
         self.homeFrame = homeFrame

@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyMonitor: Any?
     private let terminalJumper = TerminalJumper()
 
+    private var screenObserver: NSObjectProtocol?
+    private var prefsObserver: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         setupMenuBar()
@@ -23,6 +26,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startAgentListening()
         observeScreenChanges()
         setupGlobalHotkeys()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let monitor = hotkeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            hotkeyMonitor = nil
+        }
+        if let obs = screenObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = prefsObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        dragController.teardown()
     }
 
     private func setupMenuBar() {
@@ -208,7 +225,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 独立审批窗口
 
     private func showApprovalPanel() {
-        guard let geo = geometry, let approval = approvalManager else { return }
+        guard let geo = geometry,
+              let approval = approvalManager,
+              let request = approval.pendingApproval else { return }
 
         // 已有窗口则刷新内容
         if let existing = approvalPanel, existing.isVisible {
@@ -217,7 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let cardView = ApprovalCardView(
-            request: approval.pendingApproval!,
+            request: request,
             onApprove: { [weak self] in
                 approval.approve()
                 self?.hideApprovalPanel()
@@ -241,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardWidth: CGFloat = 260
         let cardHeight: CGFloat = 140
         // 定位到 notch 右侧
-        let screen = currentScreen ?? NSScreen.main!
+        guard let screen = currentScreen ?? NSScreen.main else { return }
         let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8
         let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4
 
@@ -257,8 +276,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
+        panel.isReleasedWhenClosed = false
 
-        let wrapper = NSView(frame: panel.contentView!.bounds)
+        let contentBounds = panel.contentView?.bounds ?? panel.frame
+        let wrapper = NSView(frame: contentBounds)
         wrapper.autoresizingMask = [.width, .height]
         wrapper.addSubview(hostingView)
         panel.contentView = wrapper
@@ -294,7 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func observeScreenChanges() {
-        NotificationCenter.default.addObserver(
+        screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
             queue: .main
@@ -302,7 +323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refreshNotchWindow()
         }
 
-        NotificationCenter.default.addObserver(
+        prefsObserver = NotificationCenter.default.addObserver(
             forName: PreferencesStore.didChangeNotification,
             object: nil,
             queue: .main

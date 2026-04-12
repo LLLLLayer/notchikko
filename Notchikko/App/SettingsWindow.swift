@@ -4,13 +4,11 @@ import UniformTypeIdentifiers
 // MARK: - 设置面板主窗口（侧边栏导航）
 
 enum SettingsTab: String, CaseIterable {
-    case general, display, sound, cli
+    case general, cli
 
     var displayName: String {
         switch self {
         case .general: return String(localized: "settings.general")
-        case .display: return String(localized: "settings.display")
-        case .sound: return String(localized: "settings.sound")
         case .cli: return String(localized: "settings.cli")
         }
     }
@@ -18,8 +16,6 @@ enum SettingsTab: String, CaseIterable {
     var icon: String {
         switch self {
         case .general: return "gearshape"
-        case .display: return "textformat.size"
-        case .sound: return "speaker.wave.2"
         case .cli: return "terminal"
         }
     }
@@ -40,10 +36,6 @@ struct SettingsWindowView: View {
                 switch selectedTab {
                 case .general:
                     GeneralSettingsView()
-                case .display:
-                    DisplaySettingsView()
-                case .sound:
-                    SoundSettingsView()
                 case .cli:
                     CLISettingsView()
                 }
@@ -56,57 +48,18 @@ struct SettingsWindowView: View {
     }
 }
 
-// MARK: - 通用
+// MARK: - 通用（外观 + 声音 + 审批）
 
 struct GeneralSettingsView: View {
+    @State private var themes: [ThemeInfo] = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(String(localized: "settings.general"))
                 .font(.title2.bold())
 
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(String(localized: "settings.approval_delay"))
-                        Spacer()
-                        Picker("", selection: hideDelayBinding) {
-                            Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
-                            Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
-                            Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
-                            Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
-                        }
-                        .frame(width: 140)
-                    }
-                }
-                .padding(4)
-            }
-
-            Spacer()
-        }
-    }
-
-    private var hideDelayBinding: Binding<TimeInterval> {
-        Binding(
-            get: { PreferencesStore.shared.preferences.approvalCardHideDelay },
-            set: {
-                PreferencesStore.shared.preferences.approvalCardHideDelay = $0
-                PreferencesStore.shared.save()
-            }
-        )
-    }
-}
-
-// MARK: - 显示
-
-struct DisplaySettingsView: View {
-    @State private var themes: [ThemeInfo] = []
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(String(localized: "settings.display"))
-                .font(.title2.bold())
-
-            GroupBox {
+            // 外观
+            GroupBox(String(localized: "settings.display")) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text(String(localized: "settings.pet_size"))
@@ -122,7 +75,6 @@ struct DisplaySettingsView: View {
 
                     Divider()
 
-                    // 主题选择
                     HStack {
                         Text(String(localized: "settings.theme"))
                         Spacer()
@@ -133,15 +85,38 @@ struct DisplaySettingsView: View {
                         }
                         .frame(width: 160)
                     }
+                }
+                .padding(4)
+            }
 
-                    // 导入主题
-                    HStack {
-                        Spacer()
-                        Button(String(localized: "settings.import_theme")) {
-                            importTheme()
+            // 声音
+            GroupBox(String(localized: "settings.sound")) {
+                HStack {
+                    Text(String(localized: "settings.volume"))
+                    Spacer()
+                    Picker("", selection: volumeBinding) {
+                        ForEach(SoundVolume.allCases, id: \.self) { vol in
+                            Text(vol.displayName).tag(vol)
                         }
-                        .controlSize(.small)
                     }
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                }
+                .padding(4)
+            }
+
+            // 审批
+            GroupBox {
+                HStack {
+                    Text(String(localized: "settings.approval_delay"))
+                    Spacer()
+                    Picker("", selection: hideDelayBinding) {
+                        Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
+                        Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
+                        Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
+                        Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
+                    }
+                    .frame(width: 140)
                 }
                 .padding(4)
             }
@@ -171,68 +146,21 @@ struct DisplaySettingsView: View {
         )
     }
 
-    private func importTheme() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.message = String(localized: "settings.import_theme_msg")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let themeId = try ThemeProvider.shared.importTheme(from: url)
-            PreferencesStore.shared.preferences.themeId = themeId
-            PreferencesStore.shared.save()
-            themes = ThemeProvider.shared.availableThemes
-        } catch {}
-    }
-}
-
-// MARK: - 声音
-
-struct SoundSettingsView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(String(localized: "settings.sound"))
-                .font(.title2.bold())
-
-            // 总开关 + 音量
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(String(localized: "settings.volume"))
-                        Spacer()
-                        Picker("", selection: volumeBinding) {
-                            ForEach(SoundVolume.allCases, id: \.self) { vol in
-                                Text(vol.displayName).tag(vol)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 220)
-                    }
-                }
-                .padding(4)
-            }
-
-            // 各状态音效自定义
-            GroupBox(String(localized: "settings.sound_custom")) {
-                VStack(spacing: 0) {
-                    ForEach(Array(SoundManager.soundableStates.enumerated()), id: \.element) { index, state in
-                        if index > 0 { Divider() }
-                        SoundCustomRow(stateName: state)
-                            .padding(.vertical, 6)
-                    }
-                }
-                .padding(4)
-            }
-
-            Spacer()
-        }
-    }
-
     private var volumeBinding: Binding<SoundVolume> {
         Binding(
             get: { PreferencesStore.shared.preferences.soundVolume },
             set: {
                 PreferencesStore.shared.preferences.soundVolume = $0
+                PreferencesStore.shared.save()
+            }
+        )
+    }
+
+    private var hideDelayBinding: Binding<TimeInterval> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.approvalCardHideDelay },
+            set: {
+                PreferencesStore.shared.preferences.approvalCardHideDelay = $0
                 PreferencesStore.shared.save()
             }
         )
@@ -394,53 +322,5 @@ private struct ComingSoonRow: View {
         .padding(8)
         .background(.quaternary.opacity(0.15))
         .cornerRadius(8)
-    }
-}
-
-private struct SoundCustomRow: View {
-    let stateName: String
-    @State private var hasCustom: Bool = false
-
-    var body: some View {
-        HStack {
-            Text(stateName)
-                .frame(width: 80, alignment: .leading)
-            if hasCustom {
-                Text(String(localized: "settings.custom")).font(.caption).foregroundStyle(.blue)
-            } else {
-                Text(String(localized: "settings.default")).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button(String(localized: "settings.pick_file")) { pickFile() }
-                .controlSize(.small)
-            if hasCustom {
-                Button(String(localized: "settings.reset_default")) { resetToDefault() }
-                    .controlSize(.small)
-            }
-        }
-        .onAppear {
-            hasCustom = PreferencesStore.shared.preferences.customSounds[stateName] != nil
-        }
-    }
-
-    private func pickFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.wav, .mp3, .mpeg4Audio]
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let fileName = try SoundManager.shared.importCustomSound(from: url, for: stateName)
-            PreferencesStore.shared.preferences.customSounds[stateName] = fileName
-            PreferencesStore.shared.save()
-            hasCustom = true
-        } catch {}
-    }
-
-    private func resetToDefault() {
-        SoundManager.shared.removeCustomSound(for: stateName)
-        PreferencesStore.shared.preferences.customSounds.removeValue(forKey: stateName)
-        PreferencesStore.shared.save()
-        hasCustom = false
     }
 }
