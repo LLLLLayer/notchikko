@@ -43,7 +43,12 @@ final class NotchikkoView: NSView {
             return
         }
 
-        guard let svgContent = try? String(contentsOf: url, encoding: .utf8) else { return }
+        guard var svgContent = try? String(contentsOf: url, encoding: .utf8) else { return }
+
+        // 外部主题 SVG 安全清洗（内置主题信任跳过）
+        if PreferencesStore.shared.preferences.themeId != ThemeProvider.builtinThemeId {
+            svgContent = SVGSanitizer.sanitize(svgContent)
+        }
 
         // 已加载过 HTML → 用 JS 注入新 SVG 并做 crossfade
         if hasLoadedInitialHTML {

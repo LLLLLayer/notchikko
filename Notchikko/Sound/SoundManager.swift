@@ -30,28 +30,42 @@ final class SoundManager {
 
     private var currentPlayer: AVAudioPlayer?
 
+    /// 冷却：同一状态 2 秒内不重复播放
+    private var lastPlayTimes: [String: Date] = [:]
+    private static let cooldownInterval: TimeInterval = 2.0
+
     private init() {}
 
     // MARK: - 播放
 
-    /// 根据状态名播放对应音效
+    /// 根据状态名播放对应音效（带冷却 + fallback）
     func play(for stateName: String) {
         let prefs = PreferencesStore.shared.preferences
         guard prefs.soundVolume != .mute else { return }
 
-        // 优先自定义音效
-        if let customFile = prefs.customSounds[stateName] {
-            let url = customSoundsDir.appendingPathComponent(customFile)
-            if FileManager.default.fileExists(atPath: url.path) {
-                playURL(url, volume: prefs.soundVolume.floatValue)
-                return
-            }
+        // 冷却检查：同一状态 2 秒内不重复播放
+        let now = Date()
+        if let lastTime = lastPlayTimes[stateName],
+           now.timeIntervalSince(lastTime) < Self.cooldownInterval {
+            return
+        }
+        lastPlayTimes[stateName] = now
+
+        let volume = prefs.soundVolume.floatValue
+
+        // 优先级：自定义音效 → 主题音效 → 内置音效
+        if let url = customSoundURL(for: stateName, prefs: prefs) {
+            playURL(url, volume: volume)
+            return
         }
 
-        // 内置音效
-        if let bundleName = defaultSoundMap[stateName],
-           let url = Bundle.main.url(forResource: bundleName, withExtension: "wav") {
-            playURL(url, volume: prefs.soundVolume.floatValue)
+        if let url = themeSoundURL(for: stateName) {
+            playURL(url, volume: volume)
+            return
+        }
+
+        if let url = builtinSoundURL(for: stateName) {
+            playURL(url, volume: volume)
         }
     }
 
@@ -81,11 +95,44 @@ final class SoundManager {
 
     /// 检查某状态是否有内置音效
     func hasBuiltinSound(for stateName: String) -> Bool {
-        guard let bundleName = defaultSoundMap[stateName] else { return false }
-        return Bundle.main.url(forResource: bundleName, withExtension: "wav") != nil
+        builtinSoundURL(for: stateName) != nil
     }
 
-    // MARK: - Private
+    // MARK: - Sound URL Resolution (三级 fallback)
+
+    /// 用户自定义音效
+    private func customSoundURL(for stateName: String, prefs: NotchikkoPreferences) -> URL? {
+        guard let customFile = prefs.customSounds[stateName] else { return nil }
+        let url = customSoundsDir.appendingPathComponent(customFile)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// 当前主题的音效（主题目录下 sounds/{stateName}.{ext}）
+    private func themeSoundURL(for stateName: String) -> URL? {
+        let themeId = PreferencesStore.shared.preferences.themeId
+        guard themeId != "clawd" else { return nil }  // 内置主题走 builtin 路径
+
+        let themeDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".notchikko/themes/\(themeId)/sounds")
+        guard FileManager.default.fileExists(atPath: themeDir.path) else { return nil }
+
+        // 搜索 stateName.wav / .mp3 / .aiff / .m4a
+        for ext in ["wav", "mp3", "aiff", "m4a"] {
+            let url = themeDir.appendingPathComponent("\(stateName).\(ext)")
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+        return nil
+    }
+
+    /// 内置音效（bundle 资源）
+    private func builtinSoundURL(for stateName: String) -> URL? {
+        guard let bundleName = defaultSoundMap[stateName] else { return nil }
+        return Bundle.main.url(forResource: bundleName, withExtension: "wav")
+    }
+
+    // MARK: - Playback
 
     private func playURL(_ url: URL, volume: Float) {
         guard let player = try? AVAudioPlayer(contentsOf: url) else { return }

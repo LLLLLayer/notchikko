@@ -5,9 +5,58 @@ struct ThemeManifest: Codable {
     let name: String              // 显示名称
     let author: String?
     let version: String?
+
     /// 状态 → SVG 文件名映射（不含扩展名）
     /// 未列出的状态使用默认文件名 (state rawValue)
     let animations: [String: String]?
+
+    /// 音效映射：状态名 → 音频文件名（在主题目录 sounds/ 下）
+    let sounds: [String: String]?
+
+    /// 眼球追踪配置
+    let eyeTracking: EyeTrackingConfig?
+
+    /// 反应动画：点击/拖拽等交互时播放的 SVG
+    let reactions: ReactionConfig?
+
+    /// SVG 画布配置
+    let viewBox: ViewBoxConfig?
+
+    /// 多 session 工作层级（根据并发 session 数切换不同动画）
+    let workingTiers: [WorkingTier]?
+
+    // MARK: - 子结构
+
+    struct EyeTrackingConfig: Codable {
+        let enabled: Bool
+        let elementIds: EyeTrackingElements?
+        let maxOffset: Double?       // 默认 3.0
+        let bodyLeanScale: Double?   // 默认 0.3
+
+        struct EyeTrackingElements: Codable {
+            let eyes: String?        // 默认 "eyes-js"
+            let body: String?        // 默认 "body-js"
+        }
+    }
+
+    struct ReactionConfig: Codable {
+        let click: String?           // 点击时的 SVG 文件名
+        let doubleClick: String?     // 双击
+        let drag: String?            // 拖拽中
+        let duration: Double?        // 反应动画持续时间（秒），默认 1.0
+    }
+
+    struct ViewBoxConfig: Codable {
+        let x: Double?
+        let y: Double?
+        let width: Double?
+        let height: Double?
+    }
+
+    struct WorkingTier: Codable {
+        let minSessions: Int         // 最少并发 session 数
+        let animation: String        // 对应的 SVG 文件名
+    }
 }
 
 /// 主题管理器 — 管理内置和自定义主题
