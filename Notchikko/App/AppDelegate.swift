@@ -144,11 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsView = SettingsWindowView()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 580, height: 420),
-            styleMask: [.titled, .closable, .resizable],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.title = NSLocalizedString("settings.title", comment: "")
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.contentView = NSHostingView(rootView: settingsView)
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -224,6 +225,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onDeny: { [weak self] in
                 approval.deny()
                 self?.hideApprovalPanel()
+            },
+            onBypass: { [weak self] in
+                // 开启 bypass permissions 并放行当前请求
+                Self.enableBypassPermissions()
+                approval.approve()
+                self?.hideApprovalPanel()
             }
         )
 
@@ -270,6 +277,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideApprovalPanel() {
         approvalPanel?.orderOut(nil)
         approvalPanel = nil
+    }
+
+    private static func enableBypassPermissions() {
+        let path = NSString(string: "~/.claude/settings.json").expandingTildeInPath
+        let url = URL(fileURLWithPath: path)
+        var json: [String: Any] = [:]
+        if let data = try? Data(contentsOf: url),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            json = existing
+        }
+        json["skipDangerousModePermissionPrompt"] = true
+        if let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: url, options: .atomic)
+        }
     }
 
     private func observeScreenChanges() {

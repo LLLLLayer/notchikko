@@ -8,85 +8,54 @@ Notchikko is a macOS app that displays an animated pixel crab ("Clawd") hanging 
 
 ## Build & Run
 
-This is a standard Xcode project (no SPM, no CocoaPods — zero external dependencies).
+Standard Xcode project — zero external dependencies.
 
 ```bash
-# Open in Xcode
-open Notchikko.xcodeproj
-
-# Build from CLI
-xcodebuild -project Notchikko.xcodeproj -scheme Notchikko -configuration Debug build
-
-# Clean build
-xcodebuild -project Notchikko.xcodeproj -scheme Notchikko clean build
+xcodebuild -scheme Notchikko -configuration Debug build
 ```
 
-There are no tests or linting configured.
+No tests or linting configured. SourceKit frequently reports false-positive "Cannot find type" errors — always verify with `xcodebuild` before investigating.
 
 ## Architecture
 
-The app follows an event-driven pipeline:
+Event-driven pipeline:
 
 ```
-Claude Code hook → Unix socket → AgentBridge → SessionManager → NotchikkoState → NotchikkoView (SVG)
+CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → SessionManager → NotchikkoState → ThemeProvider → NotchikkoView
 ```
 
 ### Core Modules
 
-- **IPC** — `SocketServer` listens on `/tmp/notchikko.sock` for JSON hook events. `HookInstaller` manages hook registration in `~/.claude/settings.json` and `~/.codex/config.json`, copying `notchikko-hook.sh` to `~/.notchikko/hooks/`. Multi-CLI support via `CLIHookConfig` structs — each CLI gets the same hook script injected into its own settings file. Detection checks for "notchikko" substring in serialized hook entries.
+- **IPC** — `SocketServer` listens on `/tmp/notchikko.sock`. `HookInstaller` registers hooks in `~/.claude/settings.json` (nested format: `{"hooks":[{"type":"command","command":"..."}]}`). Supports 16 hook events. For approval requests, keeps socket fd open in `pendingResponses` dict until app writes back.
 
-- **Agent** — `AgentBridge` protocol abstracts any AI agent. `ClaudeCodeAdapter` wraps SocketServer, converting raw `HookEvent` JSON into unified `AgentEvent` enums emitted via AsyncStream. Important: adapter performs **synthetic session injection** — on first sight of an unknown session ID, it auto-yields `.sessionStart` before the actual event, handling mid-session hook installation. `AgentRegistry` supports multiple adapters.
+- **Agent** — `AgentBridge` protocol. `ClaudeCodeAdapter` converts `HookEvent` → `AgentEvent` via AsyncStream. Performs **synthetic session injection** — auto-yields `.sessionStart` on first event from unknown session ID. `AgentRegistry` merges multiple adapter streams via TaskGroup.
 
-- **Session** — `SessionManager` is the main state machine. Tracks multiple active sessions by working directory, maps tool names to visual states, and auto-transitions to idle/sleeping after inactivity (60s idle, 120s sleep timers that reset on activity). Users can pin a session ID to override auto-tracking of the most recent session.
+- **Session** — `SessionManager` (@Observable) tracks multiple sessions, maps tools to visual states, manages idle/sleep timers (60s/120s). Supports pinned session binding with auto-switch: after task completion (Stop event), celebrates 3s then auto-unpins and switches to next active session.
 
-- **Notchikko (core)** — `NotchikkoState` enum defines visual states (sleeping, idle, thinking, reading, typing, building, sweeping, happy, error, dragging, approving) with priority levels. State transitions only occur if new state priority >= current, OR current is idle/sleeping. `NotchikkoView` is an NSView wrapping WKWebView that loads SVG animations from the bundle as HTML strings with `image-rendering: pixelated`. Eye tracking via JavaScript injection on `#eyes-js` and `#body-js` elements.
+- **Theme** — `ThemeProvider` resolves SVGs by state. Built-in "clawd" theme from bundle; custom themes from `~/.notchikko/themes/{id}/` with `theme.json` manifest mapping state names to SVG filenames. Falls back to built-in for missing SVGs.
 
-- **Window** — `NotchPanel` is a borderless, always-on-top NSPanel. `NotchGeometry` positions the panel relative to the hardware notch — detects notch via `screen.safeAreaInsets.top > 0`, derives width from `auxiliaryTopLeftArea`/`auxiliaryTopRightArea`. Panel top is anchored to the screen's physical top (not safe area) so content hides behind hardware notch. `DragController` handles drag-to-reposition with a 5pt threshold; captures `stateBeforeDrag` and restores it post-animation to prevent layout jitter.
+- **Notchikko (core)** — `NotchikkoState` enum defines 11 states with priority, svgName, revealAmount, soundKey. `NotchikkoView` wraps WKWebView, loads SVG via `loadSVG(for: NotchikkoState)` — accepts state directly (not string name) to avoid ambiguity when multiple states share the same SVG.
 
-- **Approval** — `ApprovalManager` shows approve/deny cards for tool approval requests. Requests carry a `request_id` UUID and keep the socket connection open (hook script waits up to 300s, defaults to "allow" on timeout). Response sent back via `SocketServer.respond(requestId:json:)` to the held file descriptor. Global hotkeys: ⌘Y approve, ⌘N deny. Only modified tools (Bash, Edit, Write, NotebookEdit) require approval.
+- **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `DragController` handles drag with 5pt threshold, hit area padded +20px. Drag end restores state in animation completion handler to prevent layout jitter.
 
-- **Preferences** — `PreferencesStore` persists settings (petScale, soundVolume, approvalCardHideDelay, installedHooks) as JSON in `~/Library/Application Support/notchikko/preferences.json`. Changes debounce writes with 100ms delay; `petScale` changes trigger UI refresh.
+- **Approval** — Separate `NSPanel` window (independent of pet panel — doesn't move during drag). `ApprovalManager` manages pending requests. Only Bash/Edit/Write/NotebookEdit require approval. Hook script checks `skipDangerousModePermissionPrompt` to skip when bypass mode is on.
 
-- **Sound** — `SoundManager` plays WAV files on state transitions. Each `NotchikkoState` has a `soundKey` mapping. Approval decisions play "nod"/"shake" sounds. Supports custom sound import to `~/Library/Application Support/notchikko/sounds/`.
+- **Preferences** — `PreferencesStore` (@Observable) auto-saves on `didSet` with 100ms debounce. Only `petScale` and `themeId` changes trigger window rebuild notification.
 
-- **Terminal** — `TerminalJumper` uses Accessibility API to find and activate the terminal window matching a session's working directory (supports Terminal, iTerm, Warp, Kitty).
+- **i18n** — All UI strings use `String(localized:)` (SwiftUI) or `NSLocalizedString()` (AppKit). Translations in `Resources/{en,zh-Hans}.lproj/Localizable.strings`.
 
-### IPC Protocol
+### Hook Script
 
-Hook events are JSON objects sent over the Unix socket with this schema:
-```json
-{
-  "session_id": "string",
-  "cwd": "/path/to/working/dir",
-  "event": "UserPromptSubmit | ToolUse | ToolResult | Stop | ...",
-  "status": "string (optional)",
-  "tool": "Read | Edit | Bash | Write | ... (optional)",
-  "tool_input": { ... },
-  "source": "claude-code | codex | ...",
-  "request_id": "UUID (for approval requests only)"
-}
-```
+`notchikko-hook.sh [source]` — Python3 inline script that reads stdin JSON from CLI, maps events to status, sends to socket. For PreToolUse on modification tools (Bash/Edit/Write/NotebookEdit), generates UUID `request_id` and blocks waiting for approval response (5 min timeout, defaults to allow).
 
-### Tool-to-State Mapping
+### SVG / Themes
 
-`SessionManager.stateForTool()` converts tool names to visual states:
-- `Read`, `Grep`, `Glob` → `.reading`
-- `Edit`, `Write`, `NotebookEdit` → `.typing`
-- `Bash` → `.building`
-- All others → `.typing` (default fallback)
-
-### State Priority Levels
-
-Higher-priority states override lower ones: dragging(100) > approving(95) > error(90) > ... > sleeping(10). Each state defines `svgName`, `revealAmount`, and `soundKey`.
+Built-in SVGs live in `Resources/themes/clawd/`, named `clawd-{hook-event}.svg` (e.g. `clawd-idle`, `clawd-prompt`, `clawd-tool-bash`). Custom theme packs go in `~/.notchikko/themes/{id}/` with a `theme.json` manifest — see `docs/public/theme-guide.md`.
 
 ### Key Patterns
 
-- **@Observable** classes for SwiftUI reactivity (SessionManager, PreferencesStore, ApprovalManager)
-- **AsyncStream** for continuous event listening from SocketServer
-- **Callback closures** wired through init in `AppDelegate` for cross-module communication (drag, approval, menu actions)
-- SVG files in `Resources/svg/` are pre-oriented — no code flipping. Named `clawd-{state}.svg` (e.g., `clawd-idle.svg`, `clawd-tool-bash.svg`)
-- The `docs/internal/competitive-analysis/` directory contains reference implementations of similar apps (Claude Island, notchi) — not part of the build
-
-### Entry Point
-
-`AppDelegate` is the orchestrator — initializes all components on launch, creates the NotchPanel, starts the SocketServer, and wires up event handlers. `NotchikkoApp` (@main) is a minimal SwiftUI shell.
+- **@Observable** for SwiftUI reactivity (SessionManager, PreferencesStore, ApprovalManager)
+- **AsyncStream** for event listening from SocketServer
+- **Callback closures** wired in AppDelegate for cross-module communication
+- SVG files are pre-oriented (hanging upside-down) — no code flipping
+- `docs/internal/competitive-analysis/` contains reference implementations — not part of build

@@ -4,6 +4,7 @@ struct ApprovalCardView: View {
     let request: ApprovalManager.ApprovalRequest
     let onApprove: () -> Void
     let onDeny: () -> Void
+    var onBypass: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -55,6 +56,19 @@ struct ApprovalCardView: View {
                 .background(Color.accentColor)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .keyboardShortcut("y", modifiers: .command)
+
+                if let onBypass {
+                    Button(action: onBypass) {
+                        Text("Bypass")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.red)
+                            .frame(height: 26)
+                            .padding(.horizontal, 6)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
             }
         }
         .padding(12)
