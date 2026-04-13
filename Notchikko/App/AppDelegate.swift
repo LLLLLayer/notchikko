@@ -239,23 +239,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 approvalManager?.onSessionEvent(sessionId: sid)
 
-                // Elicitation/Notification → 也弹通知卡片
-                if case .notification(let sid, let msg) = event,
-                   PreferencesStore.shared.preferences.approvalCardEnabled {
+                // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
+                if case .notification(let sid, let msg) = event {
                     let session = sessionManager.sessions[sid]
                     let isBypass = session?.isBypassMode ?? false
-                    // 过滤过时的通知：session 已结束/不存在，或 notification 到达前的状态是 happy/sleeping
                     let prevState = sessionManager.previousState
-                    let isStale = session == nil
-                        || session?.phase == .ended
-                        || prevState == .happy || prevState == .sleeping
-                    if !(isBypass && msg == "PermissionRequest") && !isStale {
+
+                    // 决定是否弹卡片：
+                    // 1. 纯 Notification（空 msg）和未知事件 → 不弹
+                    // 2. PermissionRequest + bypass on → 不弹
+                    // 3. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
+                    // 4. Elicitation / AskUserQuestion → 始终弹（不受 approvalCardEnabled 影响）
+                    // 5. PermissionRequest (non-bypass) → 受 approvalCardEnabled 控制
+                    let needsCard: Bool = {
+                        // 只有这三种需要用户操作
+                        guard msg == "Elicitation" || msg == "AskUserQuestion"
+                                || msg == "PermissionRequest" else { return false }
+                        // bypass 模式下 PermissionRequest 不弹
+                        if isBypass && msg == "PermissionRequest" { return false }
+                        // PermissionRequest 受 approvalCardEnabled 控制
+                        if msg == "PermissionRequest"
+                            && !PreferencesStore.shared.preferences.approvalCardEnabled { return false }
+                        // 过时检查
+                        if session == nil || session?.phase == .ended { return false }
+                        if prevState == .happy || prevState == .sleeping { return false }
+                        return true
+                    }()
+
+                    if needsCard {
                         let notifId = UUID().uuidString
                         let request = ApprovalManager.ApprovalRequest(
                             id: notifId,
                             requestId: "",
                             source: session?.source ?? "unknown",
-                            tool: msg.isEmpty ? "AskUserQuestion" : msg,
+                            tool: msg,
                             input: "",
                             sessionId: sid,
                             cwdName: session?.cwdName ?? "",

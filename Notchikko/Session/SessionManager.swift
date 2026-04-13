@@ -223,12 +223,11 @@ final class SessionManager {
 
         case .notification(let sid, let msg):
             sessions[sid]?.lastEvent = Date()
-            // bypass 模式下的 PermissionRequest 不触发 approving（权限已自动通过）
             let isBypass = sessions[sid]?.isBypassMode ?? false
-            if isBypass && msg == "PermissionRequest" {
-                break
-            }
-            // Elicitation / Notification → 等待用户操作
+            // 只有需要用户操作的事件才切 approving 状态
+            let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion"
+                || (msg == "PermissionRequest" && !isBypass))
+            guard needsUserAction else { break }
             sessions[sid]?.phase = .waitingForInput
             if sid == activeSessionId {
                 idleTimer?.cancel()

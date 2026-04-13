@@ -96,13 +96,13 @@ final class ClaudeCodeAdapter: AgentBridge {
             return nil  // Subagent 生命周期不影响主状态
         case "Notification":
             return .notification(sessionId: hook.sessionId, message: "")
-        case "Elicitation", "PermissionRequest":
-            // AskUserQuestion / 权限请求 → 等待用户操作
+        case "Elicitation", "PermissionRequest", "AskUserQuestion":
             return .notification(sessionId: hook.sessionId, message: hook.event)
         case "WorktreeCreate":
             return .prompt(sessionId: hook.sessionId, text: nil)
         default:
-            return .notification(sessionId: hook.sessionId, message: hook.event)
+            Log("Unknown hook event: \(hook.event)", tag: "Adapter")
+            return nil  // 忽略未知事件，避免产生垃圾通知卡片
         }
     }
 }
