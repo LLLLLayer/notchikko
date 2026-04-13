@@ -52,9 +52,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshNotchWindow() {
-        // 拖拽期间不重建窗口，���免产生重复 panel
+        // 拖拽期间不重建窗口，避免产生重复 panel
         guard !sessionManager.isDragging else { return }
-        setupNotchWindow(on: currentScreen)
+        // 如果当前屏幕已断开（不在 screens 列表中），回退到主屏幕
+        let target: NSScreen? = if let cur = currentScreen, NSScreen.screens.contains(cur) {
+            cur
+        } else {
+            NSScreen.main
+        }
+        setupNotchWindow(on: target)
     }
 
     private func setupNotchWindow(on screen: NSScreen?) {
