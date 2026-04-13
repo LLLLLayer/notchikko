@@ -196,10 +196,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 收到新审批请求 → 先清理该 session 的旧卡片（通知卡片等）
             approval.onSessionEvent(sessionId: hookEvent.sessionId)
             let session = self.sessionManager.sessions[hookEvent.sessionId]
+
+            // bypass 模式 → 直接放行，不弹卡片
+            if session?.isBypassMode == true {
+                Log("Approval auto-allowed (bypass mode): \(hookEvent.tool ?? "?")", tag: "App")
+                let requestId = hookEvent.requestId ?? ""
+                let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
+                if let data = try? JSONSerialization.data(withJSONObject: response) {
+                    self.adapter?.socketServerRef.respond(requestId: requestId, json: data)
+                }
+                return
+            }
+
             approval.handleApprovalRequest(from: hookEvent, session: session)
             self.sessionManager.overrideState(.approving)
             if PreferencesStore.shared.preferences.approvalCardEnabled {
-                // 取刚创建的 request
                 let requestId = hookEvent.requestId ?? ""
                 if let request = approval.pendingApprovals[requestId] {
                     self.showApprovalPanel(for: request)

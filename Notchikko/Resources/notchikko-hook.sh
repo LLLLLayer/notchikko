@@ -229,15 +229,30 @@ try:
                 response_data += chunk
                 try:
                     result = json.loads(response_data.decode())
-                    print(json.dumps(result))
+                    # App 侧回复 decision → 转换为 Claude Code hookSpecificOutput 格式
+                    decision = result.get('decision', 'allow')
+                    reason = result.get('reason', 'Approved by Notchikko')
+                    print(json.dumps({'hookSpecificOutput': {
+                        'hookEventName': 'PreToolUse',
+                        'permissionDecision': decision,
+                        'permissionDecisionReason': reason,
+                    }}))
                     break
                 except json.JSONDecodeError:
                     continue
             except socket.timeout:
-                print(json.dumps({'decision': 'allow'}))
+                print(json.dumps({'hookSpecificOutput': {
+                    'hookEventName': 'PreToolUse',
+                    'permissionDecision': 'allow',
+                    'permissionDecisionReason': 'Timeout — auto-allowed by Notchikko',
+                }}))
                 break
     sock.close()
 except:
     if needs_blocking:
-        print(json.dumps({'decision': 'allow'}))
+        print(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse',
+            'permissionDecision': 'allow',
+            'permissionDecisionReason': 'Socket error — auto-allowed by Notchikko',
+        }}))
 " 2>/dev/null
