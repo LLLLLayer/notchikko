@@ -256,7 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             requestId: "",
                             source: session?.source ?? "unknown",
                             tool: msg.isEmpty ? "AskUserQuestion" : msg,
-                            input: session?.lastPrompt ?? "",
+                            input: "",
                             sessionId: sid,
                             cwdName: session?.cwdName ?? "",
                             terminalName: session?.matchedTerminal?.appName ?? "",
