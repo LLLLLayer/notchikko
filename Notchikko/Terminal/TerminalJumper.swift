@@ -8,6 +8,9 @@ final class TerminalJumper {
     private var processTree: [Int: Int] = [:]  // pid → ppid
     private var processTreeTimestamp: Date = .distantPast
 
+    /// 终端匹配回调（AppDelegate 注入，缓存到 session）
+    var onTerminalMatched: ((String, SessionManager.TerminalMatch) -> Void)?
+
     /// 跳转到 session 对应的终端
     /// 优先级：terminalPid 直接激活 → cwd 标题匹配 → CGWindowList 跨桌面
     func jumpToSession(session: SessionManager.SessionInfo) {
@@ -22,6 +25,15 @@ final class TerminalJumper {
         if let pid = session.terminalPid,
            let app = findGUIApp(from: pid) {
             Log("PID match: pid=\(pid) → \(app.localizedName ?? "?") (pid=\(app.processIdentifier))", tag: "Terminal")
+            // 缓存终端匹配结果（供菜单/卡片显示终端名）
+            if session.matchedTerminal == nil, let bundleId = app.bundleIdentifier {
+                let terminal = KnownTerminal(rawValue: bundleId)
+                let match = SessionManager.TerminalMatch(
+                    bundleId: bundleId,
+                    appName: terminal?.displayName ?? app.localizedName ?? bundleId
+                )
+                onTerminalMatched?(session.id, match)
+            }
             focusApp(app, session: session, normalizedCwd: normalizedCwd)
             return
         }
@@ -247,8 +259,9 @@ final class TerminalJumper {
 
         do {
             try process.run()
-            process.waitUntilExit()
+            // 先读完数据再 wait，避免 pipe buffer 满时死锁
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
             guard let output = String(data: data, encoding: .utf8) else { return }
 
             var tree: [Int: Int] = [:]
@@ -280,8 +293,9 @@ final class TerminalJumper {
 
     /// 标题是否匹配 cwd（完整路径或任一候选目录名）
     static func titleMatchesCwd(_ title: String, candidates: [String], fullPath: String) -> Bool {
-        if title.contains(fullPath) { return true }
-        for candidate in candidates {
+        guard !title.isEmpty else { return false }
+        if !fullPath.isEmpty && title.contains(fullPath) { return true }
+        for candidate in candidates where !candidate.isEmpty {
             if title.contains(candidate) { return true }
         }
         return false

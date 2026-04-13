@@ -186,6 +186,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let adapter = ClaudeCodeAdapter()
         self.adapter = adapter
 
+        // 终端匹配缓存回调
+        terminalJumper.onTerminalMatched = { [weak self] sessionId, match in
+            self?.sessionManager.setTerminalMatch(match, for: sessionId)
+        }
+
         // 审批面板（受 Settings 开关控制）
         let approval = ApprovalManager(socketServer: adapter.socketServerRef)
         self.approvalManager = approval
