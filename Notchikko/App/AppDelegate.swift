@@ -222,7 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let session = self.sessionManager.sessions[hookEvent.sessionId]
 
             // bypass 模式 或 审批卡片关闭 → 直接放行，不弹卡片
-            if session?.isBypassMode == true || !PreferencesStore.shared.preferences.approvalCardEnabled {
+            // AskUserQuestion 不受 approvalCardEnabled 控制（它是问答，不是审批）
+            let isAskUser = hookEvent.tool == "AskUserQuestion"
+            if session?.isBypassMode == true || (!isAskUser && !PreferencesStore.shared.preferences.approvalCardEnabled) {
                 let reason = session?.isBypassMode == true ? "bypass mode" : "approvalCard disabled"
                 Log("Approval auto-allowed (\(reason)): \(hookEvent.tool ?? "?")", tag: "App")
                 let requestId = hookEvent.requestId ?? ""
