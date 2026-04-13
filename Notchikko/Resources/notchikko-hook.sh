@@ -136,7 +136,23 @@ GEMINI_EVENT_MAP = {
     'SessionStart': 'SessionStart',
     'SessionEnd':   'SessionEnd',
     'Notification': 'Notification',
-    'PreCompress':  'PreCompact',
+    # PreCompress 无对应 PostCompress，不映射（避免卡在 sweeping 状态）
+}
+
+# Gemini CLI 使用 snake_case 工具名，映射为 Notchikko 统一的 PascalCase
+GEMINI_TOOL_MAP = {
+    'read_file':      'Read',
+    'read_many_files':'Read',
+    'write_file':     'Write',
+    'replace':        'Edit',
+    'run_shell_command': 'Bash',
+    'glob':           'Glob',
+    'grep_search':    'Grep',
+    'search_file_content': 'Grep',
+    'list_directory': 'Glob',
+    'ask_user':       'AskUserQuestion',
+    'google_web_search': 'WebSearch',
+    'web_fetch':      'WebFetch',
 }
 
 if source == 'gemini-cli':
@@ -145,6 +161,10 @@ if source == 'gemini-cli':
     if not mapped:
         sys.exit(0)
     input_data['hook_event_name'] = mapped
+    # 工具名标准化
+    raw_tool = input_data.get('tool_name', '')
+    if raw_tool in GEMINI_TOOL_MAP:
+        input_data['tool_name'] = GEMINI_TOOL_MAP[raw_tool]
 
 # ============================================================
 # Claude Code / Codex / Gemini CLI 标准格式

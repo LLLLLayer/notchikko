@@ -60,7 +60,7 @@ final class SessionManager {
             switch phase {
             case .waitingForInput: return String(localized: "session.phase.idle")
             case .processing: return String(localized: "session.phase.thinking")
-            case .runningTool(let t): return t.lowercased()
+            case .runningTool(let t): return t
             case .compacting: return String(localized: "session.phase.sweeping")
             case .ended: return String(localized: "session.phase.ended")
             }
@@ -103,6 +103,24 @@ final class SessionManager {
         sessions.values
             .filter { $0.phase != .ended }
             .sorted { $0.lastEvent > $1.lastEvent }
+    }
+
+    // MARK: - Session 管理
+
+    /// 手动移除 session（用户从菜单关闭）
+    func removeSession(_ sessionId: String) {
+        sessionCleanupTasks[sessionId]?.cancel()
+        sessionCleanupTasks.removeValue(forKey: sessionId)
+        sessions.removeValue(forKey: sessionId)
+        if pinnedSessionId == sessionId {
+            pinnedSessionId = nil
+        }
+        // 更新状态
+        if let nextId = activeSessionId, let next = sessions[nextId] {
+            currentState = stateForPhase(next.phase)
+        } else {
+            transition(to: .sleeping)
+        }
     }
 
     // MARK: - 绑定切换

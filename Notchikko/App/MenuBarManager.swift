@@ -10,6 +10,7 @@ final class MenuBarManager {
     var onSwitchScreen: ((NSScreen) -> Void)?
     var onQuit: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onRemoveSession: ((String) -> Void)?
 
     func setup(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
@@ -40,15 +41,29 @@ final class MenuBarManager {
                 menu.addItem(autoItem)
 
                 for session in sessions {
-                    let item = NSMenuItem()
-                    item.target = self
-                    item.action = #selector(pinSession(_:))
-                    item.representedObject = session.id
-
                     let isPinned = session.id == sm.pinnedSessionId
+
+                    // 主菜单项（自定义 view）
+                    let item = NSMenuItem()
                     let view = SessionMenuItemView(session: session, isPinned: isPinned)
                     item.view = view
 
+                    // 子菜单：Pin/Unpin + Close
+                    let sub = NSMenu()
+                    let pinTitle = isPinned
+                        ? NSLocalizedString("menu.unpin", comment: "")
+                        : NSLocalizedString("menu.pin", comment: "")
+                    let pinItem = NSMenuItem(title: pinTitle, action: #selector(pinSession(_:)), keyEquivalent: "")
+                    pinItem.target = self
+                    pinItem.representedObject = session.id
+                    sub.addItem(pinItem)
+
+                    let closeItem = NSMenuItem(title: NSLocalizedString("menu.close_session", comment: ""), action: #selector(closeSession(_:)), keyEquivalent: "")
+                    closeItem.target = self
+                    closeItem.representedObject = session.id
+                    sub.addItem(closeItem)
+
+                    item.submenu = sub
                     menu.addItem(item)
                 }
 
@@ -111,6 +126,11 @@ final class MenuBarManager {
         } else {
             sm.pinSession(nil)
         }
+    }
+
+    @objc private func closeSession(_ sender: NSMenuItem) {
+        guard let sessionId = sender.representedObject as? String else { return }
+        onRemoveSession?(sessionId)
     }
 
     @objc private func screenSelected(_ sender: NSMenuItem) {

@@ -47,6 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.openSettingsWindow()
         }
 
+        menuBarManager.onRemoveSession = { [weak self] sessionId in
+            self?.sessionManager.removeSession(sessionId)
+            self?.approvalManager?.cleanupSession(sessionId)
+        }
+
         menuBarManager.onQuit = {
             NSApp.terminate(nil)
         }
