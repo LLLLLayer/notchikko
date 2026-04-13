@@ -2,25 +2,35 @@ import Foundation
 
 @MainActor @Observable
 final class ApprovalManager {
-    var pendingApproval: ApprovalRequest?
-    var isCardVisible: Bool = false
+    /// 所有待审批请求（requestId → request），每张卡片独立闭环
+    private(set) var pendingApprovals: [String: ApprovalRequest] = [:]
 
-    private var hideTimer: Task<Void, Never>?
-    private var staleTimer: Task<Void, Never>?
+    private var hideTimers: [String: Task<Void, Never>] = [:]
+    private var staleTimers: [String: Task<Void, Never>] = [:]
     private weak var socketServer: SocketServer?
 
     /// 已设为"全部允许"的 session（session 维度，不持久化）
     private var autoApprovedSessions: Set<String> = []
 
-    struct ApprovalRequest {
+    /// 卡片移除回调（AppDelegate 注入，用于关闭对应 NSPanel）
+    var onCardDismissed: ((String) -> Void)?
+    /// 全部移除回调（Allow All 时）
+    var onAllCardsDismissed: (() -> Void)?
+
+    struct ApprovalRequest: Identifiable {
+        let id: String             // 同 requestId，用于卡片标识
         let requestId: String
         let source: String
         let tool: String
         let input: String
         let sessionId: String
-        let cwdName: String        // 项目名
-        let terminalName: String   // 终端类型
+        let cwdName: String
+        let terminalName: String
         let timestamp: Date
+        var isVisible: Bool = true
+
+        /// 通知类卡片（无 requestId，不阻塞 CLI）
+        var isNotification: Bool { requestId.isEmpty }
     }
 
     init(socketServer: SocketServer) {
@@ -30,9 +40,11 @@ final class ApprovalManager {
     // MARK: - 请求处理
 
     func handleApprovalRequest(from hookEvent: HookEvent, session: SessionManager.SessionInfo?) {
+        let requestId = hookEvent.requestId ?? ""
+        Log("handleApproval: tool=\(hookEvent.tool ?? "?"), sid=\(hookEvent.sessionId.prefix(8)), reqId=\(requestId.prefix(8))", tag: "Approval")
+
         // 如果该 session 已设为"全部允许"，直接放行
         if autoApprovedSessions.contains(hookEvent.sessionId) {
-            let requestId = hookEvent.requestId ?? ""
             let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
             if let data = try? JSONSerialization.data(withJSONObject: response) {
                 socketServer?.respond(requestId: requestId, json: data)
@@ -47,7 +59,8 @@ final class ApprovalManager {
         } ?? ""
 
         let request = ApprovalRequest(
-            requestId: hookEvent.requestId ?? "",
+            id: requestId.isEmpty ? UUID().uuidString : requestId,
+            requestId: requestId,
             source: hookEvent.source ?? "unknown",
             tool: hookEvent.tool ?? "",
             input: String(toolInput.prefix(500)),
@@ -57,101 +70,166 @@ final class ApprovalManager {
             timestamp: Date()
         )
 
-        pendingApproval = request
-        isCardVisible = true
-        startHideTimer()
-        startStaleTimer()
+        pendingApprovals[request.id] = request
+        startHideTimer(for: request.id)
+        if !request.isNotification {
+            startStaleTimer(for: request.id)
+        }
     }
 
-    // MARK: - 审批操作
+    /// 添加通知类卡片（Elicitation / AskUserQuestion）
+    func addNotification(_ request: ApprovalRequest) {
+        Log("addNotification: tool=\(request.tool), sid=\(request.sessionId.prefix(8)), id=\(request.id.prefix(8))", tag: "Approval")
+        pendingApprovals[request.id] = request
+        startHideTimer(for: request.id)
+        // 通知卡片兜底：60s 后自动清理（不阻塞 CLI，无需等 300s）
+        let notifId = request.id
+        staleTimers[notifId]?.cancel()
+        staleTimers[notifId] = Task {
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else { return }
+            pendingApprovals.removeValue(forKey: notifId)
+            cleanupTimers(for: notifId)
+            onCardDismissed?(notifId)
+        }
+    }
 
-    func approve() {
-        guard let req = pendingApproval else { return }
+    // MARK: - 审批操作（每个操作都指定 requestId）
+
+    func approve(requestId: String) {
+        Log("approve: \(requestId.prefix(8))", tag: "Approval")
+        guard let req = pendingApprovals[requestId] else { return }
         let response: [String: Any] = [
             "request_id": req.requestId,
             "decision": "allow",
         ]
-        sendResponse(response)
-        dismiss()
+        sendResponse(response, for: req)
+        dismiss(requestId: requestId)
         SoundManager.shared.play(for: "nod")
     }
 
-    /// 允许当前 session 的所有后续请求（session 维度，不持久化）
-    func approveAllForSession() {
-        guard let req = pendingApproval else { return }
-        autoApprovedSessions.insert(req.sessionId)
-        approve()  // 同时放行当前请求
-    }
-
-    func deny() {
-        guard let req = pendingApproval else { return }
+    func deny(requestId: String) {
+        Log("deny: \(requestId.prefix(8))", tag: "Approval")
+        guard let req = pendingApprovals[requestId] else { return }
         let response: [String: Any] = [
             "request_id": req.requestId,
             "decision": "deny",
             "reason": "Denied by Notchikko",
         ]
-        sendResponse(response)
-        dismiss()
+        sendResponse(response, for: req)
+        dismiss(requestId: requestId)
         SoundManager.shared.play(for: "shake")
+    }
+
+    /// 允许当前 session 的所有后续请求，并放行该 session 所有待审批
+    func approveAllForSession(requestId: String) {
+        guard let req = pendingApprovals[requestId] else { return }
+        let sessionId = req.sessionId
+        autoApprovedSessions.insert(sessionId)
+
+        // 放行该 session 的所有待审批请求
+        let sessionRequests = pendingApprovals.values.filter {
+            $0.sessionId == sessionId && !$0.isNotification
+        }
+        for r in sessionRequests {
+            let response: [String: Any] = [
+                "request_id": r.requestId,
+                "decision": "allow",
+            ]
+            sendResponse(response, for: r)
+        }
+
+        // 清除该 session 的所有卡片（包括通知卡片）
+        let allSessionIds = pendingApprovals.values
+            .filter { $0.sessionId == sessionId }
+            .map { $0.id }
+        for id in allSessionIds {
+            cleanupTimers(for: id)
+            pendingApprovals.removeValue(forKey: id)
+        }
+
+        SoundManager.shared.play(for: "nod")
+        onAllCardsDismissed?()
     }
 
     // MARK: - 卡片显示控制
 
-    func onMouseEnter() {
-        guard pendingApproval != nil else { return }
-        isCardVisible = true
-        hideTimer?.cancel()
+    func onMouseEnter(requestId: String) {
+        guard pendingApprovals[requestId] != nil else { return }
+        pendingApprovals[requestId]?.isVisible = true
+        hideTimers[requestId]?.cancel()
+        hideTimers[requestId] = nil
     }
 
-    func onMouseExit() {
-        guard pendingApproval != nil else { return }
-        startHideTimer()
+    func onMouseExit(requestId: String) {
+        guard pendingApprovals[requestId] != nil else { return }
+        startHideTimer(for: requestId)
     }
 
-    var hasPendingApproval: Bool {
-        pendingApproval != nil
-    }
-
-    /// 当收到同一 session 的后续事件时，说明审批已在 CLI 侧完成，清理卡片
+    /// 当收到同一 session 的后续事件时，说明审批已在 CLI 侧完成，清理该 session 的卡片
     func onSessionEvent(sessionId: String) {
-        guard let pending = pendingApproval,
-              pending.sessionId == sessionId else { return }
-        dismiss()
+        let toRemove = pendingApprovals.values.filter { $0.sessionId == sessionId }.map { $0.id }
+        if !toRemove.isEmpty {
+            Log("onSessionEvent: sid=\(sessionId.prefix(8)), clearing \(toRemove.count) card(s)", tag: "Approval")
+        }
+        for id in toRemove {
+            dismiss(requestId: id)
+        }
     }
 
     // MARK: - Private
 
-    private func dismiss() {
-        hideTimer?.cancel()
-        staleTimer?.cancel()
-        pendingApproval = nil
-        isCardVisible = false
+    /// 关闭指定卡片（关闭按钮 = deny 审批卡，直接关闭通知卡）
+    func closeCard(requestId: String) {
+        guard let req = pendingApprovals[requestId] else { return }
+        if req.isNotification {
+            dismiss(requestId: requestId)
+        } else {
+            deny(requestId: requestId)
+        }
+    }
+
+    private func dismiss(requestId: String) {
+        Log("dismiss: \(requestId.prefix(8)), remaining=\(pendingApprovals.count - 1)", tag: "Approval")
+        cleanupTimers(for: requestId)
+        pendingApprovals.removeValue(forKey: requestId)
+        onCardDismissed?(requestId)
+    }
+
+    private func cleanupTimers(for requestId: String) {
+        hideTimers[requestId]?.cancel()
+        hideTimers.removeValue(forKey: requestId)
+        staleTimers[requestId]?.cancel()
+        staleTimers.removeValue(forKey: requestId)
     }
 
     /// Hook 脚本有 300s 超时，超时后 hook 侧自动放行。
     /// App 侧也需要在同样时间后清理审批状态，避免卡片常驻。
-    private func startStaleTimer() {
-        staleTimer?.cancel()
-        staleTimer = Task {
+    private func startStaleTimer(for requestId: String) {
+        staleTimers[requestId]?.cancel()
+        staleTimers[requestId] = Task {
             try? await Task.sleep(for: .seconds(300))
             guard !Task.isCancelled else { return }
-            dismiss()
+            // 超时自动放行（与 hook 超时行为一致）
+            pendingApprovals.removeValue(forKey: requestId)
+            cleanupTimers(for: requestId)
+            onCardDismissed?(requestId)
         }
     }
 
-    private func startHideTimer() {
-        hideTimer?.cancel()
+    private func startHideTimer(for requestId: String) {
+        hideTimers[requestId]?.cancel()
         let delay = PreferencesStore.shared.preferences.approvalCardHideDelay
-        guard delay > 0 else { return }  // 0 = 永不隐藏
-        hideTimer = Task {
+        guard delay > 0 else { return }
+        hideTimers[requestId] = Task {
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
-            isCardVisible = false
+            pendingApprovals[requestId]?.isVisible = false
         }
     }
 
-    private func sendResponse(_ dict: [String: Any]) {
-        guard let req = pendingApproval,
+    private func sendResponse(_ dict: [String: Any], for req: ApprovalRequest) {
+        guard !req.requestId.isEmpty,
               let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
         socketServer?.respond(requestId: req.requestId, json: data)
     }

@@ -74,6 +74,7 @@
 "approval.allow_all" = "Allow All";
 "approval.auto_approve" = "Auto Approve";
 "approval.jump_to_terminal" = "Jump to terminal";
+"approval.respond_in_terminal" = "Go to terminal";
 "approval.submit" = "Submit";
 
 /* SessionManager - Phase Display Names */

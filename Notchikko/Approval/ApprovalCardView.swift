@@ -36,13 +36,27 @@ struct ApprovalCardView: View {
                     .lineLimit(1)
                 Spacer()
                 if let onJump {
-                    Button(action: onJump) {
-                        Image(systemName: "arrow.up.forward.square")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
+                    if request.isNotification {
+                        // 通知卡片：可点击的文字按钮，兼做引导
+                        Button(action: onJump) {
+                            HStack(spacing: 3) {
+                                Text(String(localized: "approval.respond_in_terminal"))
+                                    .font(.system(size: 11, weight: .medium))
+                                Image(systemName: "arrow.up.forward.square")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button(action: onJump) {
+                            Image(systemName: "arrow.up.forward.square")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(String(localized: "approval.jump_to_terminal"))
                     }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "approval.jump_to_terminal"))
                 }
             }
 
@@ -71,21 +85,24 @@ struct ApprovalCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
-            // 按钮行（仅有 requestId 时显示审批按钮）
-            if !request.requestId.isEmpty {
+            if !request.isNotification {
+                // 审批按钮行
                 HStack(spacing: 6) {
+                    // Deny — 红色（破坏性操作）
                     Button(action: onDeny) {
                         Text(String(localized: "approval.deny"))
                             .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .frame(height: 26)
                     }
                     .buttonStyle(.plain)
-                    .background(Color.primary.opacity(0.08))
+                    .background(Color.red.opacity(0.85))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     Spacer()
 
+                    // Allow Once — accent（主操作）
                     Button(action: onApprove) {
                         Text(String(localized: "approval.allow_once"))
                             .font(.system(size: 11, weight: .semibold))
@@ -97,15 +114,15 @@ struct ApprovalCardView: View {
                     .background(Color.accentColor)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
+                    // Allow All — 次要便利操作
                     Button(action: onApproveAll) {
                         Text(String(localized: "approval.allow_all"))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 11, weight: .medium))
                             .padding(.horizontal, 10)
                             .frame(height: 26)
                     }
                     .buttonStyle(.plain)
-                    .background(.red)
+                    .background(Color.primary.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }

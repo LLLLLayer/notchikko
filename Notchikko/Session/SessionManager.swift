@@ -3,6 +3,8 @@ import Foundation
 @MainActor @Observable
 final class SessionManager {
     private(set) var currentState: NotchikkoState = .sleeping
+    /// handleEvent 执行前的状态（用于判断过时的 notification 事件）
+    private(set) var previousState: NotchikkoState = .sleeping
     private(set) var sessions: [String: SessionInfo] = [:]
 
     /// 弹幕事件：每次活跃 session 触发 tool 时递增，附带工具名
@@ -113,9 +115,8 @@ final class SessionManager {
     // MARK: - 事件处理
 
     func handleEvent(_ event: AgentEvent) {
-        #if DEBUG
-        print("[SessionManager] handleEvent: \(event), activeSessionId=\(activeSessionId ?? "nil"), currentState=\(currentState)")
-        #endif
+        previousState = currentState
+        Log("handleEvent: \(event), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
         let eventSessionId = sessionIdOf(event)
 
         // 收到未知 session 的事件时自动创建（应对中途安装 hook 的场景）
@@ -177,9 +178,7 @@ final class SessionManager {
         case .stop(let sid):
             sessions[sid]?.phase = .waitingForInput
             sessions[sid]?.lastEvent = Date()
-            #if DEBUG
-            print("[SessionManager] Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), current=\(currentState)")
-            #endif
+            Log("Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .happy)
@@ -251,9 +250,7 @@ final class SessionManager {
         case "Bash":
             return .building
         default:
-            #if DEBUG
-            print("[SessionManager] Unknown tool '\(tool)', defaulting to .typing")
-            #endif
+            Log("Unknown tool '\(tool)', defaulting to .typing", tag: "Session")
             return .typing
         }
     }
@@ -360,9 +357,7 @@ final class SessionManager {
             lastEvent: Date(), phase: .waitingForInput,
             terminalPid: tPid, pidChain: pChain
         )
-        #if DEBUG
-        print("[SessionManager] Auto-created session \(sid.prefix(8)), total: \(sessions.count)")
-        #endif
+        Log("Auto-created session \(sid.prefix(8)), total: \(sessions.count)", tag: "Session")
     }
 
     private func evictOldestSession() {
