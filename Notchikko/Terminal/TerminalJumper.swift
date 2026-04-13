@@ -21,9 +21,7 @@ final class TerminalJumper {
         // 方案 1：有 terminalPid → 用 PID 或其祖先找到 GUI app 并激活
         if let pid = session.terminalPid,
            let app = findGUIApp(from: pid) {
-            #if DEBUG
-            print("[TerminalJumper] PID match: pid=\(pid) → \(app.localizedName ?? "?") (pid=\(app.processIdentifier))")
-            #endif
+            Log("PID match: pid=\(pid) → \(app.localizedName ?? "?") (pid=\(app.processIdentifier))", tag: "Terminal")
             focusApp(app, session: session, normalizedCwd: normalizedCwd)
             return
         }
@@ -45,16 +43,12 @@ final class TerminalJumper {
             // CGWindowList：跨 Space
             if matchAcrossSpaces(candidates: candidates, fullPath: normalizedCwd, pid: app.processIdentifier) {
                 app.activate(options: .activateIgnoringOtherApps)
-                #if DEBUG
-                print("[TerminalJumper] CGWindowList match: \(terminal.displayName)")
-                #endif
+                Log("CGWindowList match: \(terminal.displayName)", tag: "Terminal")
                 return
             }
         }
 
-        #if DEBUG
-        print("[TerminalJumper] no match for cwd=\(session.cwdName)")
-        #endif
+        Log("no match for cwd=\(session.cwdName)", tag: "Terminal")
     }
 
     // MARK: - Focus Dispatch
@@ -129,9 +123,7 @@ final class TerminalJumper {
                         await MainActor.run {
                             app.activate(options: .activateIgnoringOtherApps)
                         }
-                        #if DEBUG
-                        print("[TerminalJumper] IDE extension focused terminal on port \(port) for \(label)")
-                        #endif
+                        Log("IDE extension focused terminal on port \(port) for \(label)", tag: "Terminal")
                         return
                     }
                 } catch {
@@ -142,9 +134,7 @@ final class TerminalJumper {
             await MainActor.run {
                 app.activate(options: .activateIgnoringOtherApps)
             }
-            #if DEBUG
-            print("[TerminalJumper] IDE extension fallback: generic activate for \(label)")
-            #endif
+            Log("IDE extension fallback: generic activate for \(label)", tag: "Terminal")
         }
     }
 
@@ -161,9 +151,7 @@ final class TerminalJumper {
             "/usr/local/bin/kitty",
         ]
         guard let kittyPath = kittyPaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            #if DEBUG
-            print("[TerminalJumper] kitty CLI not found")
-            #endif
+            Log("kitty CLI not found", tag: "Terminal")
             return
         }
 
@@ -177,13 +165,9 @@ final class TerminalJumper {
         do {
             try process.run()
             process.waitUntilExit()
-            #if DEBUG
-            print("[TerminalJumper] kitty @ focus-window pid:\(pid) exit=\(process.terminationStatus)")
-            #endif
+            Log("kitty @ focus-window pid:\(pid) exit=\(process.terminationStatus)", tag: "Terminal")
         } catch {
-            #if DEBUG
-            print("[TerminalJumper] kitty CLI failed: \(error)")
-            #endif
+            Log("kitty CLI failed: \(error)", tag: "Terminal")
         }
     }
 
@@ -199,9 +183,7 @@ final class TerminalJumper {
             if Self.titleMatchesCwd(title, candidates: candidates, fullPath: fullPath) {
                 app.activate(options: .activateIgnoringOtherApps)
                 AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-                #if DEBUG
-                print("[TerminalJumper] AX title match: \(app.localizedName ?? "?") \"\(title)\"")
-                #endif
+                Log("AX title match: \(app.localizedName ?? "?") \"\(title)\"", tag: "Terminal")
                 return true
             }
         }
@@ -313,15 +295,11 @@ final class TerminalJumper {
 
     @discardableResult
     private func runAppleScript(_ source: String, label: String) -> String? {
-        #if DEBUG
-        print("[TerminalJumper] AppleScript: \(label)")
-        #endif
+        Log("AppleScript: \(label)", tag: "Terminal")
         guard let script = NSAppleScript(source: source) else { return nil }
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
-        #if DEBUG
-        if let error { print("[TerminalJumper] AppleScript error: \(error)") }
-        #endif
+        if let error { Log("AppleScript error: \(error)", tag: "Terminal") }
         return result.stringValue
     }
 

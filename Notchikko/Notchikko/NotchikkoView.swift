@@ -41,9 +41,7 @@ final class NotchikkoView: NSView {
         currentSVG = key
 
         guard let url = ThemeProvider.shared.svgURL(for: state) else {
-            #if DEBUG
-            print("[NotchikkoView] SVG not found for state: \(state)")
-            #endif
+            Log("SVG not found for state: \(state)", tag: "View")
             return
         }
 

@@ -63,18 +63,14 @@ final class SocketServer {
 
     private func startServer() {
         if isSocketActive(Self.socketPath) {
-            #if DEBUG
-            print("[SocketServer] Another instance is already listening")
-            #endif
+            Log("Another instance is already listening", tag: "Socket")
             return
         }
         unlink(Self.socketPath)
 
         serverSocket = socket(AF_UNIX, SOCK_STREAM, 0)
         guard serverSocket >= 0 else {
-            #if DEBUG
-            print("[SocketServer] Failed to create socket: \(errno)")
-            #endif
+            Log("Failed to create socket: \(errno)", tag: "Socket")
             return
         }
 
@@ -106,9 +102,7 @@ final class SocketServer {
                 }
             }
             guard retryResult == 0 else {
-                #if DEBUG
-                print("[SocketServer] Bind failed after retry: \(errno)")
-                #endif
+                Log("Bind failed after retry: \(errno)", tag: "Socket")
                 close(serverSocket)
                 serverSocket = -1
                 return
