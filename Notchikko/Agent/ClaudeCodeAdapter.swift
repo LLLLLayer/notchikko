@@ -28,7 +28,8 @@ final class ClaudeCodeAdapter: AgentBridge {
                             sessionId: hookEvent.sessionId,
                             cwd: hookEvent.cwd,
                             source: hookEvent.source ?? "claude-code",
-                            terminalPid: hookEvent.terminalPid
+                            terminalPid: hookEvent.terminalPid,
+                            pidChain: hookEvent.pidChain
                         )
                         continuation.yield(syntheticStart)
                     }
@@ -71,7 +72,7 @@ final class ClaudeCodeAdapter: AgentBridge {
     private static func convert(_ hook: HookEvent) -> AgentEvent? {
         switch hook.event {
         case "SessionStart":
-            return .sessionStart(sessionId: hook.sessionId, cwd: hook.cwd, source: hook.source ?? "claude-code", terminalPid: hook.terminalPid)
+            return .sessionStart(sessionId: hook.sessionId, cwd: hook.cwd, source: hook.source ?? "claude-code", terminalPid: hook.terminalPid, pidChain: hook.pidChain)
         case "SessionEnd":
             return .sessionEnd(sessionId: hook.sessionId)
         case "UserPromptSubmit":

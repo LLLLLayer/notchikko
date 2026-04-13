@@ -115,17 +115,17 @@ final class SessionManager {
         ensureSession(event)
 
         // 每个事件都可能携带 terminalPid，更新到 session（首次检测到时生效）
-        if case .sessionStart(_, _, _, let tPid) = event, let tPid,
+        if case .sessionStart(_, _, _, let tPid, _) = event, let tPid,
            sessions[eventSessionId]?.terminalPid == nil {
             sessions[eventSessionId]?.terminalPid = tPid
         }
 
         switch event {
-        case .sessionStart(let sid, let cwd, let source, let terminalPid):
+        case .sessionStart(let sid, let cwd, let source, let terminalPid, let pidChain):
             sessions[sid] = SessionInfo(
                 id: sid, cwd: cwd, source: source,
                 lastEvent: Date(), phase: .waitingForInput,
-                terminalPid: terminalPid
+                terminalPid: terminalPid, pidChain: pidChain
             )
             SoundManager.shared.play(for: "session-start")
             if eventSessionId == activeSessionId || activeSessionId == nil {
@@ -336,16 +336,18 @@ final class SessionManager {
         var cwd = ""
         var source = "unknown"
         var tPid: Int? = nil
-        if case .sessionStart(_, let c, let s, let tp) = event {
+        var pChain: [Int]?
+        if case .sessionStart(_, let c, let s, let tp, let pc) = event {
             cwd = c
             source = s
             tPid = tp
+            pChain = pc
         }
 
         sessions[sid] = SessionInfo(
             id: sid, cwd: cwd, source: source,
             lastEvent: Date(), phase: .waitingForInput,
-            terminalPid: tPid
+            terminalPid: tPid, pidChain: pChain
         )
         #if DEBUG
         print("[SessionManager] Auto-created session \(sid.prefix(8)), total: \(sessions.count)")
@@ -366,7 +368,7 @@ final class SessionManager {
 
     private func sessionIdOf(_ event: AgentEvent) -> String {
         switch event {
-        case .sessionStart(let sid, _, _, _): return sid
+        case .sessionStart(let sid, _, _, _, _): return sid
         case .sessionEnd(let sid): return sid
         case .prompt(let sid, _): return sid
         case .toolUse(let sid, _, _): return sid

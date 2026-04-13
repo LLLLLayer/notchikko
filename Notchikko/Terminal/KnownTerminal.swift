@@ -42,6 +42,8 @@ enum KnownTerminal: String, CaseIterable {
         case appleScriptCwd
         /// HTTP 请求扩展定位终端 tab（VS Code, Cursor, Windsurf）
         case ideExtension
+        /// Kitty remote control CLI
+        case kittyCLI
         /// 通用：activate app + raise 窗口
         case generic
     }
@@ -51,6 +53,7 @@ enum KnownTerminal: String, CaseIterable {
         case .iterm2, .terminal: .appleScriptTty
         case .ghostty: .appleScriptCwd
         case .vscode, .vscodeInsiders: .ideExtension
+        case .kitty: .kittyCLI
         default: .generic
         }
     }

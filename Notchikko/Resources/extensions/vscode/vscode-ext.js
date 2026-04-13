@@ -7,16 +7,19 @@ const PORT_RANGE = 5;
 let server = null;
 
 async function focusTerminalByPids(pids) {
+  const channel = vscode.window.createOutputChannel("Notchikko", { log: true });
+  channel.info(`[focus] looking for pids: ${JSON.stringify(pids)}`);
   for (const terminal of vscode.window.terminals) {
     const termPid = await terminal.processId;
+    channel.info(`[focus] terminal "${terminal.name}" pid=${termPid}`);
     if (termPid && pids.includes(termPid)) {
-      // false = take focus, brings the correct window to the front
+      channel.info(`[focus] MATCH! focusing terminal "${terminal.name}"`);
       terminal.show(false);
-      // Also ensure the window itself is focused
       await vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
       return true;
     }
   }
+  channel.info(`[focus] no match found`);
   return false;
 }
 
@@ -27,6 +30,12 @@ function tryListen(port, maxPort) {
   }
 
   server = http.createServer((req, res) => {
+    if (req.method === "GET" && req.url === "/health") {
+      const pkg = require("./package.json");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "ok", version: pkg.version }));
+      return;
+    }
     if (req.method === "POST" && req.url === "/focus-tab") {
       let body = "";
       req.on("data", (chunk) => { body += chunk; });

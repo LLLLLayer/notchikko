@@ -59,7 +59,7 @@ enum AnyCodableValue: Decodable {
 
 /// 统一事件模型（多 Agent 通用）
 enum AgentEvent {
-    case sessionStart(sessionId: String, cwd: String, source: String, terminalPid: Int?)
+    case sessionStart(sessionId: String, cwd: String, source: String, terminalPid: Int?, pidChain: [Int]?)
     case sessionEnd(sessionId: String)
     case prompt(sessionId: String, text: String?)
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)

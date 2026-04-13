@@ -112,15 +112,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         dragController.onClick = { [weak self] in
             guard let self else { return }
-            guard let sid = self.sessionManager.activeSessionId,
-                  let session = self.sessionManager.sessions[sid] else {
+            // 优先活跃 session，fallback 到最近的任意 session（含已结束的）
+            let session: SessionManager.SessionInfo? = {
+                if let sid = self.sessionManager.activeSessionId,
+                   let s = self.sessionManager.sessions[sid] { return s }
+                return self.sessionManager.sessions.values
+                    .max(by: { $0.lastEvent < $1.lastEvent })
+            }()
+            guard let session else {
                 #if DEBUG
-                print("[Click] no active session")
+                print("[Click] no session at all")
                 #endif
                 return
             }
             #if DEBUG
-            print("[Click] sid=\(sid.prefix(8)), cwd=\(session.cwdName), terminalPid=\(session.terminalPid ?? -1)")
+            print("[Click] sid=\(session.id.prefix(8)), cwd=\(session.cwdName), terminalPid=\(session.terminalPid ?? -1), pidChain=\(session.pidChain ?? []), tty=\(session.terminalTty ?? "nil")")
             #endif
             self.terminalJumper.jumpToSession(session: session)
         }

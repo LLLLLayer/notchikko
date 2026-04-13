@@ -80,7 +80,11 @@ final class TerminalJumper {
                     focusIDETerminalTab(pids: pids, app: app, label: terminal.displayName)
                     return
                 }
-                // 无 PID 链则 fallthrough 到通用激活
+            case .kittyCLI:
+                if let pid = session.terminalPid {
+                    focusKittyWindow(pid: pid, app: app)
+                    return
+                }
             case .generic:
                 break  // fall through to generic activation
             }
@@ -121,6 +125,10 @@ final class TerminalJumper {
                 do {
                     let (_, response) = try await URLSession.shared.data(for: request)
                     if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                        // 扩展切换了终端 tab，现在把 VS Code 窗口带到前台
+                        await MainActor.run {
+                            app.activate(options: .activateIgnoringOtherApps)
+                        }
                         #if DEBUG
                         print("[TerminalJumper] IDE extension focused terminal on port \(port) for \(label)")
                         #endif
@@ -136,6 +144,45 @@ final class TerminalJumper {
             }
             #if DEBUG
             print("[TerminalJumper] IDE extension fallback: generic activate for \(label)")
+            #endif
+        }
+    }
+
+    // MARK: - Kitty CLI
+
+    /// 通过 kitty remote control 定位窗口
+    /// 需要用户在 kitty.conf 中设置 allow_remote_control yes
+    private func focusKittyWindow(pid: Int, app: NSRunningApplication) {
+        app.activate(options: .activateIgnoringOtherApps)
+
+        let kittyPaths = [
+            "/Applications/kitty.app/Contents/MacOS/kitten",
+            "/opt/homebrew/bin/kitty",
+            "/usr/local/bin/kitty",
+        ]
+        guard let kittyPath = kittyPaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            #if DEBUG
+            print("[TerminalJumper] kitty CLI not found")
+            #endif
+            return
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: kittyPath)
+        // kitten 用 "@" 子命令，kitty 也支持 "@"
+        process.arguments = ["@", "focus-window", "--match", "pid:\(pid)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            #if DEBUG
+            print("[TerminalJumper] kitty @ focus-window pid:\(pid) exit=\(process.terminationStatus)")
+            #endif
+        } catch {
+            #if DEBUG
+            print("[TerminalJumper] kitty CLI failed: \(error)")
             #endif
         }
     }

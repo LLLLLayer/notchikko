@@ -44,8 +44,12 @@
 
 /* SettingsWindow - IDE Extensions */
 "settings.ide_extensions" = "IDE Extensions";
-"settings.ext_installed" = "Extension: ✅ Installed";
 "settings.ext_not_installed" = "Extension: ❌ Not installed";
+"settings.ext_installed" = "Extension: ✅ Installed (not running)";
+"settings.ext_running" = "Extension: ✅ Running";
+"settings.ext_update_available" = "Extension: 🔄 Update available";
+"settings.ext_restart_hint" = "Restart VS Code for the extension to take effect";
+"settings.ext_update" = "Update";
 
 /* SettingsWindow - Integration */
 "settings.bypass_permissions" = "Bypass Permissions";

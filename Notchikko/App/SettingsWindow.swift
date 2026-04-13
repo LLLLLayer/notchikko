@@ -271,7 +271,7 @@ struct ApprovalSettingsView: View {
 struct IntegrationSettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
-    @State private var ideStatuses: [String: Bool] = [:]
+    @State private var ideStatuses: [String: IDEExtensionInstaller.ExtensionStatus] = [:]
 
     var body: some View {
         ScrollView {
@@ -302,7 +302,7 @@ struct IntegrationSettingsView: View {
                         ForEach(IDEExtensionInstaller.targets) { target in
                             IDEExtensionRow(
                                 target: target,
-                                isInstalled: ideStatuses[target.id] ?? false,
+                                status: ideStatuses[target.id] ?? .notInstalled,
                                 onInstall: { installExtension(target) },
                                 onUninstall: { uninstallExtension(target) }
                             )
@@ -349,8 +349,13 @@ struct IntegrationSettingsView: View {
         for cli in HookInstaller.supportedCLIs {
             hookStatuses[cli.name] = hookInstaller.isInstalled(for: cli)
         }
-        for target in IDEExtensionInstaller.targets {
-            ideStatuses[target.id] = target.isInstalled
+        Task {
+            for target in IDEExtensionInstaller.targets {
+                let status = await IDEExtensionInstaller.checkStatus(for: target)
+                await MainActor.run {
+                    ideStatuses[target.id] = status
+                }
+            }
         }
     }
 
@@ -394,30 +399,62 @@ private struct CLIRow: View {
 
 private struct IDEExtensionRow: View {
     let target: IDEExtensionInstaller.IDETarget
-    let isInstalled: Bool
+    let status: IDEExtensionInstaller.ExtensionStatus
     let onInstall: () -> Void
     let onUninstall: () -> Void
+
+    @State private var showRestartHint = false
+
+    private var statusText: String {
+        switch status {
+        case .notInstalled: return String(localized: "settings.ext_not_installed")
+        case .installed: return String(localized: "settings.ext_installed")
+        case .running: return String(localized: "settings.ext_running")
+        case .updateAvailable: return String(localized: "settings.ext_update_available")
+        }
+    }
 
     var body: some View {
         HStack {
             Text("💻").font(.title2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(target.name).font(.body.bold())
-                Text(isInstalled ? String(localized: "settings.ext_installed") : String(localized: "settings.ext_not_installed"))
+                Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if showRestartHint {
+                    Text(String(localized: "settings.ext_restart_hint"))
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
             Spacer()
-            if isInstalled {
+            switch status {
+            case .notInstalled:
+                Button(String(localized: "settings.install_hook")) {
+                    onInstall()
+                    showRestartHint = true
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+            case .updateAvailable:
                 Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
                     .controlSize(.small)
-                Button(String(localized: "settings.reinstall_hook")) { onInstall() }
+                Button(String(localized: "settings.ext_update")) {
+                    onInstall()
+                    showRestartHint = true
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+            default:
+                Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
                     .controlSize(.small)
-                    .buttonStyle(.borderedProminent)
-            } else {
-                Button(String(localized: "settings.install_hook")) { onInstall() }
-                    .controlSize(.small)
-                    .buttonStyle(.borderedProminent)
+                Button(String(localized: "settings.reinstall_hook")) {
+                    onInstall()
+                    showRestartHint = true
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
             }
         }
         .padding(8)
