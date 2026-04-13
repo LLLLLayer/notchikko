@@ -101,14 +101,52 @@ final class ClaudeCodeAdapter: AgentBridge {
             return nil  // Subagent 生命周期不影响主状态
         case "Notification":
             return .notification(sessionId: hook.sessionId, message: "")
-        case "Elicitation", "PermissionRequest", "AskUserQuestion":
-            return .notification(sessionId: hook.sessionId, message: hook.event)
+        case "Elicitation":
+            let detail = Self.extractElicitationDetail(from: hook.toolInput)
+            return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
+        case "PermissionRequest":
+            let detail = Self.extractPermissionDetail(from: hook)
+            return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
+        case "AskUserQuestion":
+            let detail = Self.extractAskUserDetail(from: hook.toolInput)
+            return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
         case "WorktreeCreate":
             return .prompt(sessionId: hook.sessionId, text: nil)
         default:
             Log("Unknown hook event: \(hook.event)", tag: "Adapter")
             return nil  // 忽略未知事件，避免产生垃圾通知卡片
         }
+    }
+
+    /// 从 PermissionRequest 中提取工具名和输入预览
+    private static func extractPermissionDetail(from hook: HookEvent) -> String {
+        var lines: [String] = []
+        if let tool = hook.tool, !tool.isEmpty {
+            lines.append("Tool: \(tool)")
+        }
+        if let toolInput = hook.toolInput {
+            // 提取最有用的字段：command, file_path, content
+            for key in ["command", "file_path", "path", "content", "description"] {
+                if case .string(let val) = toolInput[key], !val.isEmpty {
+                    let display = val.count > 200 ? String(val.prefix(200)) + "…" : val
+                    lines.append(display)
+                    break
+                }
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// 从 Elicitation 中提取提示信息
+    private static func extractElicitationDetail(from toolInput: [String: AnyCodableValue]?) -> String {
+        guard let toolInput else { return "" }
+        // message / description / question 字段
+        for key in ["message", "description", "question"] {
+            if case .string(let val) = toolInput[key], !val.isEmpty {
+                return val.count > 300 ? String(val.prefix(300)) + "…" : val
+            }
+        }
+        return ""
     }
 
     /// 从 AskUserQuestion 的 tool_input 中提取问题文本和选项

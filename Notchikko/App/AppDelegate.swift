@@ -337,7 +337,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
         let cardWidth: CGFloat = 340
-        let cardHeight: CGFloat = 200
+        // 让 hostingView 计算实际高度，避免空白过多
+        let fittingSize = hostingView.fittingSize
+        let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
         // 每张新卡片向右下偏移
