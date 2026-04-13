@@ -16,6 +16,14 @@ xcodebuild -scheme Notchikko -configuration Debug build
 
 No tests or linting configured. SourceKit frequently reports false-positive "Cannot find type" errors — always verify with `xcodebuild` before investigating.
 
+### Debugging
+
+- App logs: `~/Library/Logs/Notchikko/notchikko-YYYY-MM-DD.log` (3-day retention)
+- Unix socket: `/tmp/notchikko.sock`
+- Hook script (installed copy): `~/.notchikko/hooks/notchikko-hook.sh`
+- Hook script (bundle source): `Notchikko/Resources/notchikko-hook.sh`
+- Test hook manually: `echo '{"session_id":"test","event":"tool_use","tool_name":"Read"}' | ~/.notchikko/hooks/notchikko-hook.sh claude-code`
+
 ## Architecture
 
 Event-driven pipeline:
@@ -36,25 +44,31 @@ CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → Session
 
 - **Session** — `SessionManager` (@Observable) tracks multiple sessions, maps tools to visual states, manages idle/sleep timers (60s/120s). Supports pinned session binding with auto-switch: after task completion (Stop event), celebrates 3s then auto-unpins and switches to next active session. Sessions store terminal PID, tty path, prompt text, and bypass mode flag. Max 32 concurrent sessions with LRU eviction.
 
-- **Terminal** — `TerminalJumper` activates the terminal window for a session. `KnownTerminal` enum maps bundle IDs to display names and focus strategies for 13 supported terminals. Three focus strategies: `appleScriptTty` (iTerm2, Terminal.app — locates tab by tty), `appleScriptCwd` (Ghostty — locates surface by cwd), `generic` (all others — activate app only). Process tree batch-cached (single `ps -eo pid=,ppid=`, 5s TTL). CWD matching uses 3-level deepest-first candidates with symlink-resolved path normalization. Cross-Space window discovery via `CGWindowList` fallback.
+- **Terminal** — `TerminalJumper` activates the terminal window for a session. `KnownTerminal` enum maps bundle IDs to display names and focus strategies for 13 supported terminals. Five focus strategies: `appleScriptTty` (iTerm2, Terminal.app — locates tab by tty), `appleScriptCwd` (Ghostty — locates surface by cwd), `ideExtension` (VS Code/VS Code Insiders — HTTP POST to bundled extension which matches `terminal.processId` against PID chain), `kittyCLI` (Kitty — `kitty @ focus-window --match pid:X`), `generic` (all others — activate app only). Process tree batch-cached (single `ps -eo pid=,ppid=`, 5s TTL). CWD matching uses 3-level deepest-first candidates with symlink-resolved path normalization. Cross-Space window discovery via `CGWindowList` fallback. Click on Clawd jumps to session in any state (idle/sleeping/happy/etc.), falling back to the most recent session if no active session exists.
+
+- **IDE Extension** — `IDEExtensionInstaller` manages a VS Code extension (`notchikko-terminal-focus`) that enables precise terminal tab focusing. The extension runs an HTTP server on ports 23456-23460 (one per VS Code window) with `POST /focus-tab` (receives PID chain, matches `terminal.processId`, calls `terminal.show()`) and `GET /health` (returns version for status detection). Extension source files are bundled as `vscode-ext.js`/`vscode-ext-package.json` (Xcode-safe names) and copied with standard names during install to `~/.vscode/extensions/notchikko.notchikko-terminal-focus/`. Settings UI shows four-state status: not installed / installed (not running) / running / update available. **Important**: the hook script (`~/.notchikko/hooks/notchikko-hook.sh`) is a separate copy from the bundle — app updates do NOT auto-sync it. Users must reinstall hooks from Settings → Integration after updates that change the hook script.
 
 - **Theme** — `ThemeProvider` resolves SVGs by state with per-state URL caching (cleared on state exit, so re-entry picks new random variant; window rebuild reuses same SVG). Built-in "clawd" theme from bundle; custom themes from `~/.notchikko/themes/{id}/` with `theme.json` manifest. External SVGs sanitized via `SVGSanitizer` (strips `<script>`, event handlers, `javascript:` URLs).
 
 - **Notchikko (core)** — `NotchikkoState` enum defines 11 states with revealAmount and soundKey. `NotchikkoView` wraps WKWebView, loads SVG via `loadSVG(for: NotchikkoState)`. SVG transitions use JS-injected crossfade (0.3s opacity transition) — first load uses full HTML, subsequent loads inject via `evaluateJavaScript`. Rapid state changes clean up all prior layers before adding new one (prevents DOM accumulation).
 
-- **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `DragController` handles drag with 5pt threshold, hit area padded +20px. Cross-screen drag rebuilds the window on the target screen; same-screen drag animates back with `disableFrameConstraint` flag to prevent notch constraint interference during animation.
+- **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `NotchGeometry` accepts `NotchDetectionMode` (auto/forceOn/forceOff) — on non-notch screens with forceOn, simulates notch by placing panel top at `screenFrame.maxY - notchHeight` instead of screen edge. `NotchPanel.treatAsNotched` controls `constrainFrameRect` behavior (must match `NotchGeometry.hasPhysicalNotch`). `DragController` handles drag with 5pt threshold, hit area padded +20px. Cross-screen drag rebuilds the window on the target screen; same-screen drag animates back with `disableFrameConstraint` flag to prevent notch constraint interference during animation.
 
 - **Drag State Freeze** — `SessionManager.beginDrag()` sets `isDragging` flag, cancels all timers, freezes all state changes. `endDrag()` computes correct state from active session's current phase (not a stale snapshot). `refreshNotchWindow()` is blocked during drag to prevent panel duplication.
 
 - **Approval** — Separate stacked `NSPanel` windows (each offset 8px). `ApprovalManager` manages pending requests with 300s stale timer. Only Bash/Edit/Write/NotebookEdit require approval (gated by `approvalCardEnabled` preference, default on). Hook script checks `permission_mode` from CLI stdin. Buttons: Deny / Allow Once / Allow All (session-scoped, in-memory via `autoApprovedSessions` set). Notification events (Elicitation/AskUserQuestion) also show info cards with jump button. All cards have close button. `removeAllApprovalPanels()` clears entire stack.
 
-- **Preferences** — `PreferencesStore` (@Observable) auto-saves on `didSet` with 100ms debounce. Only `petScale` and `themeId` changes trigger window rebuild notification. Settings bindings do NOT call `save()` explicitly — `didSet` handles it, preventing unwanted SVG re-randomization.
+- **Preferences** — `PreferencesStore` (@Observable) auto-saves on `didSet` with 100ms debounce. `petScale`, `themeId`, and `notchDetectionMode` changes trigger window rebuild notification. Settings bindings do NOT call `save()` explicitly — `didSet` handles it, preventing unwanted SVG re-randomization. `NotchDetectionMode` (auto/forceOn/forceOff) controls notch detection — on non-notch screens with forceOn, `NotchGeometry` simulates a notch by positioning the panel below the screen top edge.
+
+- **Danmaku** — `DanmakuView` renders scrolling tool/context labels (pixel-style tags) behind Clawd using SwiftUI `Canvas` + `TimelineView` at 30fps. Items drift right-to-left with fade-in/fade-out. Fed by `SessionManager` tool events.
+
+- **Logging** — `FileLogger` singleton writes to `~/Library/Logs/Notchikko/notchikko-YYYY-MM-DD.log` with 3-day retention. Useful for debugging hook/socket/session issues without Xcode attached.
 
 - **i18n** — All UI strings use `String(localized:)` (SwiftUI) or `NSLocalizedString()` (AppKit). Translations in `Resources/{en,zh-Hans}.lproj/Localizable.strings`.
 
 ### Hook Script
 
-`notchikko-hook.sh [source]` — Bash wrapper around inline Python3. Reads stdin JSON from CLI, maps events to status, sends to socket. The `source` arg ("claude-code", "trae-cli", etc.) selects the JSON parser — Trae CLI uses a different schema (`event_type` + nested body) that gets normalized to the same socket format. For PreToolUse on modification tools (Bash/Edit/Write/NotebookEdit), generates UUID `request_id` and blocks waiting for approval response (5 min timeout, defaults to allow). Also walks the process tree (up to 15 levels) to detect the parent terminal PID and tty.
+`notchikko-hook.sh [source]` — Bash wrapper around inline Python3. Reads stdin JSON from CLI, maps events to status, sends to socket. The `source` arg ("claude-code", "trae-cli", etc.) selects the JSON parser — Trae CLI uses a different schema (`event_type` + nested body) that gets normalized to the same socket format. For PreToolUse on modification tools (Bash/Edit/Write/NotebookEdit), generates UUID `request_id` and blocks waiting for approval response (5 min timeout, defaults to allow). Walks the process tree (up to 15 levels) via `detect_terminal_info()` to collect both the terminal PID and full PID chain (used by VS Code extension for terminal tab matching). The PID chain is critical for IDE terminal focus — it must be passed through `AgentEvent.sessionStart` (not via async callback) to avoid race conditions with session creation.
 
 ### SVG / Themes
 
@@ -80,5 +94,5 @@ No priority-based gating — `transition(to:)` always accepts the new state (onl
 - **`CLIHookConfig.metadata(for:)`** — single source of truth for agent icon/name mapping (no duplicated switch statements)
 - SVG files are pre-oriented (hanging upside-down) — no code flipping
 - `NotchikkoView.updateEyePosition(dx:dy:)` does JS-based eye tracking via `#eyes-js` and `#body-js` SVG element IDs
-- Click on Clawd → jump to the active session's terminal window (via TerminalJumper); right-click → context menu
-- All source files are in `Notchikko/` subdirectories; `docs/internal/competitive-analysis/` contains reference implementations — not part of build
+- Click on Clawd → jump to session's terminal (active or most recent, works in any state); right-click → context menu
+- All source files are in `Notchikko/` subdirectories (Agent/, App/, Approval/, IPC/, Notchikko/, Preferences/, Session/, Sound/, Terminal/, Theme/, Views/, Window/); `docs/internal/competitive-analysis/` contains reference implementations — not part of build

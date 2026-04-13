@@ -94,7 +94,7 @@ final class ClaudeCodeAdapter: AgentBridge {
         case "PostCompact":
             return .prompt(sessionId: hook.sessionId, text: nil)
         case "Stop":
-            return .stop(sessionId: hook.sessionId)
+            return .stop(sessionId: hook.sessionId, usage: hook.usage)
         case "StopFailure":
             return .error(sessionId: hook.sessionId, message: "Task failed")
         case "SubagentStart", "SubagentStop":

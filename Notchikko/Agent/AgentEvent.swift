@@ -15,11 +15,35 @@ struct HookEvent: Decodable {
     let terminalTty: String?     // v0.3: 终端 tty 路径（用于 iTerm2 tab 定位）
     let permissionMode: String?  // "default" / "bypassPermissions" 等
     let pidChain: [Int]?         // v0.4: hook→终端的 PID 链（VS Code 终端定位）
+    let usage: TokenUsage?       // Stop 事件携带的 token 用量
 
+    struct TokenUsage: Decodable {
+        let inputTokens: Int
+        let outputTokens: Int
+        let cacheRead: Int
+        let cacheCreation: Int
+
+        enum CodingKeys: String, CodingKey {
+            case inputTokens = "input_tokens"
+            case outputTokens = "output_tokens"
+            case cacheRead = "cache_read"
+            case cacheCreation = "cache_creation"
+        }
+
+        var totalTokens: Int { inputTokens + outputTokens }
+
+        /// 估算成本（USD），基于 Claude Sonnet 4 定价
+        var estimatedCostUSD: Double {
+            let inputCost = Double(inputTokens) * 3.0 / 1_000_000
+            let outputCost = Double(outputTokens) * 15.0 / 1_000_000
+            let cacheCost = Double(cacheRead) * 0.30 / 1_000_000
+            return inputCost + outputCost + cacheCost
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case cwd, event, status, tool, source, prompt
+        case cwd, event, status, tool, source, prompt, usage
         case toolInput = "tool_input"
         case requestId = "request_id"
         case terminalPid = "terminal_pid"
@@ -65,7 +89,7 @@ enum AgentEvent {
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)
     case notification(sessionId: String, message: String, detail: String = "")
     case compact(sessionId: String)
-    case stop(sessionId: String)
+    case stop(sessionId: String, usage: HookEvent.TokenUsage?)
     case error(sessionId: String, message: String)
 }
 

@@ -64,6 +64,17 @@ final class HookInstaller {
             ]
         ),
         CLIHookConfig(
+            name: "gemini-cli",
+            displayName: "Gemini CLI",
+            icon: "💎",
+            settingsPath: "~/.gemini/settings.json",
+            hookEvents: [
+                "SessionStart", "SessionEnd",
+                "BeforeAgent", "BeforeTool", "AfterTool", "AfterAgent",
+                "Notification", "PreCompress",
+            ]
+        ),
+        CLIHookConfig(
             name: "trae-cli",
             displayName: "Trae CLI",
             icon: "🦎",

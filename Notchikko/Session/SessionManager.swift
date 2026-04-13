@@ -36,6 +36,7 @@ final class SessionManager {
         var terminalTty: String?             // 终端 tty 路径（iTerm2 tab 定位）
         var pidChain: [Int]?                 // hook→终端的 PID 链（VS Code 终端定位）
         var isBypassMode: Bool = false       // --dangerously-skip-permissions
+        var tokenUsage: HookEvent.TokenUsage?  // Stop 事件携带的最终 token 用量
 
         var cwdName: String {
             (cwd as NSString).lastPathComponent
@@ -176,9 +177,10 @@ final class SessionManager {
                 }
             }
 
-        case .stop(let sid):
+        case .stop(let sid, let usage):
             sessions[sid]?.phase = .waitingForInput
             sessions[sid]?.lastEvent = Date()
+            if let usage { sessions[sid]?.tokenUsage = usage }
             Log("Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
             if sid == activeSessionId {
                 resetTimers()
@@ -383,7 +385,7 @@ final class SessionManager {
         case .toolUse(let sid, _, _): return sid
         case .notification(let sid, _, _): return sid
         case .compact(let sid): return sid
-        case .stop(let sid): return sid
+        case .stop(let sid, _): return sid
         case .error(let sid, _): return sid
         }
     }

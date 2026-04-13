@@ -77,6 +77,7 @@ struct NotchikkoPreferences: Codable, Equatable {
     var themeId: String = "clawd"
     var notchDetectionMode: NotchDetectionMode = .auto
     var danmakuEnabled: Bool = true
+    var hasShownHookPrompt: Bool = false
 }
 
 /// 声音主题

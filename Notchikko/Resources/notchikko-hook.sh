@@ -125,7 +125,29 @@ if source == 'trae-cli':
     sys.exit(0)
 
 # ============================================================
-# Claude Code / Codex 标准格式
+# Gemini CLI 适配
+# Gemini CLI 的事件名与 Claude Code 不同，统一映射
+# ============================================================
+GEMINI_EVENT_MAP = {
+    'BeforeAgent':  'UserPromptSubmit',
+    'BeforeTool':   'PreToolUse',
+    'AfterTool':    'PostToolUse',
+    'AfterAgent':   'Stop',
+    'SessionStart': 'SessionStart',
+    'SessionEnd':   'SessionEnd',
+    'Notification': 'Notification',
+    'PreCompress':  'PreCompact',
+}
+
+if source == 'gemini-cli':
+    raw_event = input_data.get('hook_event_name', '')
+    mapped = GEMINI_EVENT_MAP.get(raw_event)
+    if not mapped:
+        sys.exit(0)
+    input_data['hook_event_name'] = mapped
+
+# ============================================================
+# Claude Code / Codex / Gemini CLI 标准格式
 # ============================================================
 hook_event = input_data.get('hook_event_name', '')
 if not input_data.get('session_id', ''):
@@ -166,6 +188,39 @@ output = {
     'source': source,
     'permission_mode': permission_mode,
 }
+
+# Stop 事件：从 transcript 文件提取最终 token 用量
+if hook_event == 'Stop':
+    transcript_path = input_data.get('transcript_path', '')
+    if transcript_path:
+        try:
+            # 从尾部读最后 50 行，找最后一条 assistant 消息的 usage
+            with open(transcript_path, 'rb') as tf:
+                tf.seek(0, 2)
+                size = tf.tell()
+                # 读最后 64KB 足够覆盖最后几条消息
+                read_size = min(size, 65536)
+                tf.seek(size - read_size)
+                tail = tf.read().decode('utf-8', errors='ignore')
+            last_usage = None
+            for line in tail.strip().split('\n'):
+                try:
+                    entry = json.loads(line)
+                    if entry.get('type') == 'assistant':
+                        msg = entry.get('message', {})
+                        if 'usage' in msg:
+                            last_usage = msg['usage']
+                except:
+                    continue
+            if last_usage:
+                output['usage'] = {
+                    'input_tokens': last_usage.get('input_tokens', 0),
+                    'output_tokens': last_usage.get('output_tokens', 0),
+                    'cache_read': last_usage.get('cache_read_input_tokens', 0),
+                    'cache_creation': last_usage.get('cache_creation_input_tokens', 0),
+                }
+        except:
+            pass
 
 # UserPromptSubmit 事件包含用户 prompt 文本
 prompt_text = input_data.get('prompt', '')

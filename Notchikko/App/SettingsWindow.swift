@@ -304,8 +304,6 @@ struct IntegrationSettingsView: View {
                                 onUninstall: { uninstallHook(cli) }
                             )
                         }
-
-                        ComingSoonRow(icon: "💎", name: "Gemini CLI")
                     }
                     .padding(4)
                 }

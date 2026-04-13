@@ -77,6 +77,12 @@
 "approval.respond_in_terminal" = "Go to terminal";
 "approval.submit" = "Submit";
 
+/* Hook Install Prompt */
+"hook_prompt.title" = "Install CLI Hooks?";
+"hook_prompt.message" = "Notchikko detected: %@\n\nInstall hooks so Clawd can react to your coding sessions?";
+"hook_prompt.install" = "Install";
+"hook_prompt.later" = "Later";
+
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "idle";
 "session.phase.thinking" = "thinking";
