@@ -23,11 +23,15 @@ final class SocketServer {
     }
 
     func stop() {
+        // 先清除 handler 防止 cancel 期间还在 accept
+        acceptSource?.setEventHandler(handler: nil)
         acceptSource?.cancel()
         acceptSource = nil
-        if serverSocket >= 0 {
-            close(serverSocket)
-            serverSocket = -1
+        serverQueue.sync {
+            if self.serverSocket >= 0 {
+                close(self.serverSocket)
+                self.serverSocket = -1
+            }
         }
         // 关闭所有待响应连接
         pendingLock.lock()
@@ -37,6 +41,17 @@ final class SocketServer {
         pendingResponses.removeAll()
         pendingLock.unlock()
         unlink(Self.socketPath)
+    }
+
+    /// 关闭待响应连接但不发送数据（超时清理用）
+    func closePending(requestId: String) {
+        pendingLock.lock()
+        guard let fd = pendingResponses.removeValue(forKey: requestId) else {
+            pendingLock.unlock()
+            return
+        }
+        pendingLock.unlock()
+        clientQueue.async { close(fd) }
     }
 
     /// 向指定 request_id 的客户端回写审批结果
@@ -52,11 +67,18 @@ final class SocketServer {
         // 这里是唯一持有者，安全写入后关闭
         let dataCopy = json
         clientQueue.async {
+            var ok = true
             dataCopy.withUnsafeBytes { ptr in
-                guard let base = ptr.baseAddress else { return }
-                _ = write(fd, base, dataCopy.count)
+                guard let base = ptr.baseAddress else { ok = false; return }
+                let written = write(fd, base, dataCopy.count)
+                if written != dataCopy.count {
+                    Log("Socket write failed: \(written)/\(dataCopy.count), errno=\(errno)", tag: "Socket")
+                    ok = false
+                }
             }
-            _ = write(fd, "\n", 1)
+            if ok {
+                _ = write(fd, "\n", 1)
+            }
             close(fd)
         }
     }

@@ -128,6 +128,8 @@ if source == 'trae-cli':
 # Claude Code / Codex 标准格式
 # ============================================================
 hook_event = input_data.get('hook_event_name', '')
+if not input_data.get('session_id', ''):
+    sys.exit(0)  # 无 session_id 无法处理
 
 status_map = {
     'UserPromptSubmit': 'processing',
@@ -189,15 +191,22 @@ bypass = (permission_mode == 'bypassPermissions')
 
 # 检查 bypass 标记文件（用户在审批卡片点了"自动批准"）
 session_id = input_data.get('session_id', '')
-bypass_flag_path = '/tmp/notchikko-bypass-' + session_id
-has_bypass_flag = os.path.exists(bypass_flag_path) if session_id else False
+bypass_flag_dir = os.path.expanduser('~/.notchikko/bypass-flags')
+bypass_flag_path = os.path.join(bypass_flag_dir, session_id) if session_id else ''
 
-# PermissionRequest + bypass 标记 → 输出 setMode: bypassPermissions，让 Claude Code 切换模式
-if hook_event == 'PermissionRequest' and has_bypass_flag:
+# 原子操作：尝试删除即检测，避免 TOCTOU 竞态
+has_bypass_flag = False
+if bypass_flag_path and hook_event == 'PermissionRequest':
     try:
         os.unlink(bypass_flag_path)
-    except:
+        has_bypass_flag = True
+    except FileNotFoundError:
         pass
+    except Exception:
+        pass
+
+# PermissionRequest + bypass 标记 → 输出 setMode: bypassPermissions，让 Claude Code 切换模式
+if has_bypass_flag:
     print(json.dumps({'hookSpecificOutput': {
         'hookEventName': 'PermissionRequest',
         'decision': {

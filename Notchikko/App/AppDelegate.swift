@@ -255,6 +255,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 approvalManager?.onSessionEvent(sessionId: sid)
 
+                // Session 结束 → 清理会话级审批状态 + bypass flag
+                if case .sessionEnd(let endSid) = event {
+                    approvalManager?.cleanupSession(endSid)
+                }
+
                 // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
                 if case .notification(let sid, let msg, let detail) = event {
                     let session = sessionManager.sessions[sid]
@@ -348,8 +353,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
-        // 每张新卡片向右下偏移
-        let stackIndex = CGFloat(approvalPanels.count)
+        // 每张新卡片向右下偏移，最多偏移 5 层防止卡片飘出屏幕
+        let stackIndex = min(CGFloat(approvalPanels.count), 5)
         let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8 + stackIndex * Self.cardStackOffset
         let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4 - stackIndex * Self.cardStackOffset
 

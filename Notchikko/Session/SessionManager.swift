@@ -19,6 +19,7 @@ final class SessionManager {
     private var idleTimer: Task<Void, Never>?
     private var sleepTimer: Task<Void, Never>?
     private var returnTimer: Task<Void, Never>?
+    private var sessionCleanupTasks: [String: Task<Void, Never>] = [:]
 
     struct SessionInfo {
         let id: String
@@ -209,10 +210,12 @@ final class SessionManager {
                 pinnedSessionId = nil
             }
             // 延迟移除，让菜单有时间看到 ended 状态
-            let capturedSid = sid
-            Task {
+            sessionCleanupTasks[sid]?.cancel()
+            sessionCleanupTasks[sid] = Task {
                 try? await Task.sleep(for: .seconds(3))
-                sessions.removeValue(forKey: capturedSid)
+                guard !Task.isCancelled else { return }
+                sessions.removeValue(forKey: sid)
+                sessionCleanupTasks.removeValue(forKey: sid)
             }
             // 如果还有活跃 session，切换到最新的
             if let nextActive = activeSessionId, let session = sessions[nextActive] {

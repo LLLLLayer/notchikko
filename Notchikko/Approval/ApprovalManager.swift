@@ -199,9 +199,12 @@ final class ApprovalManager {
 
     // MARK: - Bypass Flag
 
-    /// 写 bypass 标记文件供 hook 脚本读取
+    /// 写 bypass 标记文件供 hook 脚本读取（~/.notchikko/bypass-flags/{sessionId}）
     private func writeBypassFlag(sessionId: String) {
-        let flagPath = "/tmp/notchikko-bypass-\(sessionId)"
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".notchikko/bypass-flags")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let flagPath = dir.appendingPathComponent(sessionId).path
         FileManager.default.createFile(atPath: flagPath, contents: Data())
     }
 
@@ -217,6 +220,17 @@ final class ApprovalManager {
     func onMouseExit(requestId: String) {
         guard pendingApprovals[requestId] != nil else { return }
         startHideTimer(for: requestId)
+    }
+
+    /// Session 结束时清理会话级状态（auto-approve 列表 + bypass flag 文件）
+    func cleanupSession(_ sessionId: String) {
+        autoApprovedSessions.remove(sessionId)
+        autoApprovedTools.removeValue(forKey: sessionId)
+        // 清理可能残留的 bypass flag 文件
+        let flagDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".notchikko/bypass-flags")
+        let flagPath = flagDir.appendingPathComponent(sessionId).path
+        try? FileManager.default.removeItem(atPath: flagPath)
     }
 
     /// 当收到同一 session 的后续事件时，说明审批已在 CLI 侧完成，清理该 session 的卡片
@@ -263,7 +277,10 @@ final class ApprovalManager {
         staleTimers[requestId] = Task {
             try? await Task.sleep(for: .seconds(300))
             guard !Task.isCancelled else { return }
-            // 超时自动放行（与 hook 超时行为一致）
+            // 超时：hook 侧已自动放行并关闭连接，app 侧也关闭对应 fd 防止泄漏
+            if let req = pendingApprovals[requestId], !req.requestId.isEmpty {
+                socketServer?.closePending(requestId: req.requestId)
+            }
             pendingApprovals.removeValue(forKey: requestId)
             cleanupTimers(for: requestId)
             onCardDismissed?(requestId)

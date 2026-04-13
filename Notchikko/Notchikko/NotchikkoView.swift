@@ -45,6 +45,12 @@ final class NotchikkoView: NSView {
             return
         }
 
+        // 自定义主题 SVG 限制 1MB，防止恶意/巨型文件打爆内存
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let size = attrs[.size] as? Int, size > 1_000_000 {
+            Log("SVG too large (\(size) bytes), skipping: \(url.lastPathComponent)", tag: "View")
+            return
+        }
         guard var svgContent = try? String(contentsOf: url, encoding: .utf8) else { return }
 
         // 外部主题 SVG 安全清洗（内置主题信任跳过）
@@ -81,7 +87,9 @@ final class NotchikkoView: NSView {
                 });
             })();
             """
-            webView.evaluateJavaScript(js)
+            webView.evaluateJavaScript(js) { _, error in
+                if let error { Log("SVG inject JS error: \(error.localizedDescription)", tag: "View") }
+            }
             return
         }
 
