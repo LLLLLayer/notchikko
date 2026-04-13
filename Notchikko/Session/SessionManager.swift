@@ -221,7 +221,7 @@ final class SessionManager {
                 transition(to: .sleeping)
             }
 
-        case .notification(let sid, let msg):
+        case .notification(let sid, let msg, _):
             let isBypass = sessions[sid]?.isBypassMode ?? false
             let approvalOn = PreferencesStore.shared.preferences.approvalCardEnabled
             // 只有需要用户操作的事件才更新 session 和切状态
@@ -378,7 +378,7 @@ final class SessionManager {
         case .sessionEnd(let sid): return sid
         case .prompt(let sid, _): return sid
         case .toolUse(let sid, _, _): return sid
-        case .notification(let sid, _): return sid
+        case .notification(let sid, _, _): return sid
         case .compact(let sid): return sid
         case .stop(let sid): return sid
         case .error(let sid, _): return sid

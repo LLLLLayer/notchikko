@@ -63,7 +63,7 @@ enum AgentEvent {
     case sessionEnd(sessionId: String)
     case prompt(sessionId: String, text: String?)
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)
-    case notification(sessionId: String, message: String)
+    case notification(sessionId: String, message: String, detail: String = "")
     case compact(sessionId: String)
     case stop(sessionId: String)
     case error(sessionId: String, message: String)

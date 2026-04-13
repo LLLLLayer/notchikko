@@ -242,7 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .sessionEnd(let s): s
                 case .prompt(let s, _): s
                 case .toolUse(let s, _, _): s
-                case .notification(let s, _): s
+                case .notification(let s, _, _): s
                 case .compact(let s): s
                 case .stop(let s): s
                 case .error(let s, _): s
@@ -250,7 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 approvalManager?.onSessionEvent(sessionId: sid)
 
                 // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
-                if case .notification(let sid, let msg) = event {
+                if case .notification(let sid, let msg, let detail) = event {
                     let session = sessionManager.sessions[sid]
                     let isBypass = session?.isBypassMode ?? false
                     let prevState = sessionManager.previousState
@@ -283,7 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             requestId: "",
                             source: session?.source ?? "unknown",
                             tool: msg,
-                            input: "",
+                            input: detail,
                             sessionId: sid,
                             cwdName: session?.cwdName ?? "",
                             terminalName: session?.matchedTerminal?.appName ?? "",
@@ -333,8 +333,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingView = NSHostingView(rootView: cardView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
-        let cardWidth: CGFloat = 380
-        let cardHeight: CGFloat = 220
+        let cardWidth: CGFloat = 340
+        let cardHeight: CGFloat = 200
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
         // 每张新卡片向右下偏移

@@ -12,144 +12,216 @@ struct ApprovalCardView: View {
         CLIHookConfig.metadata(for: request.source)
     }
 
+    /// 左侧边条颜色：通知=蓝，审批=橙
+    private var accentBarColor: Color {
+        request.isNotification ? .blue : .orange
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // 标题行：关闭按钮 + 项目名 + 跳转按钮
-            HStack(spacing: 6) {
-                // macOS 风格关闭按钮
-                if let onClose {
-                    Button(action: onClose) {
-                        Circle()
-                            .fill(Color.red.opacity(0.8))
-                            .frame(width: 12, height: 12)
-                            .overlay(
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 7, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.9))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
+        HStack(spacing: 0) {
+            // 左侧彩色边条
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accentBarColor)
+                .frame(width: 3.5)
+                .padding(.vertical, 10)
 
-                Text(request.cwdName.isEmpty ? "Session" : request.cwdName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Spacer()
-                if let onJump {
-                    if request.isNotification {
-                        // 通知卡片：可点击的文字按钮，兼做引导
-                        Button(action: onJump) {
-                            HStack(spacing: 3) {
-                                Text(String(localized: "approval.respond_in_terminal"))
-                                    .font(.system(size: 11, weight: .medium))
-                                Image(systemName: "arrow.up.forward.square")
-                                    .font(.system(size: 10))
-                            }
-                            .foregroundColor(.accentColor)
+            VStack(alignment: .leading, spacing: 8) {
+                headerRow
+                toolRow
+                if !request.input.isEmpty {
+                    contentPreview
+                }
+                actionRow
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 12)
+            .padding(.vertical, 10)
+        }
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+    }
+
+    // MARK: - 标题行
+
+    private var headerRow: some View {
+        HStack(spacing: 5) {
+            if let onClose {
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(agentMeta.icon)
+                .font(.system(size: 12))
+            Text(request.cwdName.isEmpty ? "Session" : request.cwdName)
+                .font(.system(size: 12.5, weight: .semibold))
+                .lineLimit(1)
+
+            Spacer()
+
+            if let onJump {
+                Button(action: onJump) {
+                    HStack(spacing: 3) {
+                        if request.isNotification {
+                            Text(String(localized: "approval.respond_in_terminal"))
+                                .font(.system(size: 10.5, weight: .medium))
                         }
-                        .buttonStyle(.plain)
-                    } else {
-                        Button(action: onJump) {
-                            Image(systemName: "arrow.up.forward.square")
-                                .font(.system(size: 13))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help(String(localized: "approval.jump_to_terminal"))
+                        Image(systemName: "terminal")
+                            .font(.system(size: 10, weight: .medium))
                     }
+                    .foregroundColor(.accentColor)
                 }
-            }
-
-            // 信息标签：Agent + Terminal + Tool
-            HStack(spacing: 6) {
-                InfoTag(icon: agentMeta.icon, text: agentMeta.displayName)
-                if !request.terminalName.isEmpty {
-                    InfoTag(icon: "🖥", text: request.terminalName)
-                }
-                InfoTag(icon: "⚙", text: request.tool)
-                Spacer()
-            }
-
-            // 内容预览（可滚动）
-            if !request.input.isEmpty {
-                ScrollView(.vertical, showsIndicators: true) {
-                    Text(request.input)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.primary.opacity(0.7))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                }
-                .frame(maxHeight: 120)
-                .padding(8)
-                .background(Color.primary.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-
-            if !request.isNotification {
-                // 审批按钮行
-                HStack(spacing: 6) {
-                    // Deny — 红色（破坏性操作）
-                    Button(action: onDeny) {
-                        Text(String(localized: "approval.deny"))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .frame(height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color.red.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    Spacer()
-
-                    // Allow Once — accent（主操作）
-                    Button(action: onApprove) {
-                        Text(String(localized: "approval.allow_once"))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .frame(height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color.accentColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    // Allow All — 次要便利操作
-                    Button(action: onApproveAll) {
-                        Text(String(localized: "approval.allow_all"))
-                            .font(.system(size: 11, weight: .medium))
-                            .padding(.horizontal, 10)
-                            .frame(height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .background(Color.primary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    // MARK: - 工具行
+
+    private var toolRow: some View {
+        HStack(spacing: 5) {
+            ToolPill(name: request.tool, isNotification: request.isNotification)
+            if !request.terminalName.isEmpty {
+                Text("·")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.quaternary)
+                Text(request.terminalName)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - 内容预览
+
+    private var contentPreview: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            Text(request.input)
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .frame(maxHeight: 80)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    // MARK: - 操作行
+
+    @ViewBuilder
+    private var actionRow: some View {
+        if !request.isNotification {
+            HStack(spacing: 6) {
+                CardButton(
+                    label: String(localized: "approval.deny"),
+                    icon: "xmark",
+                    style: .destructive,
+                    action: onDeny
+                )
+
+                Spacer()
+
+                CardButton(
+                    label: String(localized: "approval.allow_once"),
+                    icon: "checkmark",
+                    style: .primary,
+                    action: onApprove
+                )
+                CardButton(
+                    label: String(localized: "approval.allow_all"),
+                    icon: "checkmark.circle",
+                    style: .secondary,
+                    action: onApproveAll
+                )
+            }
+        }
     }
 }
 
-// MARK: - 信息标签
+// MARK: - 工具名胶囊
 
-private struct InfoTag: View {
-    let icon: String
-    let text: String
+private struct ToolPill: View {
+    let name: String
+    let isNotification: Bool
+
+    private var pillColor: Color {
+        isNotification ? .blue : .orange
+    }
 
     var body: some View {
         HStack(spacing: 3) {
-            Text(icon).font(.system(size: 10))
-            Text(text).font(.system(size: 11, weight: .medium))
+            Image(systemName: isNotification ? "questionmark.circle" : "wrench")
+                .font(.system(size: 8.5, weight: .semibold))
+            Text(name)
+                .font(.system(size: 10.5, weight: .semibold))
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 6)
+        .foregroundColor(pillColor)
+        .padding(.horizontal, 7)
         .padding(.vertical, 3)
-        .background(Color.primary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .background(pillColor.opacity(0.1))
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - 按钮
+
+private struct CardButton: View {
+    let label: String
+    let icon: String
+    let style: ButtonStyle
+    let action: () -> Void
+
+    enum ButtonStyle {
+        case primary, secondary, destructive
+    }
+
+    private var bgColor: Color {
+        switch style {
+        case .primary: .accentColor
+        case .secondary: .primary.opacity(0.07)
+        case .destructive: .red.opacity(0.12)
+        }
+    }
+
+    private var fgColor: Color {
+        switch style {
+        case .primary: .white
+        case .secondary: .primary.opacity(0.7)
+        case .destructive: .red
+        }
+    }
+
+    private var fontWeight: Font.Weight {
+        style == .primary ? .semibold : .medium
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: fontWeight))
+                Text(label)
+                    .font(.system(size: 10.5, weight: fontWeight))
+            }
+            .foregroundColor(fgColor)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+        }
+        .buttonStyle(.plain)
+        .background(bgColor)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

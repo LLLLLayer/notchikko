@@ -78,6 +78,11 @@ final class ClaudeCodeAdapter: AgentBridge {
         case "UserPromptSubmit":
             return .prompt(sessionId: hook.sessionId, text: hook.prompt)
         case "PreToolUse":
+            // AskUserQuestion 是 PreToolUse 事件，tool_name = "AskUserQuestion"
+            if hook.tool == "AskUserQuestion" {
+                let detail = Self.extractAskUserDetail(from: hook.toolInput)
+                return .notification(sessionId: hook.sessionId, message: "AskUserQuestion", detail: detail)
+            }
             return .toolUse(sessionId: hook.sessionId, tool: hook.tool ?? "", phase: .pre)
         case "PostToolUse":
             let success = hook.status != "error"
@@ -104,5 +109,37 @@ final class ClaudeCodeAdapter: AgentBridge {
             Log("Unknown hook event: \(hook.event)", tag: "Adapter")
             return nil  // 忽略未知事件，避免产生垃圾通知卡片
         }
+    }
+
+    /// 从 AskUserQuestion 的 tool_input 中提取问题文本和选项
+    private static func extractAskUserDetail(from toolInput: [String: AnyCodableValue]?) -> String {
+        guard let toolInput else { return "" }
+
+        // tool_input.question (简单文本问题)
+        if case .string(let q) = toolInput["question"] {
+            return q
+        }
+
+        // tool_input.questions (结构化问题列表)
+        guard case .array(let questions) = toolInput["questions"] else { return "" }
+
+        var lines: [String] = []
+        for q in questions {
+            guard case .object(let dict) = q else { continue }
+            // 问题文本
+            if case .string(let text) = dict["question"] {
+                lines.append(text)
+            }
+            // 选项列表
+            if case .array(let options) = dict["options"] {
+                for opt in options {
+                    if case .object(let optDict) = opt,
+                       case .string(let label) = optDict["label"] {
+                        lines.append("  · \(label)")
+                    }
+                }
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 }
