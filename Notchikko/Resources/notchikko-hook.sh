@@ -320,8 +320,9 @@ needs_approval = (hook_event == 'PreToolUse'
                   and approval_enabled
                   and not bypass)
 
-# AskUserQuestion 可能以 PreToolUse 或 PermissionRequest 到达，都阻塞让用户在卡片上选择
-is_ask_user = (hook_event in ('PreToolUse', 'PermissionRequest')
+# AskUserQuestion 仅在 PermissionRequest 路径阻塞（与 Open Vibe Island 一致）
+# PreToolUse 路径不阻塞，显示通知卡让用户跳到终端操作
+is_ask_user = (hook_event == 'PermissionRequest'
                and tool_name == 'AskUserQuestion'
                and not bypass)
 
@@ -353,21 +354,13 @@ try:
                         answers = result.get('answers', {})
                         updated_input = dict(tool_input)
                         updated_input['answers'] = answers
-                        if hook_event == 'PermissionRequest':
-                            print(json.dumps({'hookSpecificOutput': {
-                                'hookEventName': 'PermissionRequest',
-                                'decision': {
-                                    'behavior': 'allow',
-                                    'updatedInput': updated_input,
-                                },
-                            }}))
-                        else:
-                            # PreToolUse 路径
-                            print(json.dumps({'hookSpecificOutput': {
-                                'hookEventName': 'PreToolUse',
-                                'permissionDecision': 'allow',
+                        print(json.dumps({'hookSpecificOutput': {
+                            'hookEventName': 'PermissionRequest',
+                            'decision': {
+                                'behavior': 'allow',
                                 'updatedInput': updated_input,
-                            }}))
+                            },
+                        }}))
                     else:
                         # 普通审批: allow/deny
                         decision = result.get('decision', 'allow')
@@ -381,7 +374,7 @@ try:
                 except json.JSONDecodeError:
                     continue
             except socket.timeout:
-                if is_ask_user and hook_event == 'PermissionRequest':
+                if is_ask_user:
                     print(json.dumps({'hookSpecificOutput': {
                         'hookEventName': 'PermissionRequest',
                         'decision': {'behavior': 'allow'},
