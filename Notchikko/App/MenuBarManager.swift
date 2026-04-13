@@ -223,18 +223,8 @@ private final class SessionMenuItemView: NSView {
         let mainStr = NSAttributedString(string: mainText, attributes: mainAttrs)
         mainStr.draw(at: NSPoint(x: x, y: Self.viewHeight - Self.vPadding - 16))
 
-        // 状态点 + phase + token 用量靠右
-        let tokenSuffix: String = {
-            guard let usage = session.tokenUsage else { return "" }
-            let total = usage.totalTokens
-            if total >= 1_000_000 {
-                return String(format: "  %.1fM tk · $%.2f", Double(total) / 1_000_000, usage.estimatedCostUSD)
-            } else if total >= 1_000 {
-                return String(format: "  %.0fK tk · $%.2f", Double(total) / 1_000, usage.estimatedCostUSD)
-            }
-            return ""
-        }()
-        let rightText = "\(statusDot) \(phaseName)\(tokenSuffix)"
+        // 状态点 + phase 靠右
+        let rightText = "\(statusDot) \(phaseName)"
         let rightAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.menuFont(ofSize: 12),
             .foregroundColor: subtitleColor,
