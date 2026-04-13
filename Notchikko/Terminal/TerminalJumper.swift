@@ -155,19 +155,22 @@ final class TerminalJumper {
             return
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: kittyPath)
-        // kitten 用 "@" 子命令，kitty 也支持 "@"
-        process.arguments = ["@", "focus-window", "--match", "pid:\(pid)"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        // 后台执行避免 waitUntilExit 阻塞主线程
+        let path = kittyPath
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = ["@", "focus-window", "--match", "pid:\(pid)"]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
 
-        do {
-            try process.run()
-            process.waitUntilExit()
-            Log("kitty @ focus-window pid:\(pid) exit=\(process.terminationStatus)", tag: "Terminal")
-        } catch {
-            Log("kitty CLI failed: \(error)", tag: "Terminal")
+            do {
+                try process.run()
+                process.waitUntilExit()
+                Log("kitty @ focus-window pid:\(pid) exit=\(process.terminationStatus)", tag: "Terminal")
+            } catch {
+                Log("kitty CLI failed: \(error)", tag: "Terminal")
+            }
         }
     }
 

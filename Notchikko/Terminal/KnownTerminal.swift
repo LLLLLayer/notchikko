@@ -52,7 +52,7 @@ enum KnownTerminal: String, CaseIterable {
         switch self {
         case .iterm2, .terminal: .appleScriptTty
         case .ghostty: .appleScriptCwd
-        case .vscode, .vscodeInsiders: .ideExtension
+        case .vscode, .vscodeInsiders, .cursor, .windsurf: .ideExtension
         case .kitty: .kittyCLI
         default: .generic
         }
