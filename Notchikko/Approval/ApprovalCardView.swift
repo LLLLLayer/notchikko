@@ -6,6 +6,8 @@ struct ApprovalCardView: View {
     let onApprove: () -> Void
     let onAlwaysAllow: () -> Void
     let onAutoApprove: () -> Void
+    /// AskUserQuestion: 用户选了某个选项 (questionText, optionLabel)
+    var onAnswer: ((String, String) -> Void)? = nil
     var onJump: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
 
@@ -29,8 +31,15 @@ struct ApprovalCardView: View {
             VStack(alignment: .leading, spacing: 8) {
                 headerRow
                 toolRow
-                if !request.input.isEmpty {
+                if !request.input.isEmpty && !request.isAskUser {
                     contentPreview
+                }
+                // AskUserQuestion: 显示问题文本（不在 contentPreview 里，因为选项在 actionRow）
+                if request.isAskUser, let q = request.questions.first {
+                    Text(q.text)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
                 }
                 actionRow
             }
@@ -124,7 +133,10 @@ struct ApprovalCardView: View {
 
     @ViewBuilder
     private var actionRow: some View {
-        if !request.isNotification {
+        if request.isAskUser {
+            // AskUserQuestion: 每个问题的选项作为可点击按钮
+            askUserActionRow
+        } else if !request.isNotification {
             HStack(spacing: 5) {
                 CardButton(
                     label: String(localized: "approval.deny"),
@@ -150,6 +162,37 @@ struct ApprovalCardView: View {
                     style: .destructive,
                     action: onAutoApprove
                 )
+            }
+        }
+    }
+
+    // MARK: - AskUserQuestion 选项
+
+    @ViewBuilder
+    private var askUserActionRow: some View {
+        // 只显示第一个问题的选项（多问题场景罕见，先支持单问题）
+        if let question = request.questions.first {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(question.options, id: \.self) { option in
+                    Button {
+                        onAnswer?(question.text, option)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "circle")
+                                .font(.system(size: 8))
+                            Text(option)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .lineLimit(2)
+                            Spacer()
+                        }
+                        .foregroundColor(.primary.opacity(0.85))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.primary.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }

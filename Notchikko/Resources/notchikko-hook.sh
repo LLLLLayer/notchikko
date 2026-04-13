@@ -136,7 +136,7 @@ GEMINI_EVENT_MAP = {
     'SessionStart': 'SessionStart',
     'SessionEnd':   'SessionEnd',
     'Notification': 'Notification',
-    # PreCompress 无对应 PostCompress，不映射（避免卡在 sweeping 状态）
+    'PreCompress':  'PreCompact',
 }
 
 # Gemini CLI 使用 snake_case 工具名，映射为 Notchikko 统一的 PascalCase
@@ -314,17 +314,18 @@ try:
 except:
     pass
 
-# AskUserQuestion 检测：
-# - Claude Code 可能通过 PreToolUse 或 Elicitation 发送
-# - tool_name 可能是 AskUserQuestion 或在 tool_input 中
-# AskUserQuestion 不阻塞（CLI 不支持 updatedInput，用户需在终端操作）
-# 仅正常审批阻塞
+# 阻塞判定
 needs_approval = (hook_event == 'PreToolUse'
                   and tool_name in approval_tools
                   and approval_enabled
                   and not bypass)
 
-needs_blocking = needs_approval
+# AskUserQuestion 以 PermissionRequest 到达时也阻塞，让用户在卡片上选择
+is_ask_user = (hook_event == 'PermissionRequest'
+               and tool_name == 'AskUserQuestion'
+               and not bypass)
+
+needs_blocking = needs_approval or is_ask_user
 
 if needs_blocking:
     output['request_id'] = str(uuid.uuid4())
@@ -346,23 +347,44 @@ try:
                 response_data += chunk
                 try:
                     result = json.loads(response_data.decode())
-                    # App 侧回复 decision → 转换为 Claude Code hookSpecificOutput 格式
-                    decision = result.get('decision', 'allow')
-                    reason = result.get('reason', 'Approved by Notchikko')
-                    print(json.dumps({'hookSpecificOutput': {
-                        'hookEventName': 'PreToolUse',
-                        'permissionDecision': decision,
-                        'permissionDecisionReason': reason,
-                    }}))
+
+                    if is_ask_user:
+                        # AskUserQuestion: 回传 questions + answers
+                        answers = result.get('answers', {})
+                        updated_input = dict(tool_input)
+                        updated_input['answers'] = answers
+                        print(json.dumps({'hookSpecificOutput': {
+                            'hookEventName': 'PermissionRequest',
+                            'decision': {
+                                'behavior': 'allow',
+                                'updatedInput': updated_input,
+                            },
+                        }}))
+                    else:
+                        # 普通审批: allow/deny
+                        decision = result.get('decision', 'allow')
+                        reason = result.get('reason', 'Approved by Notchikko')
+                        print(json.dumps({'hookSpecificOutput': {
+                            'hookEventName': 'PreToolUse',
+                            'permissionDecision': decision,
+                            'permissionDecisionReason': reason,
+                        }}))
                     break
                 except json.JSONDecodeError:
                     continue
             except socket.timeout:
-                print(json.dumps({'hookSpecificOutput': {
-                    'hookEventName': 'PreToolUse',
-                    'permissionDecision': 'allow',
-                    'permissionDecisionReason': 'Timeout — auto-allowed by Notchikko',
-                }}))
+                if is_ask_user:
+                    # 超时：放行但不带答案（回退到终端）
+                    print(json.dumps({'hookSpecificOutput': {
+                        'hookEventName': 'PermissionRequest',
+                        'decision': {'behavior': 'allow'},
+                    }}))
+                else:
+                    print(json.dumps({'hookSpecificOutput': {
+                        'hookEventName': 'PreToolUse',
+                        'permissionDecision': 'allow',
+                        'permissionDecisionReason': 'Timeout — auto-allowed by Notchikko',
+                    }}))
                 break
     sock.close()
 except:

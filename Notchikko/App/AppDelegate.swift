@@ -351,6 +351,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onAutoApprove: {
                 approval.autoApproveSession(requestId: reqId)
             },
+            onAnswer: { questionText, answer in
+                approval.answerQuestion(requestId: reqId, questionText: questionText, answer: answer)
+            },
             onJump: { [weak self] in
                 guard let self,
                       let session = self.sessionManager.sessions[request.sessionId] else { return }

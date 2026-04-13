@@ -29,8 +29,18 @@ final class ApprovalManager {
         let timestamp: Date
         var isVisible: Bool = true
 
+        /// AskUserQuestion 的结构化问题数据
+        var questions: [Question] = []
+
         /// 通知类卡片（无 requestId，不阻塞 CLI）
         var isNotification: Bool { requestId.isEmpty }
+        /// 是否是可交互的 AskUserQuestion（有 requestId + 有 questions）
+        var isAskUser: Bool { !requestId.isEmpty && !questions.isEmpty }
+
+        struct Question {
+            let text: String
+            let options: [String]      // option labels
+        }
     }
 
     init(socketServer: SocketServer) {
@@ -58,16 +68,32 @@ final class ApprovalManager {
             return nil
         } ?? ""
 
+        // 解析 AskUserQuestion 的结构化问题
+        let questions: [ApprovalRequest.Question] = Self.parseQuestions(from: hookEvent.toolInput)
+
+        // AskUserQuestion 显示问题文本，审批显示 tool input
+        let displayInput: String
+        if !questions.isEmpty {
+            displayInput = questions.map { q in
+                var lines = [q.text]
+                lines += q.options.map { "  · \($0)" }
+                return lines.joined(separator: "\n")
+            }.joined(separator: "\n\n")
+        } else {
+            displayInput = String(toolInput.prefix(500))
+        }
+
         let request = ApprovalRequest(
             id: requestId.isEmpty ? UUID().uuidString : requestId,
             requestId: requestId,
             source: hookEvent.source ?? "unknown",
             tool: hookEvent.tool ?? "",
-            input: String(toolInput.prefix(500)),
+            input: displayInput,
             sessionId: hookEvent.sessionId,
             cwdName: session?.cwdName ?? "",
             terminalName: session?.matchedTerminal?.appName ?? "",
-            timestamp: Date()
+            timestamp: Date(),
+            questions: questions
         )
 
         pendingApprovals[request.id] = request
@@ -140,6 +166,20 @@ final class ApprovalManager {
         sendResponse(response, for: req)
         dismiss(requestId: requestId)
 
+        SoundManager.shared.play(for: "nod")
+    }
+
+    /// AskUserQuestion: 用户在卡片上选择了选项
+    func answerQuestion(requestId: String, questionText: String, answer: String) {
+        guard let req = pendingApprovals[requestId] else { return }
+        Log("answerQuestion: q=\(questionText.prefix(40)), a=\(answer), reqId=\(requestId.prefix(8))", tag: "Approval")
+
+        let response: [String: Any] = [
+            "request_id": req.requestId,
+            "answers": [questionText: answer],
+        ]
+        sendResponse(response, for: req)
+        dismiss(requestId: requestId)
         SoundManager.shared.play(for: "nod")
     }
 
@@ -283,5 +323,45 @@ final class ApprovalManager {
         guard !req.requestId.isEmpty,
               let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
         socketServer?.respond(requestId: req.requestId, json: data)
+    }
+
+    // MARK: - Question Parsing
+
+    /// 从 toolInput 解析 AskUserQuestion 的结构化问题
+    static func parseQuestions(from toolInput: [String: AnyCodableValue]?) -> [ApprovalRequest.Question] {
+        guard let toolInput else { return [] }
+
+        // 单问题模式: { question: "...", options: [...] }
+        if case .string(let q) = toolInput["question"] {
+            var opts: [String] = []
+            if case .array(let options) = toolInput["options"] {
+                for opt in options {
+                    if case .object(let d) = opt, case .string(let label) = d["label"] {
+                        opts.append(label)
+                    } else if case .string(let label) = opt {
+                        opts.append(label)
+                    }
+                }
+            }
+            if !opts.isEmpty { return [.init(text: q, options: opts)] }
+        }
+
+        // 多问题模式: { questions: [{ question: "...", options: [...] }] }
+        guard case .array(let questions) = toolInput["questions"] else { return [] }
+        var result: [ApprovalRequest.Question] = []
+        for q in questions {
+            guard case .object(let dict) = q,
+                  case .string(let text) = dict["question"] else { continue }
+            var opts: [String] = []
+            if case .array(let options) = dict["options"] {
+                for opt in options {
+                    if case .object(let d) = opt, case .string(let label) = d["label"] {
+                        opts.append(label)
+                    }
+                }
+            }
+            if !opts.isEmpty { result.append(.init(text: text, options: opts)) }
+        }
+        return result
     }
 }
