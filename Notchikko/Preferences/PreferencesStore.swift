@@ -72,7 +72,7 @@ struct NotchikkoPreferences: Codable, Equatable {
     var soundThemeId: String = "arcade"   // 声音主题
     var customSounds: [String: String] = [:]
     var approvalCardHideDelay: TimeInterval = 5
-    var approvalCardEnabled: Bool = true
+    var approvalCardEnabled: Bool = false
     var installedHooks: [String: Bool] = [:]
     var themeId: String = "clawd"
     var notchDetectionMode: NotchDetectionMode = .auto
