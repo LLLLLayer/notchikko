@@ -21,6 +21,7 @@
 "settings.notch_auto" = "自动";
 "settings.notch_force_on" = "强制有 Notch";
 "settings.notch_force_off" = "强制无 Notch";
+"settings.danmaku" = "工具弹幕";
 "settings.import_theme" = "导入主题...";
 "settings.import_theme_msg" = "选择包含 theme.json 和 SVG 文件的主题文件夹";
 

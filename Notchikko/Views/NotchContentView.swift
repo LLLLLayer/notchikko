@@ -6,10 +6,19 @@ struct NotchContentView: View {
     var petSize: CGFloat = 80
 
     var body: some View {
-        // 宠物居中贴在 panel 顶部，上半身自然藏在 notch 里
-        NotchikkoRepresentable(state: sessionManager.currentState)
-            .frame(width: petSize, height: petSize)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        ZStack(alignment: .top) {
+            // 底层：弹幕（工具名飘过宠物背后）
+            if PreferencesStore.shared.preferences.danmakuEnabled {
+                DanmakuView(sessionManager: sessionManager)
+                    .frame(width: petSize * 1.6, height: petSize * 0.35)
+                    .offset(y: petSize * 0.28)
+            }
+
+            // 上层：宠物居中贴在 panel 顶部，上半身自然藏在 notch 里
+            NotchikkoRepresentable(state: sessionManager.currentState)
+                .frame(width: petSize, height: petSize)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

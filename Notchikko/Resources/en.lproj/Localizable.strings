@@ -21,6 +21,7 @@
 "settings.notch_auto" = "Auto";
 "settings.notch_force_on" = "Force notch";
 "settings.notch_force_off" = "Force no notch";
+"settings.danmaku" = "Tool danmaku";
 "settings.import_theme" = "Import Theme...";
 "settings.import_theme_msg" = "Select a theme folder containing theme.json and SVG files";
 

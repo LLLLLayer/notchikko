@@ -5,6 +5,12 @@ final class SessionManager {
     private(set) var currentState: NotchikkoState = .sleeping
     private(set) var sessions: [String: SessionInfo] = [:]
 
+    /// 弹幕事件：每次活跃 session 触发 tool 时递增，附带工具名
+    private(set) var danmakuToolEvent: (id: Int, tool: String) = (0, "")
+    /// 弹幕事件：session 切换时递增，附带项目名
+    private(set) var danmakuSessionEvent: (id: Int, name: String) = (0, "")
+    private var danmakuCounter = 0
+
     /// nil = 自动跟踪最新活跃 session
     var pinnedSessionId: String? = nil
 
@@ -97,6 +103,7 @@ final class SessionManager {
         // 切换绑定后，立即根据目标 session 的 phase 更新状态
         if let sid = activeSessionId, let session = sessions[sid] {
             currentState = stateForPhase(session.phase)
+            emitSessionDanmaku(session)
         } else {
             currentState = .sleeping
         }
@@ -128,6 +135,7 @@ final class SessionManager {
                 terminalPid: terminalPid, pidChain: pidChain
             )
             SoundManager.shared.play(for: "session-start")
+            emitSessionDanmaku(sessions[sid]!)
             if eventSessionId == activeSessionId || activeSessionId == nil {
                 resetTimers()
                 transition(to: .idle)
@@ -153,6 +161,9 @@ final class SessionManager {
                 if sid == activeSessionId {
                     resetTimers()
                     transition(to: stateForTool(tool))
+                    // 弹幕：所有工具都发射
+                    danmakuCounter += 1
+                    danmakuToolEvent = (danmakuCounter, tool)
                 }
             case .post(let success):
                 sessions[sid]?.lastEvent = Date()
@@ -429,9 +440,20 @@ final class SessionManager {
             // 切换到下一个活跃 session 的状态
             if let nextId = activeSessionId, let next = sessions[nextId] {
                 currentState = stateForPhase(next.phase)
+                emitSessionDanmaku(next)
             } else {
                 currentState = .idle
             }
         }
+    }
+
+    // MARK: - 弹幕辅助
+
+    private func emitSessionDanmaku(_ session: SessionInfo) {
+        let name = session.cwdName.isEmpty
+            ? CLIHookConfig.metadata(for: session.source).displayName
+            : session.cwdName
+        danmakuCounter += 1
+        danmakuSessionEvent = (danmakuCounter, name)
     }
 }

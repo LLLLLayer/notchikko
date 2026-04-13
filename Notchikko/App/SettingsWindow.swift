@@ -97,6 +97,13 @@ struct DisplaySettingsView: View {
                         Text(String(localized: "settings.notch_force_off")).tag(NotchDetectionMode.forceOff)
                     }
                 }
+
+                Divider()
+
+                settingsRow(String(localized: "settings.danmaku")) {
+                    Toggle("", isOn: danmakuBinding)
+                        .toggleStyle(.switch)
+                }
             }
             .padding(4)
 
@@ -135,6 +142,13 @@ struct DisplaySettingsView: View {
         Binding(
             get: { PreferencesStore.shared.preferences.notchDetectionMode },
             set: { PreferencesStore.shared.preferences.notchDetectionMode = $0 }
+        )
+    }
+
+    private var danmakuBinding: Binding<Bool> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.danmakuEnabled },
+            set: { PreferencesStore.shared.preferences.danmakuEnabled = $0 }
         )
     }
 }
