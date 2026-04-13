@@ -5,6 +5,8 @@ final class ClaudeCodeAdapter: AgentBridge {
     private var continuation: AsyncStream<AgentEvent>.Continuation?
 
     private var knownSessions: Set<String> = []
+    /// 每个 session 的 subagent 嵌套深度（>0 时抑制工具/状态事件）
+    private var subagentDepth: [String: Int] = [:]
 
     /// 终端 PID 更新回调
     var onTerminalPidUpdate: ((String, Int) -> Void)?
@@ -20,12 +22,14 @@ final class ClaudeCodeAdapter: AgentBridge {
             self?.continuation = continuation
             self?.socketServerRef.onEvent = { hookEvent in
                 guard let self else { return }
+                let sid = hookEvent.sessionId
+
                 // 首次见到的 session，自动补发一个 sessionStart（带 cwd/source）
-                if !self.knownSessions.contains(hookEvent.sessionId) {
-                    self.knownSessions.insert(hookEvent.sessionId)
+                if !self.knownSessions.contains(sid) {
+                    self.knownSessions.insert(sid)
                     if hookEvent.event != "SessionStart" {
                         let syntheticStart = AgentEvent.sessionStart(
-                            sessionId: hookEvent.sessionId,
+                            sessionId: sid,
                             cwd: hookEvent.cwd,
                             source: hookEvent.source ?? "claude-code",
                             terminalPid: hookEvent.terminalPid,
@@ -34,12 +38,41 @@ final class ClaudeCodeAdapter: AgentBridge {
                         continuation.yield(syntheticStart)
                     }
                 }
-                if let agentEvent = Self.convert(hookEvent) {
-                    continuation.yield(agentEvent)
+
+                // Subagent 嵌套深度追踪：深度 >0 时抑制工具/状态事件，
+                // 避免子代理的 tool 调用影响动画和声音
+                switch hookEvent.event {
+                case "SubagentStart":
+                    self.subagentDepth[sid, default: 0] += 1
+                    Log("SubagentStart: depth[\(sid.prefix(8))]=\(self.subagentDepth[sid]!)", tag: "Adapter")
+                    // 不产生任何 AgentEvent
+                case "SubagentStop":
+                    let d = max((self.subagentDepth[sid] ?? 1) - 1, 0)
+                    self.subagentDepth[sid] = d
+                    Log("SubagentStop: depth[\(sid.prefix(8))]=\(d)", tag: "Adapter")
+                    // 不产生任何 AgentEvent
+                default:
+                    let depth = self.subagentDepth[sid] ?? 0
+                    if depth > 0 {
+                        // 子代理运行中：仅放行需要用户交互的事件（审批/通知）
+                        let passthrough = ["Elicitation", "PermissionRequest", "AskUserQuestion"]
+                        if !passthrough.contains(hookEvent.event) {
+                            Log("Suppressed subagent event: \(hookEvent.event) (depth=\(depth))", tag: "Adapter")
+                            // 跳过 —— 但仍继续下方的 terminalPid 等回调更新
+                            break
+                        }
+                    }
+                    if let agentEvent = Self.convert(hookEvent) {
+                        continuation.yield(agentEvent)
+                    }
+                }
+
+                // Session 结束时清理 subagent 深度
+                if hookEvent.event == "SessionEnd" {
+                    self.subagentDepth.removeValue(forKey: sid)
                 }
 
                 // 每个事件都可能携带 terminalPid/tty/permissionMode，通知更新
-                let sid = hookEvent.sessionId
                 let tPid = hookEvent.terminalPid
                 let tTty = hookEvent.terminalTty
                 let pMode = hookEvent.permissionMode
@@ -81,6 +114,7 @@ final class ClaudeCodeAdapter: AgentBridge {
             // AskUserQuestion 是 PreToolUse 事件，tool_name = "AskUserQuestion"
             if hook.tool == "AskUserQuestion" {
                 let detail = Self.extractAskUserDetail(from: hook.toolInput)
+                Log("AskUserQuestion detail=\(detail.prefix(200)), toolInput keys=\(hook.toolInput?.keys.sorted() ?? [])", tag: "Adapter")
                 return .notification(sessionId: hook.sessionId, message: "AskUserQuestion", detail: detail)
             }
             return .toolUse(sessionId: hook.sessionId, tool: hook.tool ?? "", phase: .pre)
@@ -97,8 +131,7 @@ final class ClaudeCodeAdapter: AgentBridge {
             return .stop(sessionId: hook.sessionId, usage: hook.usage)
         case "StopFailure":
             return .error(sessionId: hook.sessionId, message: "Task failed")
-        case "SubagentStart", "SubagentStop":
-            return nil  // Subagent 生命周期不影响主状态
+        // SubagentStart/SubagentStop 已在 onEvent 闭包中处理（深度追踪），不会到达这里
         case "Notification":
             return .notification(sessionId: hook.sessionId, message: "")
         case "Elicitation":
@@ -106,7 +139,9 @@ final class ClaudeCodeAdapter: AgentBridge {
             return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
         case "PermissionRequest":
             let detail = Self.extractPermissionDetail(from: hook)
-            return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
+            // AskUserQuestion 可能以 PermissionRequest 到达，用更具体的 message
+            let msg = (hook.tool == "AskUserQuestion") ? "AskUserQuestion" : hook.event
+            return .notification(sessionId: hook.sessionId, message: msg, detail: detail)
         case "AskUserQuestion":
             let detail = Self.extractAskUserDetail(from: hook.toolInput)
             return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
@@ -120,12 +155,17 @@ final class ClaudeCodeAdapter: AgentBridge {
 
     /// 从 PermissionRequest 中提取工具名和输入预览
     private static func extractPermissionDetail(from hook: HookEvent) -> String {
+        // AskUserQuestion 可能以 PermissionRequest 到达，用专用解析
+        if hook.tool == "AskUserQuestion" {
+            let detail = extractAskUserDetail(from: hook.toolInput)
+            if !detail.isEmpty { return detail }
+        }
+
         var lines: [String] = []
         if let tool = hook.tool, !tool.isEmpty {
             lines.append("Tool: \(tool)")
         }
         if let toolInput = hook.toolInput {
-            // 提取最有用的字段：command, file_path, content
             for key in ["command", "file_path", "path", "content", "description"] {
                 if case .string(let val) = toolInput[key], !val.isEmpty {
                     let display = val.count > 200 ? String(val.prefix(200)) + "…" : val
