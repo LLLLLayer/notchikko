@@ -152,10 +152,11 @@ struct DanmakuView: View {
         let bubbleWidth = textWidth + padH + 2
 
         // y 位置：离散档位 + 小抖动，避免聚集
-        let slots: [CGFloat] = [0.15, 0.35, 0.55, 0.75, 0.90]
+        // 弹幕区域很矮（petSize * 0.35），yRatio 上限需留出弹幕自身高度
+        let slots: [CGFloat] = [0.15, 0.40, 0.65]
         let baseY = slots.randomElement()!
         let jitter = CGFloat.random(in: -0.06...0.06)
-        let yRatio = min(max(baseY + jitter, 0.1), 0.95)
+        let yRatio = min(max(baseY + jitter, 0.10), 0.75)
 
         let item = DanmakuItem(
             text: text,
