@@ -70,7 +70,7 @@ Custom theme packs go in `~/.notchikko/themes/{id}/` with a `theme.json` manifes
 
 ### State Transitions
 
-No priority-based gating — `transition(to:)` always accepts the new state (only blocked by `isDragging`). Tool→State mapping: Read/Grep/Glob→reading, Edit/Write/NotebookEdit→typing, Bash→building, others→typing. Error states auto-return to idle after 5s; happy (task complete) triggers 3s celebration then auto-switches session. Notification events (Elicitation/AskUserQuestion) set approving state indefinitely until next event. Approving state is interruptible by any event (like idle/sleeping).
+No priority-based gating — `transition(to:)` always accepts the new state (only blocked by `isDragging`). Note: `NotchikkoState.priority` exists but is unused — vestigial from an earlier design. Tool→State mapping: Read/Grep/Glob→reading, Edit/Write/NotebookEdit→typing, Bash→building, others→typing. Non-tool phases: processing→thinking (LLM generating), compacting→sweeping (context compaction). Error states auto-return to idle after 5s; happy (task complete) triggers 3s celebration then auto-switches session. Notification events (Elicitation/AskUserQuestion) set approving state indefinitely until next event. Approving state is interruptible by any event (like idle/sleeping).
 
 ### Key Patterns
 

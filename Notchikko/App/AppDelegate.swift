@@ -66,16 +66,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchPanel?.close()
         notchPanel = nil
 
-        let geo = NotchGeometry(screen: screen)
+        let mode = PreferencesStore.shared.preferences.notchDetectionMode
+        let geo = NotchGeometry(screen: screen, notchDetectionMode: mode)
         self.geometry = geo
 
         let panel = NotchPanel(frame: geo.panelFrame)
+        panel.treatAsNotched = geo.hasPhysicalNotch
         // 强制设置 frame，防止系统自动调整位置
         panel.setFrame(geo.panelFrame, display: false)
 
         let petSize = 80 * PreferencesStore.shared.preferences.petScale
         let contentView = NotchContentView(
-            notchHeight: geo.notchSize.height,
+            notchHeight: geo.hiddenNotchHeight,
             sessionManager: sessionManager,
             petSize: petSize
         )
@@ -100,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 拖拽
         dragController.setup(panel: panel, homeFrame: geo.panelFrame,
-                             notchHeight: geo.notchSize.height, petSize: petSize)
+                             notchHeight: geo.hiddenNotchHeight, petSize: petSize)
         dragController.onRightClick = { [weak self] screenPoint in
             guard let self, let panel = self.notchPanel else { return }
             self.menuBarManager.buildMenu()

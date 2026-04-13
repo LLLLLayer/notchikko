@@ -4,25 +4,29 @@ import UniformTypeIdentifiers
 // MARK: - 设置面板主窗口（侧边栏导航）
 
 enum SettingsTab: String, CaseIterable {
-    case general, cli
+    case display, sound, approval, integration
 
     var displayName: String {
         switch self {
-        case .general: return String(localized: "settings.general")
-        case .cli: return String(localized: "settings.cli")
+        case .display: return String(localized: "settings.display")
+        case .sound: return String(localized: "settings.sound")
+        case .approval: return String(localized: "settings.approval")
+        case .integration: return String(localized: "settings.integration")
         }
     }
 
     var icon: String {
         switch self {
-        case .general: return "gearshape"
-        case .cli: return "terminal"
+        case .display: return "paintbrush"
+        case .sound: return "speaker.wave.2"
+        case .approval: return "checkmark.shield"
+        case .integration: return "terminal"
         }
     }
 }
 
 struct SettingsWindowView: View {
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab = .display
 
     var body: some View {
         NavigationSplitView {
@@ -34,10 +38,14 @@ struct SettingsWindowView: View {
         } detail: {
             Group {
                 switch selectedTab {
-                case .general:
-                    GeneralSettingsView()
-                case .cli:
-                    CLISettingsView()
+                case .display:
+                    DisplaySettingsView()
+                case .sound:
+                    SoundSettingsView()
+                case .approval:
+                    ApprovalSettingsView()
+                case .integration:
+                    IntegrationSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -48,100 +56,55 @@ struct SettingsWindowView: View {
     }
 }
 
-// MARK: - 通用（外观 + 声音 + 审批）
+// MARK: - 显示
 
-struct GeneralSettingsView: View {
+struct DisplaySettingsView: View {
     @State private var themes: [ThemeInfo] = []
 
     private let controlWidth: CGFloat = 220
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(String(localized: "settings.general"))
+            Text(String(localized: "settings.display"))
                 .font(.title2.bold())
 
-            // 外观
-            GroupBox(String(localized: "settings.display")) {
-                VStack(spacing: 12) {
-                    settingsRow(String(localized: "settings.pet_size")) {
-                        Picker("", selection: scaleBinding) {
-                            Text(String(localized: "settings.size_small")).tag(1.0 as CGFloat)
-                            Text(String(localized: "settings.size_medium")).tag(1.5 as CGFloat)
-                            Text(String(localized: "settings.size_large")).tag(2.0 as CGFloat)
-                        }
-                        .pickerStyle(.segmented)
+            VStack(spacing: 12) {
+                settingsRow(String(localized: "settings.pet_size")) {
+                    Picker("", selection: scaleBinding) {
+                        Text(String(localized: "settings.size_small")).tag(1.0 as CGFloat)
+                        Text(String(localized: "settings.size_medium")).tag(1.5 as CGFloat)
+                        Text(String(localized: "settings.size_large")).tag(2.0 as CGFloat)
                     }
+                    .pickerStyle(.segmented)
+                }
 
-                    Divider()
+                Divider()
 
-                    settingsRow(String(localized: "settings.theme")) {
-                        Picker("", selection: themeBinding) {
-                            ForEach(themes) { theme in
-                                Text(theme.name).tag(theme.id)
-                            }
+                settingsRow(String(localized: "settings.theme")) {
+                    Picker("", selection: themeBinding) {
+                        ForEach(themes) { theme in
+                            Text(theme.name).tag(theme.id)
                         }
                     }
                 }
-                .padding(4)
-            }
 
-            // 声音
-            GroupBox(String(localized: "settings.sound")) {
-                VStack(spacing: 12) {
-                    settingsRow(String(localized: "settings.volume")) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "speaker.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                            Slider(value: volumeBinding, in: 0...1)
-                            Image(systemName: "speaker.wave.3.fill")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                        }
-                    }
+                Divider()
 
-                    Divider()
-
-                    settingsRow(String(localized: "settings.sound_theme")) {
-                        Picker("", selection: soundThemeBinding) {
-                            ForEach(SoundThemeRegistry.themes) { theme in
-                                Text(theme.name).tag(theme.id)
-                            }
-                        }
+                settingsRow(String(localized: "settings.notch_detection")) {
+                    Picker("", selection: notchDetectionBinding) {
+                        Text(String(localized: "settings.notch_auto")).tag(NotchDetectionMode.auto)
+                        Text(String(localized: "settings.notch_force_on")).tag(NotchDetectionMode.forceOn)
+                        Text(String(localized: "settings.notch_force_off")).tag(NotchDetectionMode.forceOff)
                     }
                 }
-                .padding(4)
             }
-
-            // 审批
-            GroupBox(String(localized: "settings.approval")) {
-                VStack(spacing: 12) {
-                    settingsRow(String(localized: "settings.approval_card")) {
-                        Toggle("", isOn: approvalEnabledBinding)
-                            .toggleStyle(.switch)
-                    }
-
-                    if PreferencesStore.shared.preferences.approvalCardEnabled {
-                        Divider()
-                        settingsRow(String(localized: "settings.approval_delay")) {
-                            Picker("", selection: hideDelayBinding) {
-                                Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
-                                Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
-                                Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
-                                Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
-                            }
-                        }
-                    }
-                }
-                .padding(4)
-            }
+            .padding(4)
 
             Spacer()
         }
         .onAppear { themes = ThemeProvider.shared.availableThemes }
     }
 
-    /// 统一的设置行：左边标签 + 右边控件（固定宽度容器右对齐）
     private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack {
             Text(label)
@@ -168,6 +131,65 @@ struct GeneralSettingsView: View {
         )
     }
 
+    private var notchDetectionBinding: Binding<NotchDetectionMode> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.notchDetectionMode },
+            set: { PreferencesStore.shared.preferences.notchDetectionMode = $0 }
+        )
+    }
+}
+
+// MARK: - 声音
+
+struct SoundSettingsView: View {
+    private let controlWidth: CGFloat = 220
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(String(localized: "settings.sound"))
+                .font(.title2.bold())
+
+            VStack(spacing: 12) {
+                settingsRow(String(localized: "settings.volume")) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "speaker.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        Slider(value: volumeBinding, in: 0...1)
+                        Image(systemName: "speaker.wave.3.fill")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+
+                Divider()
+
+                settingsRow(String(localized: "settings.sound_theme")) {
+                    Picker("", selection: soundThemeBinding) {
+                        ForEach(SoundThemeRegistry.themes) { theme in
+                            Text(theme.name).tag(theme.id)
+                        }
+                    }
+                }
+            }
+            .padding(4)
+
+            Spacer()
+        }
+    }
+
+    private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            HStack {
+                Spacer()
+                content()
+            }
+            .frame(width: controlWidth)
+        }
+    }
+
     private var volumeBinding: Binding<Float> {
         Binding(
             get: { PreferencesStore.shared.preferences.soundVolume },
@@ -180,6 +202,53 @@ struct GeneralSettingsView: View {
             get: { PreferencesStore.shared.preferences.soundThemeId },
             set: { PreferencesStore.shared.preferences.soundThemeId = $0 }
         )
+    }
+}
+
+// MARK: - 审批
+
+struct ApprovalSettingsView: View {
+    private let controlWidth: CGFloat = 220
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(String(localized: "settings.approval"))
+                .font(.title2.bold())
+
+            VStack(spacing: 12) {
+                settingsRow(String(localized: "settings.approval_card")) {
+                    Toggle("", isOn: approvalEnabledBinding)
+                        .toggleStyle(.switch)
+                }
+
+                if PreferencesStore.shared.preferences.approvalCardEnabled {
+                    Divider()
+                    settingsRow(String(localized: "settings.approval_delay")) {
+                        Picker("", selection: hideDelayBinding) {
+                            Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
+                            Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
+                        }
+                    }
+                }
+            }
+            .padding(4)
+
+            Spacer()
+        }
+    }
+
+    private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            HStack {
+                Spacer()
+                content()
+            }
+            .frame(width: controlWidth)
+        }
     }
 
     private var approvalEnabledBinding: Binding<Bool> {
@@ -197,15 +266,15 @@ struct GeneralSettingsView: View {
     }
 }
 
-// MARK: - CLI 集成
+// MARK: - 集成
 
-struct CLISettingsView: View {
+struct IntegrationSettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(String(localized: "settings.cli"))
+            Text(String(localized: "settings.integration"))
                 .font(.title2.bold())
 
             VStack(spacing: 12) {

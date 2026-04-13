@@ -6,19 +6,10 @@
 "menu.quit" = "Quit Notchikko";
 
 /* SettingsWindow - Tabs */
-"settings.general" = "General";
 "settings.display" = "Display";
 "settings.sound" = "Sound";
-"settings.cli" = "CLI Integration";
-
-/* SettingsWindow - General */
 "settings.approval" = "Approval";
-"settings.approval_card" = "Show approval card";
-"settings.approval_delay" = "Auto-hide delay";
-"settings.seconds_3" = "3 sec";
-"settings.seconds_5" = "5 sec";
-"settings.seconds_10" = "10 sec";
-"settings.never_hide" = "Never hide";
+"settings.integration" = "Integration";
 
 /* SettingsWindow - Display */
 "settings.pet_size" = "Notchikko size";
@@ -26,20 +17,32 @@
 "settings.size_medium" = "Medium";
 "settings.size_large" = "Large";
 "settings.theme" = "Notchikko theme";
-"settings.sound_theme" = "Sound theme";
-"sound.theme.arcade" = "Arcade";
+"settings.notch_detection" = "Notch detection";
+"settings.notch_auto" = "Auto";
+"settings.notch_force_on" = "Force notch";
+"settings.notch_force_off" = "Force no notch";
 "settings.import_theme" = "Import Theme...";
 "settings.import_theme_msg" = "Select a theme folder containing theme.json and SVG files";
 
 /* SettingsWindow - Sound */
 "settings.volume" = "Volume";
+"settings.sound_theme" = "Sound theme";
+"sound.theme.arcade" = "Arcade";
 "settings.sound_custom" = "Sound Customization";
 "settings.pick_file" = "Pick File...";
 "settings.reset_default" = "Reset Default";
 "settings.custom" = "Custom";
 "settings.default" = "Default";
 
-/* SettingsWindow - CLI */
+/* SettingsWindow - Approval */
+"settings.approval_card" = "Show approval card";
+"settings.approval_delay" = "Auto-hide delay";
+"settings.seconds_3" = "3 sec";
+"settings.seconds_5" = "5 sec";
+"settings.seconds_10" = "10 sec";
+"settings.never_hide" = "Never hide";
+
+/* SettingsWindow - Integration */
 "settings.bypass_permissions" = "Bypass Permissions";
 "settings.bypass_on_desc" = "Enabled — all tools auto-approved, no approval card";
 "settings.bypass_off_desc" = "Disabled — destructive tools will show approval card";

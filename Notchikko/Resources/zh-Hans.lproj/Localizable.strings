@@ -6,19 +6,10 @@
 "menu.quit" = "退出 Notchikko";
 
 /* SettingsWindow - Tabs */
-"settings.general" = "通用";
 "settings.display" = "显示";
 "settings.sound" = "声音";
-"settings.cli" = "CLI 集成";
-
-/* SettingsWindow - General */
 "settings.approval" = "审批";
-"settings.approval_card" = "显示审批卡片";
-"settings.approval_delay" = "自动隐藏延时";
-"settings.seconds_3" = "3 秒";
-"settings.seconds_5" = "5 秒";
-"settings.seconds_10" = "10 秒";
-"settings.never_hide" = "永不隐藏";
+"settings.integration" = "集成";
 
 /* SettingsWindow - Display */
 "settings.pet_size" = "Notchikko 大小";
@@ -26,20 +17,32 @@
 "settings.size_medium" = "中";
 "settings.size_large" = "大";
 "settings.theme" = "Notchikko 主题";
-"settings.sound_theme" = "声音主题";
-"sound.theme.arcade" = "电玩";
+"settings.notch_detection" = "Notch 检测";
+"settings.notch_auto" = "自动";
+"settings.notch_force_on" = "强制有 Notch";
+"settings.notch_force_off" = "强制无 Notch";
 "settings.import_theme" = "导入主题...";
 "settings.import_theme_msg" = "选择包含 theme.json 和 SVG 文件的主题文件夹";
 
 /* SettingsWindow - Sound */
 "settings.volume" = "音量";
+"settings.sound_theme" = "声音主题";
+"sound.theme.arcade" = "电玩";
 "settings.sound_custom" = "音效自定义";
 "settings.pick_file" = "选择文件...";
 "settings.reset_default" = "恢复默认";
 "settings.custom" = "自定义";
 "settings.default" = "默认";
 
-/* SettingsWindow - CLI */
+/* SettingsWindow - Approval */
+"settings.approval_card" = "显示审批卡片";
+"settings.approval_delay" = "自动隐藏延时";
+"settings.seconds_3" = "3 秒";
+"settings.seconds_5" = "5 秒";
+"settings.seconds_10" = "10 秒";
+"settings.never_hide" = "永不隐藏";
+
+/* SettingsWindow - Integration */
 "settings.bypass_permissions" = "Bypass Permissions";
 "settings.bypass_on_desc" = "已开启 — 所有工具自动放行，不弹审批卡片";
 "settings.bypass_off_desc" = "关闭中 — 修改型工具会弹出审批卡片";

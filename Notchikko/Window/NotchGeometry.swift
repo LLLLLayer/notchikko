@@ -5,16 +5,31 @@ struct NotchGeometry {
     let notchCenter: CGPoint
     let panelFrame: NSRect
     let hasPhysicalNotch: Bool
+    /// panel 内被刘海遮住的高度（模拟刘海时为 0，因为 panel 没有延伸到屏幕外）
+    let hiddenNotchHeight: CGFloat
 
-    init(screen: NSScreen) {
-        hasPhysicalNotch = screen.safeAreaInsets.top > 0
+    init(screen: NSScreen, notchDetectionMode: NotchDetectionMode = .auto) {
+        switch notchDetectionMode {
+        case .auto:
+            hasPhysicalNotch = screen.safeAreaInsets.top > 0
+        case .forceOn:
+            hasPhysicalNotch = true
+        case .forceOff:
+            hasPhysicalNotch = false
+        }
 
-        if hasPhysicalNotch {
+        let screenHasNotch = screen.safeAreaInsets.top > 0
+
+        if hasPhysicalNotch && screenHasNotch {
+            // 真实刘海：从屏幕 API 读取尺寸
             let leftPadding = screen.auxiliaryTopLeftArea?.width ?? 0
             let rightPadding = screen.auxiliaryTopRightArea?.width ?? 0
             let notchWidth = screen.frame.width - leftPadding - rightPadding + 4
             let notchHeight = screen.safeAreaInsets.top
             notchSize = CGSize(width: notchWidth, height: notchHeight)
+        } else if hasPhysicalNotch && !screenHasNotch {
+            // 强制有刘海，但屏幕没有物理刘海：模拟一个合理的刘海尺寸
+            notchSize = CGSize(width: 200, height: 32)
         } else {
             // 没有 Notch：用屏幕顶部菜单栏高度，宽度给一个合理值
             let menuBarHeight = screen.frame.height - screen.visibleFrame.height
@@ -30,17 +45,31 @@ struct NotchGeometry {
 
         // Panel 宽度 = notch 宽度（有 notch）或固定宽度（无 notch）
         let panelWidth = notchSize.width
-        let panelHeight = notchSize.height + 150
 
-        // 关键：Panel 顶部始终对齐屏幕物理顶部
-        // 有 Notch → 上半身藏在 Notch 硬件挖孔里
-        // 无 Notch → 上半身超出屏幕顶部被裁剪
-        panelFrame = NSRect(
-            x: screenFrame.midX - panelWidth / 2,
-            y: screenFrame.maxY - panelHeight,
-            width: panelWidth,
-            height: panelHeight
-        )
+        if hasPhysicalNotch && !screenHasNotch {
+            // 强制有刘海 + 无物理刘海：模拟刘海底边位置
+            // 真实刘海屏上 pet 从刘海底边往下挂，这里同理：
+            // panel 顶部 = screenTop - notchHeight，pet 从这里开始往下
+            let panelHeight: CGFloat = 150
+            hiddenNotchHeight = 0
+            panelFrame = NSRect(
+                x: screenFrame.midX - panelWidth / 2,
+                y: screenFrame.maxY - notchSize.height - panelHeight,
+                width: panelWidth,
+                height: panelHeight
+            )
+        } else {
+            let panelHeight = notchSize.height + 150
+            hiddenNotchHeight = notchSize.height
+            // 有真实 Notch → 上半身藏在 Notch 硬件挖孔里
+            // 无 Notch → 上半身超出屏幕顶部被裁剪
+            panelFrame = NSRect(
+                x: screenFrame.midX - panelWidth / 2,
+                y: screenFrame.maxY - panelHeight,
+                width: panelWidth,
+                height: panelHeight
+            )
+        }
 
     }
 }

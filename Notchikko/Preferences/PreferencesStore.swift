@@ -9,6 +9,7 @@ final class PreferencesStore {
         didSet {
             let needsRefresh = oldValue.petScale != preferences.petScale
                 || oldValue.themeId != preferences.themeId
+                || oldValue.notchDetectionMode != preferences.notchDetectionMode
             scheduleSave(notifyUI: needsRefresh)
         }
     }
@@ -59,6 +60,12 @@ final class PreferencesStore {
 
 // MARK: - 数据模型
 
+enum NotchDetectionMode: String, Codable, CaseIterable {
+    case auto
+    case forceOn
+    case forceOff
+}
+
 struct NotchikkoPreferences: Codable, Equatable {
     var petScale: CGFloat = 1.5
     var soundVolume: Float = 0.3          // 0.0 = 静音, 1.0 = 最大
@@ -68,6 +75,7 @@ struct NotchikkoPreferences: Codable, Equatable {
     var approvalCardEnabled: Bool = true
     var installedHooks: [String: Bool] = [:]
     var themeId: String = "clawd"
+    var notchDetectionMode: NotchDetectionMode = .auto
 }
 
 /// 声音主题
