@@ -2,10 +2,10 @@
 "menu.sessions" = "Sessions";
 "menu.auto" = "🔄 Auto（自动跟踪）";
 "menu.display" = "显示器";
-"menu.pin" = "固定 Session";
+"menu.pin" = "固定";
 "menu.unpin" = "取消固定";
-"menu.jump_to_terminal" = "跳转到终端";
-"menu.close_session" = "关闭 Session";
+"menu.jump_to_terminal" = "跳转";
+"menu.close_session" = "关闭";
 "menu.settings" = "更多设置...";
 "menu.quit" = "退出 Notchikko";
 

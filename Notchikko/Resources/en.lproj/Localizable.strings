@@ -2,10 +2,10 @@
 "menu.sessions" = "Sessions";
 "menu.auto" = "🔄 Auto (track latest)";
 "menu.display" = "Display";
-"menu.pin" = "Pin Session";
-"menu.unpin" = "Unpin Session";
-"menu.jump_to_terminal" = "Jump to Terminal";
-"menu.close_session" = "Close Session";
+"menu.pin" = "Pin";
+"menu.unpin" = "Unpin";
+"menu.jump_to_terminal" = "Jump";
+"menu.close_session" = "Close";
 "menu.settings" = "More Settings...";
 "menu.quit" = "Quit Notchikko";
 
