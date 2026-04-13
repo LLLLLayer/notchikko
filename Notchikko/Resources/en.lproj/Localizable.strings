@@ -71,7 +71,7 @@
 /* ApprovalCardView */
 "approval.deny" = "Deny";
 "approval.allow_once" = "Allow Once";
-"approval.allow_all" = "Allow All";
+"approval.always_allow" = "Always Allow";
 "approval.auto_approve" = "Auto Approve";
 "approval.jump_to_terminal" = "Jump to terminal";
 "approval.respond_in_terminal" = "Go to terminal";

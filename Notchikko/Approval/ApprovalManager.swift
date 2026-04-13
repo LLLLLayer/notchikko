@@ -12,9 +12,12 @@ final class ApprovalManager {
     /// 已设为"全部允许"的 session（session 维度，不持久化）
     private var autoApprovedSessions: Set<String> = []
 
+    /// 已设为"始终允许"的 tool（session × tool 维度）
+    private var autoApprovedTools: [String: Set<String>] = [:]
+
     /// 卡片移除回调（AppDelegate 注入，用于关闭对应 NSPanel）
     var onCardDismissed: ((String) -> Void)?
-    /// 全部移除回调（Allow All 时）
+    /// 全部移除回调（Allow All / Auto Approve 时）
     var onAllCardsDismissed: (() -> Void)?
 
     struct ApprovalRequest: Identifiable {
@@ -45,6 +48,18 @@ final class ApprovalManager {
 
         // 如果该 session 已设为"全部允许"，直接放行
         if autoApprovedSessions.contains(hookEvent.sessionId) {
+            let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
+            if let data = try? JSONSerialization.data(withJSONObject: response) {
+                socketServer?.respond(requestId: requestId, json: data)
+            }
+            SoundManager.shared.play(for: "nod")
+            return
+        }
+
+        // 如果该 tool 已被"始终允许"，直接放行
+        let toolName = hookEvent.tool ?? ""
+        if let approvedTools = autoApprovedTools[hookEvent.sessionId], approvedTools.contains(toolName) {
+            Log("Auto-allowed tool '\(toolName)' for session \(hookEvent.sessionId.prefix(8))", tag: "Approval")
             let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
             if let data = try? JSONSerialization.data(withJSONObject: response) {
                 socketServer?.respond(requestId: requestId, json: data)
@@ -121,11 +136,41 @@ final class ApprovalManager {
         SoundManager.shared.play(for: "shake")
     }
 
-    /// 允许当前 session 的所有后续请求，并放行该 session 所有待审批
-    func approveAllForSession(requestId: String) {
+    /// 始终允许该 tool（session × tool 维度），放行当前请求
+    func alwaysAllowTool(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
         let sessionId = req.sessionId
+        let tool = req.tool
+
+        Log("alwaysAllowTool: tool=\(tool), sid=\(sessionId.prefix(8))", tag: "Approval")
+        autoApprovedTools[sessionId, default: []].insert(tool)
+
+        // 放行该 session 所有同类 tool 的待审批请求
+        let sameToolRequests = pendingApprovals.values.filter {
+            $0.sessionId == sessionId && $0.tool == tool && !$0.isNotification
+        }
+        for r in sameToolRequests {
+            let response: [String: Any] = [
+                "request_id": r.requestId,
+                "decision": "allow",
+            ]
+            sendResponse(response, for: r)
+            dismiss(requestId: r.id)
+        }
+
+        SoundManager.shared.play(for: "nod")
+    }
+
+    /// 自动批准：放行所有待审批 + 写 bypass 标记文件，hook 下次 PermissionRequest 时切换 Claude Code 到 bypassPermissions
+    func autoApproveSession(requestId: String) {
+        guard let req = pendingApprovals[requestId] else { return }
+        let sessionId = req.sessionId
+
+        Log("autoApproveSession: sid=\(sessionId.prefix(8))", tag: "Approval")
         autoApprovedSessions.insert(sessionId)
+
+        // 写 bypass 标记文件，hook 脚本检测后输出 setMode: bypassPermissions
+        writeBypassFlag(sessionId: sessionId)
 
         // 放行该 session 的所有待审批请求
         let sessionRequests = pendingApprovals.values.filter {
@@ -150,6 +195,14 @@ final class ApprovalManager {
 
         SoundManager.shared.play(for: "nod")
         onAllCardsDismissed?()
+    }
+
+    // MARK: - Bypass Flag
+
+    /// 写 bypass 标记文件供 hook 脚本读取
+    private func writeBypassFlag(sessionId: String) {
+        let flagPath = "/tmp/notchikko-bypass-\(sessionId)"
+        FileManager.default.createFile(atPath: flagPath, contents: Data())
     }
 
     // MARK: - 卡片显示控制

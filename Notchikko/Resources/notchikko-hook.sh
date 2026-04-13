@@ -187,6 +187,39 @@ tool_name = input_data.get('tool_name', '')
 tool_input = input_data.get('tool_input', {})
 bypass = (permission_mode == 'bypassPermissions')
 
+# 检查 bypass 标记文件（用户在审批卡片点了"自动批准"）
+session_id = input_data.get('session_id', '')
+bypass_flag_path = '/tmp/notchikko-bypass-' + session_id
+has_bypass_flag = os.path.exists(bypass_flag_path) if session_id else False
+
+# PermissionRequest + bypass 标记 → 输出 setMode: bypassPermissions，让 Claude Code 切换模式
+if hook_event == 'PermissionRequest' and has_bypass_flag:
+    try:
+        os.unlink(bypass_flag_path)
+    except:
+        pass
+    print(json.dumps({'hookSpecificOutput': {
+        'hookEventName': 'PermissionRequest',
+        'decision': {
+            'behavior': 'allow',
+            'updatedPermissions': [{
+                'type': 'setMode',
+                'mode': 'bypassPermissions',
+                'destination': 'session',
+            }],
+        },
+    }}))
+    # 仍然发送事件给 app（非阻塞），让 app 知道模式已切换
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        sock.connect('$SOCKET_PATH')
+        sock.sendall(json.dumps(output).encode())
+        sock.close()
+    except:
+        pass
+    sys.exit(0)
+
 # 读取 app 的审批开关
 approval_enabled = False
 try:

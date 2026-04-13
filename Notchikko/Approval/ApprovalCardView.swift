@@ -4,7 +4,8 @@ struct ApprovalCardView: View {
     let request: ApprovalManager.ApprovalRequest
     let onDeny: () -> Void
     let onApprove: () -> Void
-    let onApproveAll: () -> Void
+    let onAlwaysAllow: () -> Void
+    let onAutoApprove: () -> Void
     var onJump: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
 
@@ -124,27 +125,30 @@ struct ApprovalCardView: View {
     @ViewBuilder
     private var actionRow: some View {
         if !request.isNotification {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 CardButton(
                     label: String(localized: "approval.deny"),
                     icon: "xmark",
-                    style: .destructive,
+                    style: .muted,
                     action: onDeny
                 )
-
-                Spacer()
-
                 CardButton(
                     label: String(localized: "approval.allow_once"),
                     icon: "checkmark",
-                    style: .primary,
+                    style: .light,
                     action: onApprove
                 )
                 CardButton(
-                    label: String(localized: "approval.allow_all"),
+                    label: String(localized: "approval.always_allow"),
                     icon: "checkmark.circle",
-                    style: .secondary,
-                    action: onApproveAll
+                    style: .primary,
+                    action: onAlwaysAllow
+                )
+                CardButton(
+                    label: String(localized: "approval.auto_approve"),
+                    icon: "bolt.fill",
+                    style: .destructive,
+                    action: onAutoApprove
                 )
             }
         }
@@ -185,27 +189,32 @@ private struct CardButton: View {
     let action: () -> Void
 
     enum ButtonStyle {
-        case primary, secondary, destructive
+        case muted       // 拒绝：深灰背景
+        case light       // 允许一次：浅色/白色背景
+        case primary     // 始终允许：蓝色背景
+        case destructive // 自动批准：红色背景
     }
 
     private var bgColor: Color {
         switch style {
+        case .muted: .primary.opacity(0.08)
+        case .light: .primary.opacity(0.15)
         case .primary: .accentColor
-        case .secondary: .primary.opacity(0.07)
-        case .destructive: .red.opacity(0.12)
+        case .destructive: .red
         }
     }
 
     private var fgColor: Color {
         switch style {
+        case .muted: .primary.opacity(0.5)
+        case .light: .primary.opacity(0.85)
         case .primary: .white
-        case .secondary: .primary.opacity(0.7)
-        case .destructive: .red
+        case .destructive: .white
         }
     }
 
     private var fontWeight: Font.Weight {
-        style == .primary ? .semibold : .medium
+        (style == .primary || style == .destructive) ? .semibold : .medium
     }
 
     var body: some View {

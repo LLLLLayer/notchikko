@@ -316,8 +316,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onApprove: {
                 approval.approve(requestId: reqId)
             },
-            onApproveAll: {
-                approval.approveAllForSession(requestId: reqId)
+            onAlwaysAllow: {
+                approval.alwaysAllowTool(requestId: reqId)
+            },
+            onAutoApprove: {
+                approval.autoApproveSession(requestId: reqId)
             },
             onJump: { [weak self] in
                 guard let self,
