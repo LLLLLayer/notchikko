@@ -223,9 +223,10 @@ final class SessionManager {
 
         case .notification(let sid, let msg):
             let isBypass = sessions[sid]?.isBypassMode ?? false
+            let approvalOn = PreferencesStore.shared.preferences.approvalCardEnabled
             // 只有需要用户操作的事件才更新 session 和切状态
             let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion"
-                || (msg == "PermissionRequest" && !isBypass))
+                || (msg == "PermissionRequest" && !isBypass && approvalOn))
             guard needsUserAction else { break }
             sessions[sid]?.lastEvent = Date()
             sessions[sid]?.phase = .waitingForInput

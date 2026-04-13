@@ -197,9 +197,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             approval.onSessionEvent(sessionId: hookEvent.sessionId)
             let session = self.sessionManager.sessions[hookEvent.sessionId]
 
-            // bypass 模式 → 直接放行，不弹卡片
-            if session?.isBypassMode == true {
-                Log("Approval auto-allowed (bypass mode): \(hookEvent.tool ?? "?")", tag: "App")
+            // bypass 模式 或 审批卡片关闭 → 直接放行，不弹卡片
+            if session?.isBypassMode == true || !PreferencesStore.shared.preferences.approvalCardEnabled {
+                let reason = session?.isBypassMode == true ? "bypass mode" : "approvalCard disabled"
+                Log("Approval auto-allowed (\(reason)): \(hookEvent.tool ?? "?")", tag: "App")
                 let requestId = hookEvent.requestId ?? ""
                 let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
                 if let data = try? JSONSerialization.data(withJSONObject: response) {
@@ -210,11 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             approval.handleApprovalRequest(from: hookEvent, session: session)
             self.sessionManager.overrideState(.approving)
-            if PreferencesStore.shared.preferences.approvalCardEnabled {
-                let requestId = hookEvent.requestId ?? ""
-                if let request = approval.pendingApprovals[requestId] {
-                    self.showApprovalPanel(for: request)
-                }
+            let requestId = hookEvent.requestId ?? ""
+            if let request = approval.pendingApprovals[requestId] {
+                self.showApprovalPanel(for: request)
             }
         }
 
