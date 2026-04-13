@@ -47,6 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.openSettingsWindow()
         }
 
+        menuBarManager.onJumpToSession = { [weak self] sessionId in
+            guard let self, let session = self.sessionManager.sessions[sessionId] else { return }
+            self.terminalJumper.jumpToSession(session: session)
+        }
+
         menuBarManager.onRemoveSession = { [weak self] sessionId in
             self?.sessionManager.removeSession(sessionId)
             self?.approvalManager?.cleanupSession(sessionId)

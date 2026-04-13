@@ -11,6 +11,7 @@ final class MenuBarManager {
     var onQuit: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onRemoveSession: ((String) -> Void)?
+    var onJumpToSession: ((String) -> Void)?
 
     func setup(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
@@ -48,7 +49,7 @@ final class MenuBarManager {
                     let view = SessionMenuItemView(session: session, isPinned: isPinned)
                     item.view = view
 
-                    // 子菜单：Pin/Unpin + Close
+                    // 子菜单：固定 / 跳转 / 关闭
                     let sub = NSMenu()
                     let pinTitle = isPinned
                         ? NSLocalizedString("menu.unpin", comment: "")
@@ -57,6 +58,13 @@ final class MenuBarManager {
                     pinItem.target = self
                     pinItem.representedObject = session.id
                     sub.addItem(pinItem)
+
+                    let jumpItem = NSMenuItem(title: NSLocalizedString("menu.jump_to_terminal", comment: ""), action: #selector(jumpToSession(_:)), keyEquivalent: "")
+                    jumpItem.target = self
+                    jumpItem.representedObject = session.id
+                    sub.addItem(jumpItem)
+
+                    sub.addItem(.separator())
 
                     let closeItem = NSMenuItem(title: NSLocalizedString("menu.close_session", comment: ""), action: #selector(closeSession(_:)), keyEquivalent: "")
                     closeItem.target = self
@@ -126,6 +134,11 @@ final class MenuBarManager {
         } else {
             sm.pinSession(nil)
         }
+    }
+
+    @objc private func jumpToSession(_ sender: NSMenuItem) {
+        guard let sessionId = sender.representedObject as? String else { return }
+        onJumpToSession?(sessionId)
     }
 
     @objc private func closeSession(_ sender: NSMenuItem) {
