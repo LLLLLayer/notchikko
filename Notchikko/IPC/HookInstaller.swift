@@ -56,7 +56,7 @@ final class HookInstaller {
             name: "codex",
             displayName: "OpenAI Codex",
             icon: "📦",
-            settingsPath: "~/.codex/config.json",
+            settingsPath: "~/.codex/hooks.json",
             hookEvents: [
                 "UserPromptSubmit", "SessionStart", "SessionEnd",
                 "PreToolUse", "PostToolUse",
