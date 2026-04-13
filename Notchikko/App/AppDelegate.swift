@@ -156,10 +156,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let isSameScreen = (landingScreen == self.currentScreen)
 
             if isSameScreen {
-                // 同屏：解冻状态（恢复为当前 session 实际 phase），同时飞回原位
+                // 同屏：先飞回原位，动画完成后再解冻状态
+                // 避免 endDrag 触发的状态变化在动画期间干扰 panel frame
                 guard let geo = self.geometry else { return }
-                self.sessionManager.endDrag()
-                self.dragController.animateToFrame(geo.panelFrame) {}
+                self.dragController.animateToFrame(geo.panelFrame) {
+                    self.sessionManager.endDrag()
+                }
             } else {
                 // 跨屏：解冻状态，重建到目标屏幕
                 self.sessionManager.endDrag()
