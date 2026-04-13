@@ -42,6 +42,11 @@
 "settings.seconds_10" = "10 秒";
 "settings.never_hide" = "永不隐藏";
 
+/* SettingsWindow - IDE Extensions */
+"settings.ide_extensions" = "IDE 扩展";
+"settings.ext_installed" = "扩展: ✅ 已安装";
+"settings.ext_not_installed" = "扩展: ❌ 未安装";
+
 /* SettingsWindow - Integration */
 "settings.bypass_permissions" = "Bypass Permissions";
 "settings.bypass_on_desc" = "已开启 — 所有工具自动放行，不弹审批卡片";

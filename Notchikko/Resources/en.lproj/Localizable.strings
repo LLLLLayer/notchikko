@@ -42,6 +42,11 @@
 "settings.seconds_10" = "10 sec";
 "settings.never_hide" = "Never hide";
 
+/* SettingsWindow - IDE Extensions */
+"settings.ide_extensions" = "IDE Extensions";
+"settings.ext_installed" = "Extension: ✅ Installed";
+"settings.ext_not_installed" = "Extension: ❌ Not installed";
+
 /* SettingsWindow - Integration */
 "settings.bypass_permissions" = "Bypass Permissions";
 "settings.bypass_on_desc" = "Enabled — all tools auto-approved, no approval card";

@@ -14,6 +14,7 @@ struct HookEvent: Decodable {
     let terminalPid: Int?        // v0.3: 终端进程 PID（hook 进程树检测）
     let terminalTty: String?     // v0.3: 终端 tty 路径（用于 iTerm2 tab 定位）
     let permissionMode: String?  // "default" / "bypassPermissions" 等
+    let pidChain: [Int]?         // v0.4: hook→终端的 PID 链（VS Code 终端定位）
 
 
     enum CodingKeys: String, CodingKey {
@@ -24,6 +25,7 @@ struct HookEvent: Decodable {
         case terminalPid = "terminal_pid"
         case terminalTty = "terminal_tty"
         case permissionMode = "permission_mode"
+        case pidChain = "pid_chain"
     }
 }
 

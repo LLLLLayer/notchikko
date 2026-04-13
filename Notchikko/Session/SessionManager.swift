@@ -25,6 +25,7 @@ final class SessionManager {
         var matchedTerminal: TerminalMatch?  // 终端匹配缓存
         var terminalPid: Int?                // 终端进程 PID（hook 进程树检测）
         var terminalTty: String?             // 终端 tty 路径（iTerm2 tab 定位）
+        var pidChain: [Int]?                 // hook→终端的 PID 链（VS Code 终端定位）
         var isBypassMode: Bool = false       // --dangerously-skip-permissions
 
         var cwdName: String {
@@ -303,6 +304,11 @@ final class SessionManager {
     func setTerminalTty(_ tty: String, for sessionId: String) {
         guard sessions[sessionId]?.terminalTty == nil else { return }
         sessions[sessionId]?.terminalTty = tty
+    }
+
+    func setPidChain(_ chain: [Int], for sessionId: String) {
+        guard sessions[sessionId]?.pidChain == nil else { return }
+        sessions[sessionId]?.pidChain = chain
     }
 
     /// 更新 session 的 bypass 模式

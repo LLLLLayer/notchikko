@@ -10,6 +10,8 @@ final class ClaudeCodeAdapter: AgentBridge {
     var onTerminalPidUpdate: ((String, Int) -> Void)?
     /// 终端 tty 更新回调
     var onTerminalTtyUpdate: ((String, String) -> Void)?
+    /// PID 链更新回调（VS Code 终端定位）
+    var onPidChainUpdate: ((String, [Int]) -> Void)?
     /// permission_mode 更新回调
     var onPermissionModeUpdate: ((String, String) -> Void)?
 
@@ -40,13 +42,16 @@ final class ClaudeCodeAdapter: AgentBridge {
                 let tPid = hookEvent.terminalPid
                 let tTty = hookEvent.terminalTty
                 let pMode = hookEvent.permissionMode
-                if tPid != nil || tTty != nil || pMode != nil {
+                let pChain = hookEvent.pidChain
+                if tPid != nil || tTty != nil || pMode != nil || pChain != nil {
                     let pidCb = self.onTerminalPidUpdate
                     let ttyCb = self.onTerminalTtyUpdate
+                    let chainCb = self.onPidChainUpdate
                     let modeCb = self.onPermissionModeUpdate
                     DispatchQueue.main.async {
                         if let tPid { pidCb?(sid, tPid) }
                         if let tTty { ttyCb?(sid, tTty) }
+                        if let pChain, !pChain.isEmpty { chainCb?(sid, pChain) }
                         if let pMode { modeCb?(sid, pMode) }
                     }
                 }

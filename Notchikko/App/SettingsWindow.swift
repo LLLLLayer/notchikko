@@ -271,26 +271,46 @@ struct ApprovalSettingsView: View {
 struct IntegrationSettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
+    @State private var ideStatuses: [String: Bool] = [:]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(String(localized: "settings.integration"))
-                .font(.title2.bold())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(String(localized: "settings.integration"))
+                    .font(.title2.bold())
 
-            VStack(spacing: 12) {
-                ForEach(HookInstaller.supportedCLIs, id: \.name) { cli in
-                    CLIRow(
-                        cli: cli,
-                        isInstalled: hookStatuses[cli.name] ?? false,
-                        onInstall: { installHook(cli) },
-                        onUninstall: { uninstallHook(cli) }
-                    )
+                // CLI Hooks
+                GroupBox("CLI Hooks") {
+                    VStack(spacing: 12) {
+                        ForEach(HookInstaller.supportedCLIs, id: \.name) { cli in
+                            CLIRow(
+                                cli: cli,
+                                isInstalled: hookStatuses[cli.name] ?? false,
+                                onInstall: { installHook(cli) },
+                                onUninstall: { uninstallHook(cli) }
+                            )
+                        }
+
+                        ComingSoonRow(icon: "💎", name: "Gemini CLI")
+                    }
+                    .padding(4)
                 }
 
-                ComingSoonRow(icon: "💎", name: "Gemini CLI")
+                // IDE Extensions
+                GroupBox(String(localized: "settings.ide_extensions")) {
+                    VStack(spacing: 12) {
+                        ForEach(IDEExtensionInstaller.targets) { target in
+                            IDEExtensionRow(
+                                target: target,
+                                isInstalled: ideStatuses[target.id] ?? false,
+                                onInstall: { installExtension(target) },
+                                onUninstall: { uninstallExtension(target) }
+                            )
+                        }
+                    }
+                    .padding(4)
+                }
             }
-
-            Spacer()
         }
         .onAppear {
             refreshStatuses()
@@ -301,23 +321,36 @@ struct IntegrationSettingsView: View {
         do {
             try hookInstaller.install(for: cli)
             refreshStatuses()
-        } catch {
-            // TODO: error alert
-        }
+        } catch {}
     }
 
     private func uninstallHook(_ cli: CLIHookConfig) {
         do {
             try hookInstaller.uninstall(for: cli)
             refreshStatuses()
-        } catch {
-            // TODO: error alert
-        }
+        } catch {}
+    }
+
+    private func installExtension(_ target: IDEExtensionInstaller.IDETarget) {
+        do {
+            try IDEExtensionInstaller.install(for: target)
+            refreshStatuses()
+        } catch {}
+    }
+
+    private func uninstallExtension(_ target: IDEExtensionInstaller.IDETarget) {
+        do {
+            try IDEExtensionInstaller.uninstall(for: target)
+            refreshStatuses()
+        } catch {}
     }
 
     private func refreshStatuses() {
         for cli in HookInstaller.supportedCLIs {
             hookStatuses[cli.name] = hookInstaller.isInstalled(for: cli)
+        }
+        for target in IDEExtensionInstaller.targets {
+            ideStatuses[target.id] = target.isInstalled
         }
     }
 
@@ -337,6 +370,40 @@ private struct CLIRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(cli.displayName).font(.body.bold())
                 Text(isInstalled ? String(localized: "settings.hook_installed") : String(localized: "settings.hook_not_installed"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isInstalled {
+                Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
+                    .controlSize(.small)
+                Button(String(localized: "settings.reinstall_hook")) { onInstall() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button(String(localized: "settings.install_hook")) { onInstall() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.3))
+        .cornerRadius(8)
+    }
+}
+
+private struct IDEExtensionRow: View {
+    let target: IDEExtensionInstaller.IDETarget
+    let isInstalled: Bool
+    let onInstall: () -> Void
+    let onUninstall: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("💻").font(.title2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(target.name).font(.body.bold())
+                Text(isInstalled ? String(localized: "settings.ext_installed") : String(localized: "settings.ext_not_installed"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

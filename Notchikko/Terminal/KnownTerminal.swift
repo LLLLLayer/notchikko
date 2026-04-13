@@ -40,6 +40,8 @@ enum KnownTerminal: String, CaseIterable {
         case appleScriptTty
         /// AppleScript 按 cwd 匹配（Ghostty）
         case appleScriptCwd
+        /// HTTP 请求扩展定位终端 tab（VS Code, Cursor, Windsurf）
+        case ideExtension
         /// 通用：activate app + raise 窗口
         case generic
     }
@@ -48,6 +50,7 @@ enum KnownTerminal: String, CaseIterable {
         switch self {
         case .iterm2, .terminal: .appleScriptTty
         case .ghostty: .appleScriptCwd
+        case .vscode, .vscodeInsiders: .ideExtension
         default: .generic
         }
     }

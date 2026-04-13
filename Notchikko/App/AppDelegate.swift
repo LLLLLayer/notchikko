@@ -198,6 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         adapter.onTerminalTtyUpdate = { [weak self] sessionId, tty in
             self?.sessionManager.setTerminalTty(tty, for: sessionId)
         }
+        adapter.onPidChainUpdate = { [weak self] sessionId, chain in
+            self?.sessionManager.setPidChain(chain, for: sessionId)
+        }
         adapter.onPermissionModeUpdate = { [weak self] sessionId, mode in
             self?.sessionManager.setBypassMode(mode == "bypassPermissions", for: sessionId)
         }

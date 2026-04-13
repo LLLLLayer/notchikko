@@ -75,6 +75,12 @@ final class TerminalJumper {
                     let result = runAppleScript(script, label: "\(terminal.displayName) cwd")
                     if result?.contains("matched") == true { return }
                 }
+            case .ideExtension:
+                if let pids = session.pidChain, !pids.isEmpty {
+                    focusIDETerminalTab(pids: pids, app: app, label: terminal.displayName)
+                    return
+                }
+                // 无 PID 链则 fallthrough 到通用激活
             case .generic:
                 break  // fall through to generic activation
             }
@@ -85,6 +91,52 @@ final class TerminalJumper {
         let appRef = AXUIElementCreateApplication(app.processIdentifier)
         if let windows = axWindows(of: appRef), let first = windows.first {
             AXUIElementPerformAction(first, kAXRaiseAction as CFString)
+        }
+    }
+
+    // MARK: - IDE Extension (HTTP)
+
+    /// 通过 HTTP 请求 VS Code 扩展定位终端 tab
+    /// 扩展 terminal.show(false) 会自动把正确的窗口带到前台
+    /// 如果所有端口都没匹配到，fallback 到通用窗口激活
+    private func focusIDETerminalTab(pids: [Int], app: NSRunningApplication, label: String) {
+        let portBase = 23456
+        let portRange = 5
+        let body: [String: Any] = ["pids": pids]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else {
+            app.activate(options: .activateIgnoringOtherApps)
+            return
+        }
+
+        Task.detached {
+            // 广播到所有端口（每个 VS Code 窗口占一个端口），命中的窗口会自动聚焦
+            for port in portBase..<(portBase + portRange) {
+                guard let url = URL(string: "http://127.0.0.1:\(port)/focus-tab") else { continue }
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.httpBody = bodyData
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.timeoutInterval = 1
+
+                do {
+                    let (_, response) = try await URLSession.shared.data(for: request)
+                    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                        #if DEBUG
+                        print("[TerminalJumper] IDE extension focused terminal on port \(port) for \(label)")
+                        #endif
+                        return
+                    }
+                } catch {
+                    continue
+                }
+            }
+            // 所有端口都没匹配到（扩展未安装或终端不匹配）→ fallback 通用激活
+            await MainActor.run {
+                app.activate(options: .activateIgnoringOtherApps)
+            }
+            #if DEBUG
+            print("[TerminalJumper] IDE extension fallback: generic activate for \(label)")
+            #endif
         }
     }
 

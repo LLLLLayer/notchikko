@@ -19,13 +19,16 @@ KNOWN_TERMINALS = {
     'Code Helper', 'Cursor Helper',  # VSCode/Cursor 的终端进程
 }
 
-def detect_terminal_pid():
-    \"\"\"沿进程树向上查找终端应用的 PID\"\"\"
+def detect_terminal_info():
+    \"\"\"沿进程树向上查找终端应用的 PID，并收集中间 PID 链（用于 VS Code 终端定位）\"\"\"
+    chain = []
+    terminal_pid = None
     try:
         pid = os.getppid()
         for _ in range(15):
             if pid <= 1:
                 break
+            chain.append(pid)
             # 获取进程名和父 PID
             result = subprocess.run(
                 ['ps', '-o', 'ppid=,comm=', '-p', str(pid)],
@@ -41,11 +44,12 @@ def detect_terminal_pid():
             # 检查是否是已知终端
             for term in KNOWN_TERMINALS:
                 if term in proc_name:
-                    return pid
+                    terminal_pid = pid
+                    return terminal_pid, chain
             pid = int(ppid_str)
     except:
         pass
-    return None
+    return terminal_pid, chain
 
 try:
     input_data = json.load(sys.stdin)
@@ -53,7 +57,7 @@ except:
     sys.exit(0)
 
 source = '$SOURCE'
-terminal_pid = detect_terminal_pid()
+terminal_pid, pid_chain = detect_terminal_info()
 
 # ============================================================
 # Trae CLI (Coco) 适配
@@ -99,6 +103,8 @@ if source == 'trae-cli':
         output['prompt'] = prompt[:200]
     if terminal_pid:
         output['terminal_pid'] = terminal_pid
+    if pid_chain:
+        output['pid_chain'] = pid_chain
     try:
         tty = os.ttyname(0)
         if tty:
@@ -165,6 +171,8 @@ if prompt_text:
     output['prompt'] = prompt_text[:200]
 if terminal_pid:
     output['terminal_pid'] = terminal_pid
+if pid_chain:
+    output['pid_chain'] = pid_chain
 # 获取当前 tty（用于 iTerm2 多 tab 定位）
 try:
     tty = os.ttyname(0)
