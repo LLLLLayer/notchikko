@@ -82,15 +82,20 @@ final class SessionManager {
 
     // MARK: - 当前活跃 session
 
-    /// 当前展示的 session（pinned 优先，否则最新活跃）
+    /// 当前展示的 session（pinned 优先 → 正在工作的 → 最近活跃的）
     var activeSessionId: String? {
         if let pinned = pinnedSessionId, sessions[pinned] != nil,
            sessions[pinned]?.phase != .ended {
             return pinned
         }
-        return sessions.values
-            .filter { $0.phase != .ended }
-            .max(by: { $0.lastEvent < $1.lastEvent })?.id
+        let alive = sessions.values.filter { $0.phase != .ended }
+        // 优先选正在工作的 session（processing / runningTool / compacting）
+        if let working = alive.filter({ $0.phase != .waitingForInput })
+            .max(by: { $0.lastEvent < $1.lastEvent }) {
+            return working.id
+        }
+        // 都在等待输入则选最近活跃的
+        return alive.max(by: { $0.lastEvent < $1.lastEvent })?.id
     }
 
     /// 活跃 session 列表（供右键菜单用，按最近活跃排序）
@@ -132,6 +137,8 @@ final class SessionManager {
 
         switch event {
         case .sessionStart(let sid, let cwd, let source, let terminalPid, let pidChain):
+            // 记住创建前是否有正在工作的 session
+            let hadWorkingSession = sessions.values.contains { $0.phase != .ended && $0.phase != .waitingForInput }
             sessions[sid] = SessionInfo(
                 id: sid, cwd: cwd, source: source,
                 lastEvent: Date(), phase: .waitingForInput,
@@ -139,7 +146,8 @@ final class SessionManager {
             )
             SoundManager.shared.play(for: "session-start")
             emitSessionDanmaku(sessions[sid]!)
-            if eventSessionId == activeSessionId || activeSessionId == nil {
+            // 只在没有其他工作中 session 时切到 idle，避免打断正在工作的 session
+            if !hadWorkingSession {
                 resetTimers()
                 transition(to: .idle)
             }
