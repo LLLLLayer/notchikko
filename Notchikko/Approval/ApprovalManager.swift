@@ -97,7 +97,10 @@ final class ApprovalManager {
         )
 
         pendingApprovals[request.id] = request
-        startHideTimer(for: request.id)
+        // 审批卡和 AskUserQuestion 卡不自动隐藏（需要用户操作）
+        if request.isNotification {
+            startHideTimer(for: request.id)
+        }
         if !request.isNotification {
             startStaleTimer(for: request.id)
         }

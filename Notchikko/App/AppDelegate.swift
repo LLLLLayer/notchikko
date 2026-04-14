@@ -217,8 +217,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
             guard let self else { return }
-            // 收到新审批请求 → 先清理该 session 的旧卡片（通知卡片等）
-            approval.onSessionEvent(sessionId: hookEvent.sessionId)
+            // 收到新审批请求 → 只清理该 session 的通知卡片，保留其他审批卡片
+            let notifCards = approval.pendingApprovals.values.filter {
+                $0.sessionId == hookEvent.sessionId && $0.isNotification
+            }
+            for card in notifCards {
+                approval.closeCard(requestId: card.id)
+            }
             let session = self.sessionManager.sessions[hookEvent.sessionId]
 
             // bypass 模式 或 审批卡片关闭 → 直接放行，不弹卡片
