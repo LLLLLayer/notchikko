@@ -1,6 +1,8 @@
 ---
 name: theme-guide
 description: "Notchikko theme and SVG system reference — how Clawd's visual states are resolved and rendered. MUST use this skill when: adding/modifying SVG animations, creating or editing themes, changing ThemeProvider logic, modifying NotchikkoView rendering, adjusting NotchikkoState visual properties (svgName, revealAmount), working with files in Theme/, Notchikko/NotchikkoView.swift, Notchikko/NotchikkoState.swift, Views/NotchContentView.swift, or Resources/themes/. Also use when the user mentions SVG, animation, theme, pixel art, eye tracking, or visual states."
+allowed-tools: Read Grep Glob Edit Write
+paths: "Notchikko/Theme/**,Notchikko/Notchikko/NotchikkoState.swift,Notchikko/Notchikko/NotchikkoView.swift,Notchikko/Views/NotchContentView.swift,Notchikko/Resources/themes/**"
 ---
 
 # Notchikko Theme & SVG System

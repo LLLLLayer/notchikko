@@ -1,6 +1,8 @@
 ---
 name: hook-guide
 description: "Notchikko hook system reference — the full event pipeline from CLI hook to Clawd animation. MUST use this skill when: adding/modifying hook events, changing the hook script (notchikko-hook.sh), editing ClaudeCodeAdapter event conversion, updating SessionManager event handling, adding approval tools, adding new CLI integrations, or touching any file in IPC/, Agent/, or Session/. Also use when the user mentions hooks, events, socket, approval flow, or agent adapters."
+allowed-tools: Read Grep Glob Edit Write Bash
+paths: "Notchikko/IPC/**,Notchikko/Agent/**,Notchikko/Session/**,Notchikko/Approval/**,Notchikko/Resources/notchikko-hook.sh"
 ---
 
 # Notchikko Hook System

@@ -6,6 +6,8 @@ description: |
   design pixel art animations, or work with the Notchikko hook state system.
   Covers: body templates (front/side), CSS keyframe animations, state-folder mapping,
   color palette, and common pitfalls.
+allowed-tools: Read Grep Glob Edit Write
+paths: "Notchikko/Resources/themes/clawd/**"
 ---
 
 # Clawd SVG Creator
