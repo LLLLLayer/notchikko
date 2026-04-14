@@ -150,22 +150,17 @@ final class ApprovalManager {
     /// 始终允许：放行当前请求 + 开 bypassPermissions（会话级）
     func alwaysAllowTool(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
-        let sessionId = req.sessionId
+        Log("alwaysAllow: sid=\(req.sessionId.prefix(8))", tag: "Approval")
+        autoApprovedSessions.insert(req.sessionId)
 
-        Log("alwaysAllow: sid=\(sessionId.prefix(8))", tag: "Approval")
-        // app 侧标记：bypass flag 生效前的过渡期也能自动放行
-        autoApprovedSessions.insert(sessionId)
-        // 写 bypass flag → hook 下次 PermissionRequest 时切 Claude Code 到 bypassPermissions
-        writeBypassFlag(sessionId: sessionId)
-
-        // 放行当前请求
+        // 直接在本次响应里带 bypass=true，hook 输出 setMode: bypassPermissions
         let response: [String: Any] = [
             "request_id": req.requestId,
             "decision": "allow",
+            "bypass": true,
         ]
         sendResponse(response, for: req)
         dismiss(requestId: requestId)
-
         SoundManager.shared.play(for: "nod")
     }
 
@@ -183,7 +178,7 @@ final class ApprovalManager {
         SoundManager.shared.play(for: "nod")
     }
 
-    /// 自动批准：放行所有待审批 + 写 bypass 标记文件，hook 下次 PermissionRequest 时切换 Claude Code 到 bypassPermissions
+    /// 自动批准：放行所有待审批 + 立即开 bypassPermissions（会话级）
     func autoApproveSession(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
         let sessionId = req.sessionId
@@ -191,18 +186,20 @@ final class ApprovalManager {
         Log("autoApproveSession: sid=\(sessionId.prefix(8))", tag: "Approval")
         autoApprovedSessions.insert(sessionId)
 
-        // 写 bypass 标记文件，hook 脚本检测后输出 setMode: bypassPermissions
-        writeBypassFlag(sessionId: sessionId)
-
-        // 放行该 session 的所有待审批请求
+        // 放行该 session 的所有待审批请求，第一个带 bypass=true 切模式
         let sessionRequests = pendingApprovals.values.filter {
             $0.sessionId == sessionId && !$0.isNotification
         }
+        var bypassSent = false
         for r in sessionRequests {
-            let response: [String: Any] = [
+            var response: [String: Any] = [
                 "request_id": r.requestId,
                 "decision": "allow",
             ]
+            if !bypassSent {
+                response["bypass"] = true
+                bypassSent = true
+            }
             sendResponse(response, for: r)
         }
 
@@ -219,17 +216,6 @@ final class ApprovalManager {
         onAllCardsDismissed?()
     }
 
-    // MARK: - Bypass Flag
-
-    /// 写 bypass 标记文件供 hook 脚本读取（~/.notchikko/bypass-flags/{sessionId}）
-    private func writeBypassFlag(sessionId: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notchikko/bypass-flags")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let flagPath = dir.appendingPathComponent(sessionId).path
-        FileManager.default.createFile(atPath: flagPath, contents: Data())
-    }
-
     // MARK: - 卡片显示控制
 
     func onMouseEnter(requestId: String) {
@@ -244,14 +230,9 @@ final class ApprovalManager {
         startHideTimer(for: requestId)
     }
 
-    /// Session 结束时清理会话级状态（auto-approve 列表 + bypass flag 文件）
+    /// Session 结束时清理会话级状态
     func cleanupSession(_ sessionId: String) {
         autoApprovedSessions.remove(sessionId)
-        // 清理可能残留的 bypass flag 文件
-        let flagDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notchikko/bypass-flags")
-        let flagPath = flagDir.appendingPathComponent(sessionId).path
-        try? FileManager.default.removeItem(atPath: flagPath)
     }
 
     /// 当收到同一 session 的后续事件时，说明审批已在 CLI 侧完成，清理该 session 的卡片

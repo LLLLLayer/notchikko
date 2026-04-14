@@ -264,46 +264,6 @@ tool_name = input_data.get('tool_name', '')
 tool_input = input_data.get('tool_input', {})
 bypass = (permission_mode == 'bypassPermissions')
 
-# 检查 bypass 标记文件（用户在审批卡片点了"自动批准"）
-session_id = input_data.get('session_id', '')
-bypass_flag_dir = os.path.expanduser('~/.notchikko/bypass-flags')
-bypass_flag_path = os.path.join(bypass_flag_dir, session_id) if session_id else ''
-
-# 原子操作：尝试删除即检测，避免 TOCTOU 竞态
-has_bypass_flag = False
-if bypass_flag_path and hook_event == 'PermissionRequest':
-    try:
-        os.unlink(bypass_flag_path)
-        has_bypass_flag = True
-    except FileNotFoundError:
-        pass
-    except Exception:
-        pass
-
-# PermissionRequest + bypass 标记 → 输出 setMode: bypassPermissions，让 Claude Code 切换模式
-if has_bypass_flag:
-    print(json.dumps({'hookSpecificOutput': {
-        'hookEventName': 'PermissionRequest',
-        'decision': {
-            'behavior': 'allow',
-            'updatedPermissions': [{
-                'type': 'setMode',
-                'mode': 'bypassPermissions',
-                'destination': 'session',
-            }],
-        },
-    }}))
-    # 仍然发送事件给 app（非阻塞），让 app 知道模式已切换
-    try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(2)
-        sock.connect('$SOCKET_PATH')
-        sock.sendall(json.dumps(output).encode())
-        sock.close()
-    except:
-        pass
-    sys.exit(0)
-
 # 读取 app 的审批开关
 approval_enabled = False
 try:
@@ -364,9 +324,17 @@ try:
                     else:
                         # PermissionRequest 审批
                         decision = result.get('decision', 'allow')
+                        decision_obj = {'behavior': decision}
+                        # 自动批准/始终允许：同时切 bypassPermissions
+                        if result.get('bypass'):
+                            decision_obj['updatedPermissions'] = [{
+                                'type': 'setMode',
+                                'mode': 'bypassPermissions',
+                                'destination': 'session',
+                            }]
                         print(json.dumps({'hookSpecificOutput': {
                             'hookEventName': 'PermissionRequest',
-                            'decision': {'behavior': decision},
+                            'decision': decision_obj,
                         }}))
                     break
                 except json.JSONDecodeError:
