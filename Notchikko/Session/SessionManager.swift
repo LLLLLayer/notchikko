@@ -430,6 +430,7 @@ final class SessionManager {
     private func resetTimers() {
         idleTimer?.cancel()
         sleepTimer?.cancel()
+        returnTimer?.cancel()
 
         idleTimer = Task {
             try? await Task.sleep(for: .seconds(60))
