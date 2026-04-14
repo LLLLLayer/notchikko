@@ -219,7 +219,17 @@ final class SocketServer {
     private func monitorDisconnect(fd: Int32, requestId: String) {
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: clientQueue)
         source.setEventHandler { [weak self] in
-            // peek 检测 EOF：recv 返回 0 = 远端关闭
+            guard let self else { return }
+
+            // 先检查 fd 是否仍归我们管（respond() 可能已 close 了它）
+            self.pendingLock.lock()
+            guard self.pendingResponses[requestId] != nil else {
+                self.pendingLock.unlock()
+                return
+            }
+            self.pendingLock.unlock()
+
+            // fd 仍存活，安全 peek 检测 EOF
             var buf: UInt8 = 0
             let n = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT)
             guard n == 0 else { return }
@@ -227,7 +237,6 @@ final class SocketServer {
             Log("Hook disconnected: \(requestId.prefix(8))", tag: "Socket")
             source.cancel()
 
-            guard let self else { return }
             self.pendingLock.lock()
             guard self.pendingResponses.removeValue(forKey: requestId) != nil else {
                 self.pendingLock.unlock()

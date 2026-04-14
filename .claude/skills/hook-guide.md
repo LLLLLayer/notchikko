@@ -182,13 +182,14 @@ PermissionRequest event fires
   ▼ ApprovalManager sends response via SocketServer.respond()
   │ approve:         { decision: "allow" }
   │ deny:            { decision: "deny", reason: "..." }
-  │ alwaysAllow:     { decision: "allow", bypass: true }
+  │ alwaysAllow:     { decision: "allow", allow_tool: "Write" }
   │ autoApprove:     { decision: "allow", bypass: true } (+ approve all pending)
   │ answerQuestion:  { answers: { "question text": "selected option" } }
   │
   ▼ Hook script reads response, outputs hookSpecificOutput
   │ approval:     { hookEventName: "PermissionRequest", decision: { behavior: "allow|deny" } }
-  │ + bypass:     { ..., decision: { behavior: "allow", updatedPermissions: [setMode: bypassPermissions] } }
+  │ + alwaysAllow: { ..., decision: { behavior: "allow", updatedPermissions: [addRules: {toolName, ruleContent:"*"}, destination: "localSettings"] } }
+  │ + autoApprove: { ..., decision: { behavior: "allow", updatedPermissions: [setMode: bypassPermissions, destination: "session"] } }
   │ askUser:      { ..., decision: { behavior: "allow", updatedInput: { questions, answers } } }
   │
   ▼ Claude Code receives, continues or stops

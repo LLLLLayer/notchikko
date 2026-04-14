@@ -293,12 +293,12 @@ if needs_blocking:
 
 try:
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.settimeout(2 if not needs_blocking else 300)
+    sock.settimeout(2 if not needs_blocking else 3600)
     sock.connect('$SOCKET_PATH')
     sock.sendall(json.dumps(output).encode())
 
     if needs_blocking:
-        sock.settimeout(300)
+        sock.settimeout(3600)
         response_data = b''
         while True:
             try:
