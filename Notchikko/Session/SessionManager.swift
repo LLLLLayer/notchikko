@@ -258,8 +258,7 @@ final class SessionManager {
             let isBypass = sessions[sid]?.isBypassMode ?? false
             let approvalOn = PreferencesStore.shared.preferences.approvalCardEnabled
             // 只有需要用户操作的事件才更新 session 和切状态
-            // AskUserQuestion 交互由 PermissionRequest 阻塞路径处理，不经过事件流
-            let needsUserAction = (msg == "Elicitation"
+            let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion"
                 || (msg == "PermissionRequest" && !isBypass && approvalOn))
             guard needsUserAction else { break }
             sessions[sid]?.lastEvent = Date()

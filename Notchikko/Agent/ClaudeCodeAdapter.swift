@@ -111,8 +111,12 @@ final class ClaudeCodeAdapter: AgentBridge {
         case "UserPromptSubmit":
             return .prompt(sessionId: hook.sessionId, text: hook.prompt)
         case "PreToolUse":
-            // PreToolUse 纯状态追踪，不做特殊处理
-            // AskUserQuestion 的交互由 PermissionRequest 路径处理
+            // AskUserQuestion 可能只走 PreToolUse（不走 PermissionRequest）
+            // 此时弹非阻塞通知卡提醒用户回终端操作
+            if hook.tool == "AskUserQuestion" {
+                let detail = Self.extractAskUserDetail(from: hook.toolInput)
+                return .notification(sessionId: hook.sessionId, message: "AskUserQuestion", detail: detail)
+            }
             return .toolUse(sessionId: hook.sessionId, tool: hook.tool ?? "", phase: .pre)
         case "PostToolUse":
             let success = hook.status != "error"
