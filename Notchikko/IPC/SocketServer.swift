@@ -10,11 +10,15 @@ final class SocketServer {
 
     /// 待响应的连接 (request_id → client fd)
     private var pendingResponses: [String: Int32] = [:]
+    /// 监控远端断开的 dispatch source (request_id → source)
+    private var pendingMonitors: [String: DispatchSourceRead] = [:]
     private let pendingLock = NSLock()
 
     var onEvent: ((HookEvent) -> Void)?
     /// 需要审批的事件回调（包含 request_id）
     var onApprovalRequest: ((HookEvent) -> Void)?
+    /// Hook 进程断开回调（用户按 Esc 等场景，自动清理审批卡片）
+    var onApprovalDisconnect: ((String) -> Void)?
 
     func start() {
         serverQueue.async { [weak self] in
@@ -33,11 +37,11 @@ final class SocketServer {
                 self.serverSocket = -1
             }
         }
-        // 关闭所有待响应连接
+        // 关闭所有待响应连接和监控源
         pendingLock.lock()
-        for (_, fd) in pendingResponses {
-            close(fd)
-        }
+        for (_, source) in pendingMonitors { source.cancel() }
+        pendingMonitors.removeAll()
+        for (_, fd) in pendingResponses { close(fd) }
         pendingResponses.removeAll()
         pendingLock.unlock()
         unlink(Self.socketPath)
@@ -50,6 +54,7 @@ final class SocketServer {
             pendingLock.unlock()
             return
         }
+        pendingMonitors.removeValue(forKey: requestId)?.cancel()
         pendingLock.unlock()
         clientQueue.async { close(fd) }
     }
@@ -61,6 +66,7 @@ final class SocketServer {
             pendingLock.unlock()
             return
         }
+        pendingMonitors.removeValue(forKey: requestId)?.cancel()
         pendingLock.unlock()
 
         // fd 已从 pendingResponses 移除，stop() 不会再 close 它
@@ -193,6 +199,9 @@ final class SocketServer {
             pendingResponses[requestId] = clientSocket
             pendingLock.unlock()
 
+            // 监控远端断开（用户按 Esc 等场景 → hook 进程被杀 → fd EOF）
+            monitorDisconnect(fd: clientSocket, requestId: requestId)
+
             DispatchQueue.main.async { [weak self] in
                 self?.onApprovalRequest?(event)
             }
@@ -204,6 +213,37 @@ final class SocketServer {
                 self?.onEvent?(event)
             }
         }
+    }
+
+    /// 用 DispatchSourceRead 监控 fd，远端关闭时自动清理
+    private func monitorDisconnect(fd: Int32, requestId: String) {
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: clientQueue)
+        source.setEventHandler { [weak self] in
+            // peek 检测 EOF：recv 返回 0 = 远端关闭
+            var buf: UInt8 = 0
+            let n = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT)
+            guard n == 0 else { return }
+
+            Log("Hook disconnected: \(requestId.prefix(8))", tag: "Socket")
+            source.cancel()
+
+            guard let self else { return }
+            self.pendingLock.lock()
+            guard self.pendingResponses.removeValue(forKey: requestId) != nil else {
+                self.pendingLock.unlock()
+                return
+            }
+            self.pendingMonitors.removeValue(forKey: requestId)
+            self.pendingLock.unlock()
+
+            close(fd)
+            DispatchQueue.main.async { self.onApprovalDisconnect?(requestId) }
+        }
+        source.resume()
+
+        pendingLock.lock()
+        pendingMonitors[requestId] = source
+        pendingLock.unlock()
     }
 
     private func isSocketActive(_ path: String) -> Bool {

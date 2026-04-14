@@ -278,6 +278,13 @@ final class ApprovalManager {
     // MARK: - Private
 
     /// 关闭指定卡片（关闭按钮 = deny 审批卡，直接关闭通知卡）
+    /// Hook 断开时直接关闭卡片（不发送响应 — hook 已死）
+    func dismissOnDisconnect(requestId: String) {
+        guard pendingApprovals[requestId] != nil else { return }
+        Log("dismissOnDisconnect: \(requestId.prefix(8))", tag: "Approval")
+        dismiss(requestId: requestId)
+    }
+
     func closeCard(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
         if req.isNotification {

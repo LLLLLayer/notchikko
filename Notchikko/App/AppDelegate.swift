@@ -242,6 +242,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.sessionManager.endApproval()
         }
 
+        // Hook 进程断开 → 自动关闭对应审批卡片（用户按 Esc 等场景）
+        adapter.socketServerRef.onApprovalDisconnect = { [weak self] requestId in
+            Log("Hook disconnected, dismissing card: \(requestId.prefix(8))", tag: "App")
+            self?.approvalManager?.dismissOnDisconnect(requestId: requestId)
+        }
+
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
             guard let self else { return }
             // 收到新审批请求 → 只清理该 session 的通知卡片，保留其他审批卡片
@@ -425,12 +431,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
-        // 卡片与宠物重叠，从宠物背后探出
+        // 气泡尾巴从宠物底部探出，微量重叠确保视觉连接
         let petSize = 80 * PreferencesStore.shared.preferences.petScale
         let stackIndex = min(CGFloat(approvalPanels.count), 5)
         let cardX = screen.frame.midX - cardWidth / 2
         let petBottom = screen.frame.maxY - geo.notchSize.height - petSize
-        let overlap: CGFloat = 15
+        let overlap: CGFloat = 40
         let finalY = petBottom - cardHeight + overlap - stackIndex * Self.cardStackOffset
         let finalFrame = NSRect(x: cardX, y: finalY, width: cardWidth, height: cardHeight)
 
@@ -457,6 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wrapper.onMouseEnter = { [weak self] in
             self?.approvalManager?.onMouseEnter(requestId: reqId)
             self?.approvalPanels[reqId]?.alphaValue = 1.0
+            self?.approvalPanels[reqId]?.contentView?.layer?.transform = CATransform3DIdentity
         }
         wrapper.onMouseExit = { [weak self] in
             self?.approvalManager?.onMouseExit(requestId: reqId)
@@ -471,17 +478,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hostingView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
         ])
 
+        // 启用 layer 以支持缩放动画
+        wrapper.wantsLayer = true
+        wrapper.layer?.transform = CATransform3DMakeScale(0.88, 0.88, 1.0)
+
         panel.orderFrontRegardless()
         approvalPanels[reqId] = panel
         cardFinalFrames[reqId] = finalFrame
 
-        // 滑入 + 淡入：从宠物背后探出
+        // 滑入 + 淡入 + 缩放：从宠物背后探出
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.3
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(finalFrame, display: true)
             panel.animator().alphaValue = 1.0
         })
+        // 由小变大
+        let scaleIn = CABasicAnimation(keyPath: "transform")
+        scaleIn.fromValue = CATransform3DMakeScale(0.88, 0.88, 1.0)
+        scaleIn.toValue = CATransform3DIdentity
+        scaleIn.duration = 0.3
+        scaleIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        wrapper.layer?.add(scaleIn, forKey: "scaleIn")
+        wrapper.layer?.transform = CATransform3DIdentity
 
         // 监听 isVisible 变化 → 滑动+淡入淡出
         let panelRef = panel
@@ -501,6 +520,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         panelRef.animator().setFrame(targetFrame, display: true)
                         panelRef.animator().alphaValue = visible ? 1.0 : 0.0
                     }, completionHandler: {})
+                    // 显示时放大，隐藏时缩小
+                    let dur = visible ? 0.25 : 0.2
+                    let fromScale = visible ? CATransform3DMakeScale(0.88, 0.88, 1.0) : CATransform3DIdentity
+                    let toScale = visible ? CATransform3DIdentity : CATransform3DMakeScale(0.88, 0.88, 1.0)
+                    let scaleAnim = CABasicAnimation(keyPath: "transform")
+                    scaleAnim.fromValue = fromScale
+                    scaleAnim.toValue = toScale
+                    scaleAnim.duration = dur
+                    scaleAnim.timingFunction = CAMediaTimingFunction(name: visible ? .easeOut : .easeIn)
+                    panelRef.contentView?.layer?.add(scaleAnim, forKey: "scaleToggle")
+                    panelRef.contentView?.layer?.transform = toScale
                 }
             }
         }
@@ -518,6 +548,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 panel.animator().setFrame(finalFrame, display: true)
                 panel.animator().alphaValue = 1.0
             })
+            // 恢复缩放
+            let scaleIn = CABasicAnimation(keyPath: "transform")
+            scaleIn.fromValue = CATransform3DMakeScale(0.88, 0.88, 1.0)
+            scaleIn.toValue = CATransform3DIdentity
+            scaleIn.duration = 0.25
+            scaleIn.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.contentView?.layer?.add(scaleIn, forKey: "scaleRestore")
+            panel.contentView?.layer?.transform = CATransform3DIdentity
         }
     }
 
@@ -530,6 +568,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var hiddenFrame = panel.frame
         hiddenFrame.origin.y = hideY
 
+        // 滑出 + 淡出 + 缩小
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.2
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
@@ -538,6 +577,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }, completionHandler: {
             panel.close()
         })
+        let scaleOut = CABasicAnimation(keyPath: "transform")
+        scaleOut.fromValue = CATransform3DIdentity
+        scaleOut.toValue = CATransform3DMakeScale(0.88, 0.88, 1.0)
+        scaleOut.duration = 0.2
+        scaleOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        panel.contentView?.layer?.add(scaleOut, forKey: "scaleOut")
+        panel.contentView?.layer?.transform = CATransform3DMakeScale(0.88, 0.88, 1.0)
     }
 
     /// 移除所有审批面板（Allow All 时）
