@@ -235,11 +235,14 @@ final class ApprovalManager {
         autoApprovedSessions.remove(sessionId)
     }
 
-    /// 当收到同一 session 的后续事件时，说明审批已在 CLI 侧完成，清理该 session 的卡片
+    /// 收到后续事件 → 只清理通知卡片，保留阻塞式审批/AskUser 卡片
+    /// 阻塞式卡片由用户操作或 staleTimer 清理
     func onSessionEvent(sessionId: String) {
-        let toRemove = pendingApprovals.values.filter { $0.sessionId == sessionId }.map { $0.id }
+        let toRemove = pendingApprovals.values.filter {
+            $0.sessionId == sessionId && $0.isNotification
+        }.map { $0.id }
         if !toRemove.isEmpty {
-            Log("onSessionEvent: sid=\(sessionId.prefix(8)), clearing \(toRemove.count) card(s)", tag: "Approval")
+            Log("onSessionEvent: sid=\(sessionId.prefix(8)), clearing \(toRemove.count) notification card(s)", tag: "Approval")
         }
         for id in toRemove {
             dismiss(requestId: id)
@@ -272,12 +275,14 @@ final class ApprovalManager {
         staleTimers.removeValue(forKey: requestId)
     }
 
-    /// Hook 脚本有 300s 超时，超时后 hook 侧自动放行。
-    /// App 侧也需要在同样时间后清理审批状态，避免卡片常驻。
+    /// Hook PermissionRequest timeout = 86400s (24h)。
+    /// App 侧兜底清理，防止卡片永驻。
+    private static let staleTimeout: TimeInterval = 86400
+
     private func startStaleTimer(for requestId: String) {
         staleTimers[requestId]?.cancel()
         staleTimers[requestId] = Task {
-            try? await Task.sleep(for: .seconds(300))
+            try? await Task.sleep(for: .seconds(Self.staleTimeout))
             guard !Task.isCancelled else { return }
             // 超时：hook 侧已自动放行并关闭连接，app 侧也关闭对应 fd 防止泄漏
             if let req = pendingApprovals[requestId], !req.requestId.isEmpty {

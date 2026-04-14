@@ -267,7 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)
 
-                // 收到后续事件 → 说明 CLI 侧已处理完审批，自动关闭该 session 的卡片
+                // 收到后续事件 → 清理该 session 的通知卡片（保留阻塞式审批卡）
                 let sid: String = switch event {
                 case .sessionStart(let s, _, _, _, _): s
                 case .sessionEnd(let s): s
@@ -432,7 +432,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if visible != lastVisible {
                     lastVisible = visible
                     NSAnimationContext.runAnimationGroup({ ctx in
-                        ctx.duration = 0.25
+                        ctx.duration = visible ? 0.15 : 0.25
                         panelRef.animator().alphaValue = visible ? 1.0 : 0.0
                     }, completionHandler: {})
                 }
