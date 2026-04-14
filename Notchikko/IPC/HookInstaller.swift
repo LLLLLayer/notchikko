@@ -162,8 +162,9 @@ final class HookInstaller {
 
         var hooks = json["hooks"] as? [String: Any] ?? [:]
 
-        // Claude Code 嵌套格式: { "hooks": [{ "type": "command", "command": "..." }] }
-        let hookEntry: [String: Any] = [
+        // Claude Code 嵌套格式: { "matcher": "*", "hooks": [{ "type": "command", "command": "...", "timeout": N }] }
+        let defaultHookEntry: [String: Any] = [
+            "matcher": "*",
             "hooks": [
                 [
                     "type": "command",
@@ -172,7 +173,20 @@ final class HookInstaller {
             ]
         ]
 
+        // PermissionRequest 需要长超时（阻塞等用户操作）
+        let permissionHookEntry: [String: Any] = [
+            "matcher": "*",
+            "hooks": [
+                [
+                    "type": "command",
+                    "command": "\(hookScriptPath) \(cli.name)",
+                    "timeout": 86400,  // 24h，与 Vibe Island 一致
+                ] as [String: Any]
+            ]
+        ]
+
         for event in cli.hookEvents {
+            let hookEntry = (event == "PermissionRequest") ? permissionHookEntry : defaultHookEntry
             var entries = hooks[event] as? [[String: Any]] ?? []
             let alreadyExists = entries.contains { entry in
                 let jsonStr = (try? JSONSerialization.data(withJSONObject: entry)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
