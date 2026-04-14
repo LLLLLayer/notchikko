@@ -290,11 +290,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // 1. 纯 Notification（空 msg）和未知事件 → 不弹
                     // 2. PermissionRequest + bypass on → 不弹
                     // 3. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
-                    // 4. Elicitation / AskUserQuestion → 始终弹（不受 approvalCardEnabled 影响）
+                    // 4. Elicitation → 始终弹（不受 approvalCardEnabled 影响）
                     // 5. PermissionRequest (non-bypass) → 受 approvalCardEnabled 控制
+                    // 注：AskUserQuestion 的交互由 PermissionRequest 阻塞路径（onApprovalRequest）处理
                     let needsCard: Bool = {
-                        // 只有这三种需要用户操作
-                        guard msg == "Elicitation" || msg == "AskUserQuestion"
+                        guard msg == "Elicitation"
                                 || msg == "PermissionRequest" else { return false }
                         // bypass 模式下 PermissionRequest 不弹
                         if isBypass && msg == "PermissionRequest" { return false }
