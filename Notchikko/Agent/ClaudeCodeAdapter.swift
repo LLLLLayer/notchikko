@@ -10,6 +10,14 @@ final class ClaudeCodeAdapter: AgentBridge {
     /// 保护 knownSessions / subagentDepth 的并发访问（onEvent 在并发队列上调用）
     private let stateLock = NSLock()
 
+    /// 指定 session 是否正在运行 subagent（depth > 0）
+    func isInSubagent(sessionId: String) -> Bool {
+        stateLock.lock()
+        let depth = subagentDepth[sessionId] ?? 0
+        stateLock.unlock()
+        return depth > 0
+    }
+
     /// 终端 PID 更新回调
     var onTerminalPidUpdate: ((String, Int) -> Void)?
     /// 终端 tty 更新回调
@@ -59,7 +67,7 @@ final class ClaudeCodeAdapter: AgentBridge {
                 default:
                     let depth = self.subagentDepth[sid] ?? 0
                     if depth > 0 {
-                        let passthrough = ["Elicitation", "PermissionRequest", "AskUserQuestion"]
+                        let passthrough = ["Elicitation", "AskUserQuestion"]
                         if !passthrough.contains(hookEvent.event) {
                             Log("Suppressed subagent event: \(hookEvent.event) (depth=\(depth))", tag: "Adapter")
                             shouldEmitEvent = false

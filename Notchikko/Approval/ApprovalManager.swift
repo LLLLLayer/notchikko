@@ -28,6 +28,8 @@ final class ApprovalManager {
         let terminalName: String
         let timestamp: Date
         var isVisible: Bool = true
+        /// 来自 subagent 的请求（标注用，不影响审批流程）
+        var isSubagent: Bool = false
 
         /// AskUserQuestion 的结构化问题数据
         var questions: [Question] = []
@@ -49,7 +51,7 @@ final class ApprovalManager {
 
     // MARK: - 请求处理
 
-    func handleApprovalRequest(from hookEvent: HookEvent, session: SessionManager.SessionInfo?) {
+    func handleApprovalRequest(from hookEvent: HookEvent, session: SessionManager.SessionInfo?, isSubagent: Bool = false) {
         let requestId = hookEvent.requestId ?? ""
         Log("handleApproval: tool=\(hookEvent.tool ?? "?"), sid=\(hookEvent.sessionId.prefix(8)), reqId=\(requestId.prefix(8))", tag: "Approval")
 
@@ -93,6 +95,7 @@ final class ApprovalManager {
             cwdName: session?.cwdName ?? "",
             terminalName: session?.matchedTerminal?.appName ?? "",
             timestamp: Date(),
+            isSubagent: isSubagent,
             questions: questions
         )
 
