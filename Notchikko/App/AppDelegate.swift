@@ -376,10 +376,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
-        // 每张新卡片向右下偏移，最多偏移 5 层防止卡片飘出屏幕
+        // 卡片居中在宠物正下方，多张卡片向下堆叠
         let stackIndex = min(CGFloat(approvalPanels.count), 5)
-        let cardX = screen.frame.midX + geo.notchSize.width / 2 + 8 + stackIndex * Self.cardStackOffset
-        let cardY = screen.frame.maxY - geo.notchSize.height - cardHeight - 4 - stackIndex * Self.cardStackOffset
+        let cardX = screen.frame.midX - cardWidth / 2
+        let petBottom = screen.frame.maxY - geo.notchSize.height - (80 * PreferencesStore.shared.preferences.petScale)
+        let cardY = petBottom - cardHeight - 8 - stackIndex * Self.cardStackOffset
 
         let panel = NSPanel(
             contentRect: NSRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight),
