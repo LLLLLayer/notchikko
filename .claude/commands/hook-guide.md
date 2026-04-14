@@ -5,51 +5,200 @@ description: "Notchikko hook system reference — the full event pipeline from C
 
 # Notchikko Hook System
 
-This skill contains the complete reference for the event-driven pipeline that connects CLI agent hooks to Clawd's animation states.
-
 ## Pipeline
 
 ```
-CLI (Claude Code / Codex)
-  │  hook event
+CLI (Claude Code / Codex / Gemini CLI / Trae CLI)
+  │  hook event (stdin JSON)
   ▼
 notchikko-hook.sh [source]        ← Resources/notchikko-hook.sh
-  │  Python3 inline: reads stdin JSON, maps event, sends to socket
+  │  Bash wrapper → inline Python3 (python3 -c "...")
+  │  ⚠️ NEVER insert code with double quotes — breaks the bash wrapper
+  │  Normalizes all CLI formats → unified Notchikko JSON
+  │  Blocks on PermissionRequest only (not PreToolUse)
   ▼
 Unix Socket /tmp/notchikko.sock   ← IPC/SocketServer.swift
-  │
+  │  with request_id → onApprovalRequest (blocking, fd kept open)
+  │  without request_id → onEvent (fire-and-forget, fd closed)
   ▼
 ClaudeCodeAdapter                 ← Agent/ClaudeCodeAdapter.swift
   │  HookEvent → AgentEvent (+ synthetic sessionStart injection)
   ▼
 SessionManager                    ← Session/SessionManager.swift
-  │  AgentEvent → NotchikkoState (priority-based transitions)
+  │  AgentEvent → NotchikkoState
   ▼
 ThemeProvider → NotchikkoView     ← SVG rendered in WKWebView
 ```
 
-## All 16 Hook Events
+---
 
-| Hook Event | status_map value | AgentEvent | NotchikkoState | SVG Dir |
-|---|---|---|---|---|
-| `SessionStart` | `waiting_for_input` | `.sessionStart` | `idle` | `idle/` |
-| `SessionEnd` | `ended` | `.sessionEnd` | `sleeping` | `sleeping/` |
-| `UserPromptSubmit` | `processing` | `.prompt` | `thinking` | `thinking/` |
-| `PreToolUse` | `running_tool` | `.toolUse(.pre)` | by tool* | by tool* |
-| `PostToolUse` | `processing` | `.toolUse(.post(true))` | `thinking` | `thinking/` |
-| `PostToolUseFailure` | `error` | `.toolUse(.post(false))` | `error` | `error/` |
-| `PreCompact` | `compacting` | `.compact` | `sweeping` | `sweeping/` |
-| `PostCompact` | `processing` | `.prompt` | `thinking` | `thinking/` |
-| `Stop` | `waiting_for_input` | `.stop` | `happy` | `happy/` |
-| `StopFailure` | `error` | `.error` | `error` | `error/` |
-| `SubagentStart` | `subagent_start` | `.prompt` | `thinking` | `thinking/` |
-| `SubagentStop` | `subagent_stop` | `.stop` | `happy` | `happy/` |
-| `Notification` | `notification` | `.notification` | (unchanged) | - |
-| `Elicitation` | `elicitation` | `.notification` | (unchanged) | - |
-| `WorktreeCreate` | `worktree_create` | `.prompt` | `thinking` | `thinking/` |
-| `PermissionRequest` | `permission_request` | `.notification` | (unchanged) | - |
+## Supported CLI Agents
 
-*PreToolUse maps by tool name — see next section.
+### Claude Code 🤖
+- **Config**: `~/.claude/settings.json`
+- **Format**: JSON `{ "hooks": { "EventName": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "...", "timeout": N }] }] } }`
+- **Events**: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, PreCompact, PostCompact, Stop, StopFailure, SubagentStart, SubagentStop, Notification, Elicitation, WorktreeCreate, PermissionRequest
+- **Stdin key**: `hook_event_name`
+- **Blocking events**: PermissionRequest (for approval + AskUserQuestion)
+- **Approval response**: `{ "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": { "behavior": "allow|deny" } } }`
+- **AskUserQuestion response**: `{ "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": { "behavior": "allow", "updatedInput": { "questions": [...], "answers": {"question": "selected_option"} } } } }`
+- **Bypass mode**: `{ "decision": { "behavior": "allow", "updatedPermissions": [{ "type": "setMode", "mode": "bypassPermissions", "destination": "session" }] } }`
+- **PermissionRequest timeout**: 86400s (24h) — must set explicitly, default is 600s
+- **PermissionRequest matcher**: `"*"` required for AskUserQuestion to fire
+- **Token usage**: Stop event has `transcript_path` — hook reads transcript tail for last assistant message `usage`
+
+### OpenAI Codex 📦
+- **Config**: `~/.codex/hooks.json` (NOT config.json!)
+- **Format**: Same JSON structure as Claude Code
+- **Events**: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, Stop
+- **Stdin key**: `hook_event_name`
+- **Limitations**: PreToolUse only supports Bash tool interception; no PermissionRequest; no AskUserQuestion (`request_user_input` has no hook event yet)
+- **Approval**: Not supported (no PermissionRequest event)
+
+### Gemini CLI 💎
+- **Config**: `~/.gemini/settings.json`
+- **Format**: Same JSON structure as Claude Code
+- **Events**: SessionStart, SessionEnd, BeforeAgent, BeforeTool, AfterTool, AfterAgent, Notification, PreCompress
+- **Stdin key**: `hook_event_name`
+- **Event name mapping** (Gemini → Notchikko internal):
+  ```
+  BeforeAgent  → UserPromptSubmit
+  BeforeTool   → PreToolUse
+  AfterTool    → PostToolUse
+  AfterAgent   → Stop
+  PreCompress  → PreCompact (but no PostCompact mapping — avoid sweeping stuck state)
+  ```
+- **Tool name mapping** (snake_case → PascalCase):
+  ```
+  read_file / read_many_files → Read
+  write_file                  → Write
+  replace                     → Edit
+  run_shell_command           → Bash
+  glob / list_directory       → Glob
+  grep_search / search_file_content → Grep
+  ask_user                    → AskUserQuestion
+  google_web_search           → WebSearch
+  web_fetch                   → WebFetch
+  ```
+- **Approval**: Not supported (no PermissionRequest equivalent)
+
+### Trae CLI 🦎
+- **Config**: `~/.trae/traecli.yaml`
+- **Format**: YAML (separate parsing in HookInstaller)
+- **Events**: user_prompt_submit, pre_tool_use, post_tool_use, stop, subagent_stop
+- **Stdin format**: Different from Claude Code! Uses `event_type` + nested body:
+  ```json
+  { "event_type": "pre_tool_use", "pre_tool_use": { "cwd": "...", "tool_name": "...", "tool_input": {...} } }
+  ```
+- **Session ID**: No `session_id` — hook uses `'trae-' + str(os.getppid())` as stable identifier
+- **Approval**: Not supported (fire-and-forget only)
+
+---
+
+## Claude Code Hook Events — Complete Reference
+
+### PreToolUse
+- **Fires**: Before every tool execution (regardless of permission settings)
+- **Matcher**: Tool name (`Bash`, `Edit`, `Write`, `Read`, `AskUserQuestion`, MCP tools, etc.)
+- **Stdin**: `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input`, `tool_use_id`, `permission_mode`, `transcript_path`
+- **Notchikko behavior**: Fire-and-forget (never blocks). Maps to `.toolUse(.pre)`. AskUserQuestion → `.notification` (non-blocking notification card)
+- **Output**: `permissionDecision: "allow|deny|ask|defer"`, `updatedInput`, `additionalContext`
+- **Precedence**: `deny > defer > ask > allow`
+
+### PermissionRequest
+- **Fires**: Only when Claude Code needs user confirmation (permission dialog about to show)
+- **Matcher**: Tool name — `"*"` required for AskUserQuestion to trigger
+- **Stdin**: `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input`, `permission_mode`, `permission_suggestions`
+- **Timeout**: Default 600s for command hooks. **Must set to 86400 for interactive approval.**
+- **Notchikko behavior**: Blocks. Generates `request_id`, sends to socket, waits for app response.
+  - Approval tools (Bash/Edit/Write/NotebookEdit): Shows 4-button approval card
+  - AskUserQuestion: Shows interactive option card with clickable buttons
+- **Output**: `decision: { behavior: "allow|deny", updatedInput, updatedPermissions, message }`
+
+### PostToolUse
+- **Fires**: After tool succeeds
+- **Stdin**: `tool_name`, `tool_input`, `tool_response`, `tool_use_id`
+- **Notchikko behavior**: Maps to `.toolUse(.post(success: true))`
+
+### PostToolUseFailure
+- **Fires**: After tool fails
+- **Stdin**: `tool_name`, `tool_input`, `tool_use_id`, `error`, `is_interrupt`
+- **Notchikko behavior**: Maps to `.toolUse(.post(success: false))` → `error` state → returns to idle after 5s
+
+### UserPromptSubmit
+- **Fires**: When user submits a prompt
+- **Stdin**: `prompt`
+- **Notchikko behavior**: Maps to `.prompt` → `thinking` state
+
+### Stop
+- **Fires**: When Claude finishes responding
+- **Stdin**: `transcript_path` (hook reads this for token usage extraction)
+- **Notchikko behavior**: Maps to `.stop(usage:)` → `happy` state → 3s celebration → auto-switch session
+- **Token extraction**: Hook reads last 64KB of transcript, finds last `assistant` message, extracts `usage.{input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens}`
+
+### SessionStart / SessionEnd
+- **Notchikko behavior**: Session creation/destruction, terminal PID/tty/pidChain capture
+
+### SubagentStart / SubagentStop
+- **Notchikko behavior**: Silently dropped (return nil from `convert()`) to avoid affecting main pet state
+
+### Notification / Elicitation
+- **Notchikko behavior**: Maps to `.notification`. Elicitation shows notification card. Empty Notification events ignored.
+
+### PreCompact / PostCompact
+- **Notchikko behavior**: PreCompact → `.compact` → `sweeping` state. PostCompact → `.prompt` → `thinking` state.
+
+### WorktreeCreate
+- **Notchikko behavior**: Maps to `.prompt` → `thinking` state
+
+---
+
+## Approval Flow (PermissionRequest path only)
+
+```
+PermissionRequest event fires
+  │
+  ▼ Hook script
+  │ tool_name in approval_tools AND approval_enabled? → generates request_id, blocks
+  │ tool_name == "AskUserQuestion"? → generates request_id, blocks
+  │ Otherwise → fire-and-forget (no request_id)
+  │
+  ▼ SocketServer (request_id present → onApprovalRequest)
+  │ Stores fd in pendingResponses[requestId]
+  │
+  ▼ AppDelegate.onApprovalRequest
+  │ bypass mode? → auto-allow (respond + close fd)
+  │ approvalCardEnabled off + not AskUser? → auto-allow
+  │ Otherwise → ApprovalManager.handleApprovalRequest → showApprovalPanel
+  │
+  ▼ ApprovalCardView
+  │ Approval tools: [Deny] [Allow Once] [Always Allow] [Auto Approve]
+  │ AskUserQuestion: [Option A] [Option B] [Option C] ...
+  │
+  ▼ User clicks button
+  │
+  ▼ ApprovalManager sends response via SocketServer.respond()
+  │ approve:         { decision: "allow" }
+  │ deny:            { decision: "deny", reason: "..." }
+  │ alwaysAllow:     { decision: "allow", bypass: true }
+  │ autoApprove:     { decision: "allow", bypass: true } (+ approve all pending)
+  │ answerQuestion:  { answers: { "question text": "selected option" } }
+  │
+  ▼ Hook script reads response, outputs hookSpecificOutput
+  │ approval:     { hookEventName: "PermissionRequest", decision: { behavior: "allow|deny" } }
+  │ + bypass:     { ..., decision: { behavior: "allow", updatedPermissions: [setMode: bypassPermissions] } }
+  │ askUser:      { ..., decision: { behavior: "allow", updatedInput: { questions, answers } } }
+  │
+  ▼ Claude Code receives, continues or stops
+```
+
+### Card Lifecycle
+- Cards auto-hide after configurable delay (Settings → Approval → auto-hide delay)
+- Fade out via `alphaValue` animation (0.25s), hover restores via `ApprovalTrackingView` NSTrackingArea (0.15s fade in)
+- `onSessionEvent` only clears notification cards, not blocking approval cards
+- Stale timer: 86400s (matches hook timeout), closes orphaned socket fds via `closePending()`
+
+---
 
 ## Tool → State Mapping
 
@@ -60,43 +209,34 @@ ThemeProvider → NotchikkoView     ← SVG rendered in WKWebView
 | `Read`, `Grep`, `Glob` | `reading` | `reading/` |
 | `Edit`, `Write`, `NotebookEdit` | `typing` | `typing/` |
 | `Bash` | `building` | `building/` |
-| All others | `typing` | `typing/` |
+| All others (including MCP tools) | `typing` | `typing/` |
 
-## State Priority & Transitions
+---
 
-`SessionManager.transition(to:)` only accepts a new state if its priority > current, OR current is `idle`/`sleeping`. This prevents low-priority events from interrupting important animations.
+## Timer System
 
-```
-sleeping(10) < idle(20) < thinking(50) < sweeping(53) < reading(55)
-< typing(60) < building(70) < happy(80) < error(90) < approving(95) < dragging(100)
-```
+`resetTimers()` cancels **all three** timers (forgetting returnTimer causes error→idle override):
 
-Auto-return timers: error → idle after 5s, happy → auto-switch session after 3s, any → idle after 60s, any → sleeping after 120s.
+| Timer | Delay | Action |
+|---|---|---|
+| `idleTimer` | 60s | transition → `.idle` |
+| `sleepTimer` | 120s | transition → `.sleeping` |
+| `returnTimer` | 5s (error) or 3s (happy) | transition → `.idle` or auto-switch session |
 
-## Approval Flow
-
-Only for modification tools: `Bash`, `Edit`, `Write`, `NotebookEdit`.
-
-1. Hook script checks `skipDangerousModePermissionPrompt` in `~/.claude/settings.json` — if true, skips approval entirely
-2. Hook script generates UUID `request_id`, adds it to the JSON payload
-3. Sends to socket and blocks waiting for response (5 min timeout, default allow)
-4. `SocketServer` keeps the client fd open in `pendingResponses[requestId]`
-5. `SocketServer.onApprovalRequest` → `ApprovalManager.handleApprovalRequest` → shows `ApprovalCardView`
-6. State → `.approving` (priority 95, high reveal)
-7. User clicks Allow/Deny or presses `⌘Y`/`⌘N`
-8. `ApprovalManager.approve()/deny()` → `SocketServer.respond(requestId:json:)` writes back JSON and closes fd
-9. Hook script reads response, outputs to stdout for CLI consumption
+---
 
 ## Data Formats
 
-### CLI stdin → Hook script
+### CLI stdin → Hook script (Claude Code)
 ```json
 {
-  "hook_event_name": "PreToolUse",
+  "hook_event_name": "PermissionRequest",
   "session_id": "abc-123",
   "cwd": "/path/to/project",
+  "permission_mode": "default",
   "tool_name": "Bash",
-  "tool_input": { "command": "npm test" }
+  "tool_input": { "command": "npm test" },
+  "permission_suggestions": [...]
 }
 ```
 
@@ -105,52 +245,56 @@ Only for modification tools: `Bash`, `Edit`, `Write`, `NotebookEdit`.
 {
   "session_id": "abc-123",
   "cwd": "/path/to/project",
-  "event": "PreToolUse",
-  "status": "running_tool",
+  "event": "PermissionRequest",
+  "status": "permission_request",
   "tool": "Bash",
   "tool_input": { "command": "npm test" },
   "source": "claude-code",
-  "request_id": "uuid (only for approval requests)"
+  "permission_mode": "default",
+  "request_id": "uuid (only for blocking requests)",
+  "terminal_pid": 12345,
+  "terminal_tty": "/dev/ttys001",
+  "pid_chain": [12345, 12344, 12343],
+  "usage": { "input_tokens": 100, "output_tokens": 50, "cache_read": 1000, "cache_creation": 500 }
 }
 ```
 
-### Approval response
-```json
-{"decision": "allow"}
-{"decision": "deny", "reason": "Denied by Notchikko"}
-```
+---
 
-## Adding a New Hook Event — Checklist
+## Adding a New CLI Integration — Checklist
 
-1. **`notchikko-hook.sh`**: add entry to `status_map` dict
-2. **`HookInstaller.supportedCLIs`**: add event name to the `hookEvents` array for each CLI that supports it
-3. **`ClaudeCodeAdapter.convert()`**: add `case` to map the event string → `AgentEvent`
-4. **`SessionManager.handleEvent()`**: add `case` to handle the `AgentEvent` and set appropriate `NotchikkoState`
-5. If it needs a new visual state: add case to `NotchikkoState` enum (svgName, revealAmount, priority, soundKey) and create SVG directory in `Resources/themes/clawd/{state}/`
+1. **`HookInstaller.supportedCLIs`**: Add `CLIHookConfig` with name, displayName, icon, settingsPath, hookEvents, configFormat
+2. **Hook script**: If event names differ from Claude Code, add a mapping dict (see `GEMINI_EVENT_MAP`, `GEMINI_TOOL_MAP`). If stdin format is completely different, add a new source branch (see Trae CLI section)
+3. **`CLIHookConfig.metadata(for:)`** automatically picks up the new agent's icon/name from supportedCLIs
+
+### Config paths for each CLI
+| CLI | Config Path | Format |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` | JSON |
+| Codex | `~/.codex/hooks.json` | JSON |
+| Gemini CLI | `~/.gemini/settings.json` | JSON |
+| Trae CLI | `~/.trae/traecli.yaml` | YAML |
+
+---
 
 ## Adding a New Approval Tool
 
-1. **`notchikko-hook.sh`**: add tool name to `approval_tools` set
-2. That's it — the rest of the approval pipeline is tool-agnostic
+1. **Hook script**: Add tool name to `approval_tools` set (line ~262)
+2. That's it — the rest of the pipeline is tool-agnostic
 
-## Adding a New CLI Integration
-
-1. Add `CLIHookConfig` entry to `HookInstaller.supportedCLIs` with the CLI's settings path and supported hook events
-2. Optionally create a new `AgentBridge` implementation if the CLI uses a different protocol than hooks (currently all CLIs use the same hook script)
-3. The hook script accepts a `source` argument (`notchikko-hook.sh codex`) which gets forwarded as `source` in the JSON payload
+---
 
 ## Key Files
 
 | File | Role |
 |---|---|
-| `Resources/notchikko-hook.sh` | Hook script (bash + inline Python3) |
-| `IPC/SocketServer.swift` | Unix socket server, manages pending approval fds |
-| `IPC/HookInstaller.swift` | Registers hooks in CLI settings files |
-| `Agent/AgentEvent.swift` | `HookEvent` (wire format), `AgentEvent` (app model), `ToolPhase` |
-| `Agent/ClaudeCodeAdapter.swift` | HookEvent → AgentEvent conversion + synthetic session injection |
-| `Agent/AgentBridge.swift` | Protocol for agent adapters |
-| `Agent/AgentRegistry.swift` | Merges multiple adapter streams via TaskGroup |
-| `Session/SessionManager.swift` | Event → state machine, multi-session tracking, timers |
-| `Notchikko/NotchikkoState.swift` | 11 states with priority, svgName, revealAmount, soundKey |
-| `Approval/ApprovalManager.swift` | Manages pending approval requests |
-| `Approval/ApprovalCardView.swift` | SwiftUI approval card UI |
+| `Resources/notchikko-hook.sh` | Hook script (bash + inline Python3) — **never add double-quoted code** |
+| `IPC/SocketServer.swift` | Unix socket server, pending approval fds, `closePending()` for stale cleanup |
+| `IPC/HookInstaller.swift` | Registers hooks in CLI config files, `matcher: "*"` + `timeout: 86400` for PermissionRequest |
+| `Agent/AgentEvent.swift` | `HookEvent` (wire format with `TokenUsage`), `AgentEvent` (app model), `ToolPhase` |
+| `Agent/ClaudeCodeAdapter.swift` | HookEvent → AgentEvent conversion, AskUserQuestion/PermissionRequest detail extraction |
+| `Session/SessionManager.swift` | Event → state machine, multi-session tracking (working-first priority), 3 timers |
+| `Notchikko/NotchikkoState.swift` | 11 states with revealAmount and soundKey |
+| `Approval/ApprovalManager.swift` | Pending requests, `alwaysAllowTool`/`autoApproveSession` with bypass, `answerQuestion`, `parseQuestions` |
+| `Approval/ApprovalCardView.swift` | 4-button approval card + AskUserQuestion option buttons |
+| `App/AppDelegate.swift` | Wires all callbacks, `showApprovalPanel` with `ApprovalTrackingView` for hover |
