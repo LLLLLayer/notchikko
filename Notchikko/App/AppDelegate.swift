@@ -400,8 +400,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
 
-        let wrapper = NSView(frame: panel.contentView?.bounds ?? panel.frame)
+        let wrapper = ApprovalTrackingView(frame: panel.contentView?.bounds ?? panel.frame)
         wrapper.autoresizingMask = [.width, .height]
+        wrapper.onMouseEnter = { [weak self] in
+            self?.approvalManager?.onMouseEnter(requestId: reqId)
+            self?.approvalPanels[reqId]?.alphaValue = 1.0
+        }
+        wrapper.onMouseExit = { [weak self] in
+            self?.approvalManager?.onMouseExit(requestId: reqId)
+        }
         wrapper.addSubview(hostingView)
         panel.contentView = wrapper
 
@@ -414,6 +421,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.orderFrontRegardless()
         approvalPanels[reqId] = panel
+
+        // 监听 isVisible 变化 → 淡入淡出
+        let panelRef = panel
+        Task { @MainActor in
+            var lastVisible = true
+            while approvalPanels[reqId] != nil {
+                try? await Task.sleep(for: .milliseconds(300))
+                let visible = approval.pendingApprovals[reqId]?.isVisible ?? false
+                if visible != lastVisible {
+                    lastVisible = visible
+                    NSAnimationContext.runAnimationGroup({ ctx in
+                        ctx.duration = 0.25
+                        panelRef.animator().alphaValue = visible ? 1.0 : 0.0
+                    }, completionHandler: {})
+                }
+            }
+        }
     }
 
     /// 移除指定 requestId 的审批面板
@@ -493,5 +517,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             self?.refreshNotchWindow()
         }
+    }
+}
+
+// MARK: - 审批卡片鼠标追踪
+
+private final class ApprovalTrackingView: NSView {
+    var onMouseEnter: (() -> Void)?
+    var onMouseExit: (() -> Void)?
+    private var trackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let old = trackingArea { removeTrackingArea(old) }
+        trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(trackingArea!)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onMouseEnter?()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onMouseExit?()
     }
 }
