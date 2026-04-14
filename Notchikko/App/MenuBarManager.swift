@@ -10,6 +10,7 @@ final class MenuBarManager {
     var onSwitchScreen: ((NSScreen) -> Void)?
     var onQuit: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
     var onRemoveSession: ((String) -> Void)?
     var onJumpToSession: ((String) -> Void)?
 
@@ -103,6 +104,11 @@ final class MenuBarManager {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        // 检查更新
+        let updateItem = NSMenuItem(title: NSLocalizedString("menu.check_for_updates", comment: ""), action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
         menu.addItem(.separator())
 
         // 退出
@@ -154,6 +160,10 @@ final class MenuBarManager {
 
     @objc private func openSettings(_ sender: NSMenuItem) {
         onOpenSettings?()
+    }
+
+    @objc private func checkForUpdates(_ sender: NSMenuItem) {
+        onCheckForUpdates?()
     }
 
     @objc private func quitApp(_ sender: NSMenuItem) {

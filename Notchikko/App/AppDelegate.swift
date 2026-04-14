@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var approvalPanels: [String: NSPanel] = [:]       // requestId → panel
     private var cardFinalFrames: [String: NSRect] = [:]      // requestId → 展开后的目标 frame
     private let terminalJumper = TerminalJumper()
+    private let updateManager = UpdateManager()
 
     private var screenObserver: NSObjectProtocol?
     private var prefsObserver: NSObjectProtocol?
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startAgentListening()
         observeScreenChanges()
         showHookInstallPromptIfNeeded()
+        updateManager.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -59,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager.onRemoveSession = { [weak self] sessionId in
             self?.sessionManager.removeSession(sessionId)
             self?.approvalManager?.cleanupSession(sessionId)
+        }
+
+        menuBarManager.onCheckForUpdates = { [weak self] in
+            self?.updateManager.checkForUpdates()
         }
 
         menuBarManager.onQuit = {

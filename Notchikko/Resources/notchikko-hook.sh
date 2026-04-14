@@ -325,8 +325,17 @@ try:
                         # PermissionRequest 审批
                         decision = result.get('decision', 'allow')
                         decision_obj = {'behavior': decision}
-                        # 自动批准/始终允许：同时切 bypassPermissions
-                        if result.get('bypass'):
+                        allow_tool = result.get('allow_tool')
+                        if allow_tool:
+                            # 始终允许：将该工具加入项目允许列表
+                            decision_obj['updatedPermissions'] = [{
+                                'type': 'addRules',
+                                'rules': [{'toolName': allow_tool, 'ruleContent': '*'}],
+                                'behavior': 'allow',
+                                'destination': 'localSettings',
+                            }]
+                        elif result.get('bypass'):
+                            # 自动批准：整个 session 切 bypassPermissions
                             decision_obj['updatedPermissions'] = [{
                                 'type': 'setMode',
                                 'mode': 'bypassPermissions',

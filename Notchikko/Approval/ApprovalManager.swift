@@ -147,17 +147,16 @@ final class ApprovalManager {
         SoundManager.shared.play(for: "shake")
     }
 
-    /// 始终允许：放行当前请求 + 开 bypassPermissions（会话级）
+    /// 始终允许：放行当前请求 + 将该工具加入项目允许列表（settings.local.json）
     func alwaysAllowTool(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
-        Log("alwaysAllow: sid=\(req.sessionId.prefix(8))", tag: "Approval")
-        autoApprovedSessions.insert(req.sessionId)
+        Log("alwaysAllow: tool=\(req.tool), sid=\(req.sessionId.prefix(8))", tag: "Approval")
 
-        // 直接在本次响应里带 bypass=true，hook 输出 setMode: bypassPermissions
+        // allow_tool 告诉 hook 脚本用 addRules 写入 settings.local.json
         let response: [String: Any] = [
             "request_id": req.requestId,
             "decision": "allow",
-            "bypass": true,
+            "allow_tool": req.tool,
         ]
         sendResponse(response, for: req)
         dismiss(requestId: requestId)
