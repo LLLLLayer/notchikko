@@ -314,8 +314,9 @@ try:
 except:
     pass
 
-# 阻塞判定：PreToolUse 或 PermissionRequest 的审批工具都需要阻塞
-needs_approval = (hook_event in ('PreToolUse', 'PermissionRequest')
+# 阻塞判定：仅 PermissionRequest 阻塞（Claude Code 真正需要用户确认时才触发）
+# PreToolUse 对所有工具都触发，不应阻塞（否则已 allow 的工具也会弹卡）
+needs_approval = (hook_event == 'PermissionRequest'
                   and tool_name in approval_tools
                   and approval_enabled
                   and not bypass)
@@ -360,50 +361,28 @@ try:
                                 'updatedInput': updated_input,
                             },
                         }}))
-                    elif hook_event == 'PermissionRequest':
+                    else:
                         # PermissionRequest 审批
                         decision = result.get('decision', 'allow')
                         print(json.dumps({'hookSpecificOutput': {
                             'hookEventName': 'PermissionRequest',
                             'decision': {'behavior': decision},
                         }}))
-                    else:
-                        # PreToolUse 审批
-                        decision = result.get('decision', 'allow')
-                        reason = result.get('reason', 'Approved by Notchikko')
-                        print(json.dumps({'hookSpecificOutput': {
-                            'hookEventName': 'PreToolUse',
-                            'permissionDecision': decision,
-                            'permissionDecisionReason': reason,
-                        }}))
                     break
                 except json.JSONDecodeError:
                     continue
             except socket.timeout:
-                if hook_event == 'PermissionRequest':
-                    print(json.dumps({'hookSpecificOutput': {
-                        'hookEventName': 'PermissionRequest',
-                        'decision': {'behavior': 'allow'},
-                    }}))
-                else:
-                    print(json.dumps({'hookSpecificOutput': {
-                        'hookEventName': 'PreToolUse',
-                        'permissionDecision': 'allow',
-                        'permissionDecisionReason': 'Timeout — auto-allowed by Notchikko',
-                    }}))
+                # 超时自动放行
+                print(json.dumps({'hookSpecificOutput': {
+                    'hookEventName': 'PermissionRequest',
+                    'decision': {'behavior': 'allow'},
+                }}))
                 break
     sock.close()
 except:
     if needs_blocking:
-        if hook_event == 'PermissionRequest':
-            print(json.dumps({'hookSpecificOutput': {
-                'hookEventName': 'PermissionRequest',
-                'decision': {'behavior': 'allow'},
-            }}))
-        else:
-            print(json.dumps({'hookSpecificOutput': {
-                'hookEventName': 'PreToolUse',
-                'permissionDecision': 'allow',
-                'permissionDecisionReason': 'Socket error — auto-allowed by Notchikko',
-            }}))
+        print(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PermissionRequest',
+            'decision': {'behavior': 'allow'},
+        }}))
 " 2>/dev/null
