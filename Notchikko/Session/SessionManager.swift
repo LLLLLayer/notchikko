@@ -245,10 +245,12 @@ final class SessionManager {
                 sessions.removeValue(forKey: sid)
                 sessionCleanupTasks.removeValue(forKey: sid)
             }
-            // 如果还有活跃 session，切换到最新的
+            // 如果还有活跃 session，切换到它的状态并重置 timer
             if let nextActive = activeSessionId, let session = sessions[nextActive] {
-                currentState = stateForPhase(session.phase)
+                resetTimers()
+                transition(to: stateForPhase(session.phase))
             } else if activeSessions.isEmpty {
+                resetTimers()
                 transition(to: .sleeping)
             }
 
