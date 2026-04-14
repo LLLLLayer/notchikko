@@ -188,28 +188,25 @@ final class ApprovalManager {
         Log("autoApproveSession: sid=\(sessionId.prefix(8))", tag: "Approval")
         autoApprovedSessions.insert(sessionId)
 
-        // 放行该 session 的所有待审批请求，第一个带 bypass=true 切模式
-        let sessionRequests = pendingApprovals.values.filter {
-            $0.sessionId == sessionId && !$0.isNotification
-        }
+        // 单次遍历：放行阻塞式请求 + 收集所有卡片 ID
         var bypassSent = false
-        for r in sessionRequests {
-            var response: [String: Any] = [
-                "request_id": r.requestId,
-                "decision": "allow",
-            ]
-            if !bypassSent {
-                response["bypass"] = true
-                bypassSent = true
+        var allIds: [String] = []
+        for r in pendingApprovals.values where r.sessionId == sessionId {
+            allIds.append(r.id)
+            if !r.isNotification {
+                var response: [String: Any] = [
+                    "request_id": r.requestId,
+                    "decision": "allow",
+                ]
+                if !bypassSent {
+                    response["bypass"] = true
+                    bypassSent = true
+                }
+                sendResponse(response, for: r)
             }
-            sendResponse(response, for: r)
         }
 
-        // 清除该 session 的所有卡片（包括通知卡片）
-        let allSessionIds = pendingApprovals.values
-            .filter { $0.sessionId == sessionId }
-            .map { $0.id }
-        for id in allSessionIds {
+        for id in allIds {
             cleanupTimers(for: id)
             pendingApprovals.removeValue(forKey: id)
         }
@@ -262,6 +259,7 @@ final class ApprovalManager {
     /// 收到后续事件 → 只清理通知卡片，保留阻塞式审批/AskUser 卡片
     /// 阻塞式卡片由用户操作或 staleTimer 清理
     func onSessionEvent(sessionId: String) {
+        guard !pendingApprovals.isEmpty else { return }
         let toRemove = pendingApprovals.values.filter {
             $0.sessionId == sessionId && $0.requestId.isEmpty
         }.map { $0.id }

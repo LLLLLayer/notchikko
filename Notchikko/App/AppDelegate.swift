@@ -304,17 +304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)
 
-                // 收到后续事件 → 清理该 session 的通知卡片（保留阻塞式审批卡）
-                let sid: String = switch event {
-                case .sessionStart(let s, _, _, _, _): s
-                case .sessionEnd(let s): s
-                case .prompt(let s, _): s
-                case .toolUse(let s, _, _): s
-                case .notification(let s, _, _): s
-                case .compact(let s): s
-                case .stop(let s, _): s
-                case .error(let s, _): s
-                }
+                let sid = event.sessionId
                 approvalManager?.onSessionEvent(sessionId: sid)
 
                 // 用户在终端操作了（新 prompt / 任务结束）→ 自动关闭过期审批卡片

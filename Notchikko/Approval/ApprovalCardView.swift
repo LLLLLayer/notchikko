@@ -32,12 +32,7 @@ struct ApprovalCardView: View {
     }
 
     private static func toolColor(for tool: String) -> Color {
-        switch tool {
-        case "Bash": return Color(red: 0.13, green: 0.77, blue: 0.37)
-        case "Edit", "Write", "NotebookEdit": return Color(red: 0.23, green: 0.51, blue: 0.96)
-        case "Read", "Grep", "Glob": return Color(red: 0.66, green: 0.33, blue: 0.97)
-        default: return .orange
-        }
+        ToolColors.color(for: tool)
     }
 
     private var bubbleShape: BubbleShape {

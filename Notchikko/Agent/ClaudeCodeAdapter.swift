@@ -18,6 +18,9 @@ final class ClaudeCodeAdapter: AgentBridge {
         return depth > 0
     }
 
+    /// Subagent 深度 >0 时仍需放行的事件类型
+    private static let subagentPassthroughEvents: Set<String> = ["Elicitation", "AskUserQuestion"]
+
     /// 终端 PID 更新回调
     var onTerminalPidUpdate: ((String, Int) -> Void)?
     /// 终端 tty 更新回调
@@ -34,50 +37,35 @@ final class ClaudeCodeAdapter: AgentBridge {
                 guard let self else { return }
                 let sid = hookEvent.sessionId
 
-                // 首次见到的 session，自动补发一个 sessionStart（带 cwd/source）
+                // 单次加锁：session 注册 + subagent 深度追踪
                 self.stateLock.lock()
                 let isNewSession = self.knownSessions.insert(sid).inserted
-                self.stateLock.unlock()
-
-                if isNewSession && hookEvent.event != "SessionStart" {
-                    let syntheticStart = AgentEvent.sessionStart(
-                        sessionId: sid,
-                        cwd: hookEvent.cwd,
-                        source: hookEvent.source ?? "claude-code",
-                        terminalPid: hookEvent.terminalPid,
-                        pidChain: hookEvent.pidChain
-                    )
-                    continuation.yield(syntheticStart)
-                }
-
-                // Subagent 嵌套深度追踪：深度 >0 时抑制工具/状态事件，
-                // 避免子代理的 tool 调用影响动画和声音
-                self.stateLock.lock()
                 var shouldEmitEvent = true
                 switch hookEvent.event {
                 case "SubagentStart":
                     self.subagentDepth[sid, default: 0] += 1
-                    Log("SubagentStart: depth[\(sid.prefix(8))]=\(self.subagentDepth[sid]!)", tag: "Adapter")
                     shouldEmitEvent = false
                 case "SubagentStop":
-                    let d = max((self.subagentDepth[sid] ?? 1) - 1, 0)
-                    self.subagentDepth[sid] = d
-                    Log("SubagentStop: depth[\(sid.prefix(8))]=\(d)", tag: "Adapter")
+                    self.subagentDepth[sid] = max((self.subagentDepth[sid] ?? 1) - 1, 0)
                     shouldEmitEvent = false
                 default:
                     let depth = self.subagentDepth[sid] ?? 0
-                    if depth > 0 {
-                        let passthrough = ["Elicitation", "AskUserQuestion"]
-                        if !passthrough.contains(hookEvent.event) {
-                            Log("Suppressed subagent event: \(hookEvent.event) (depth=\(depth))", tag: "Adapter")
-                            shouldEmitEvent = false
-                        }
+                    if depth > 0, !Self.subagentPassthroughEvents.contains(hookEvent.event) {
+                        shouldEmitEvent = false
                     }
                 }
                 if hookEvent.event == "SessionEnd" {
                     self.subagentDepth.removeValue(forKey: sid)
                 }
                 self.stateLock.unlock()
+
+                if isNewSession && hookEvent.event != "SessionStart" {
+                    continuation.yield(.sessionStart(
+                        sessionId: sid, cwd: hookEvent.cwd,
+                        source: hookEvent.source ?? "claude-code",
+                        terminalPid: hookEvent.terminalPid, pidChain: hookEvent.pidChain
+                    ))
+                }
 
                 if shouldEmitEvent {
                     if let agentEvent = Self.convert(hookEvent) {

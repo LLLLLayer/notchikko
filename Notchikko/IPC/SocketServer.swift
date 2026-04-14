@@ -221,30 +221,24 @@ final class SocketServer {
         source.setEventHandler { [weak self] in
             guard let self else { return }
 
-            // 先检查 fd 是否仍归我们管（respond() 可能已 close 了它）
+            // 单次加锁：检查 fd 归属 + peek EOF + 清理
             self.pendingLock.lock()
             guard self.pendingResponses[requestId] != nil else {
                 self.pendingLock.unlock()
                 return
             }
-            self.pendingLock.unlock()
-
-            // fd 仍存活，安全 peek 检测 EOF
+            // fd 仍存活，MSG_DONTWAIT peek 是非阻塞的（亚微秒级），持锁安全
             var buf: UInt8 = 0
             let n = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT)
-            guard n == 0 else { return }
-
-            Log("Hook disconnected: \(requestId.prefix(8))", tag: "Socket")
-            source.cancel()
-
-            self.pendingLock.lock()
-            guard self.pendingResponses.removeValue(forKey: requestId) != nil else {
+            guard n == 0 else {
                 self.pendingLock.unlock()
                 return
             }
+            self.pendingResponses.removeValue(forKey: requestId)
             self.pendingMonitors.removeValue(forKey: requestId)
             self.pendingLock.unlock()
 
+            source.cancel()
             close(fd)
             DispatchQueue.main.async { self.onApprovalDisconnect?(requestId) }
         }

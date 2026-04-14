@@ -142,7 +142,7 @@ final class SessionManager {
     func handleEvent(_ event: AgentEvent) {
         previousState = currentState
         Log("handleEvent: \(event), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
-        let eventSessionId = sessionIdOf(event)
+        let eventSessionId = event.sessionId
 
         // 收到未知 session 的事件时自动创建（应对中途安装 hook 的场景）
         ensureSession(event)
@@ -319,13 +319,7 @@ final class SessionManager {
     /// 结束拖拽状态：解冻并恢复到当前 session 的实际状态
     func endDrag() {
         isDragging = false
-        // 从活跃 session 的当前 phase 计算正确状态，而非使用拖拽前的快照
-        if let sid = activeSessionId, let session = sessions[sid] {
-            currentState = stateForPhase(session.phase)
-        } else {
-            currentState = .idle
-        }
-        resetTimers()
+        restoreActiveState()
     }
 
     /// 直接设置状态（外部控制用，拖拽期间被阻止）
@@ -341,10 +335,15 @@ final class SessionManager {
     func endApproval() {
         guard isApproving else { return }
         isApproving = false
+        restoreActiveState()
+    }
+
+    /// 从活跃 session 的当前 phase 恢复正确状态
+    private func restoreActiveState(fallback: NotchikkoState = .idle) {
         if let sid = activeSessionId, let session = sessions[sid] {
             currentState = stateForPhase(session.phase)
         } else {
-            currentState = .idle
+            currentState = fallback
         }
         resetTimers()
     }
@@ -383,7 +382,7 @@ final class SessionManager {
     private static let maxSessions = 32
 
     private func ensureSession(_ event: AgentEvent) {
-        let sid = sessionIdOf(event)
+        let sid = event.sessionId
         if case .sessionEnd = event { return }
         if sessions[sid] != nil { return }
 
@@ -424,18 +423,6 @@ final class SessionManager {
         }
     }
 
-    private func sessionIdOf(_ event: AgentEvent) -> String {
-        switch event {
-        case .sessionStart(let sid, _, _, _, _): return sid
-        case .sessionEnd(let sid): return sid
-        case .prompt(let sid, _): return sid
-        case .toolUse(let sid, _, _): return sid
-        case .notification(let sid, _, _): return sid
-        case .compact(let sid): return sid
-        case .stop(let sid, _): return sid
-        case .error(let sid, _): return sid
-        }
-    }
 
     private func transition(to newState: NotchikkoState) {
         guard !isDragging else { return }
@@ -499,10 +486,9 @@ final class SessionManager {
     // MARK: - 弹幕辅助
 
     private func emitSessionDanmaku(_ session: SessionInfo) {
-        let name = session.cwdName.isEmpty
-            ? CLIHookConfig.metadata(for: session.source).displayName
-            : session.cwdName
+        // 只播报项目名，CLI 名称（如 "Claude Code"）不弹
+        guard !session.cwdName.isEmpty else { return }
         danmakuCounter += 1
-        danmakuSessionEvent = (danmakuCounter, name)
+        danmakuSessionEvent = (danmakuCounter, session.cwdName)
     }
 }

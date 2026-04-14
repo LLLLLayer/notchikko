@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// 弹幕层：工具名从右向左飘过宠物背后，透明黑底像素标签，渐入渐出
+/// 弹幕层：工具名从右向左飘过宠物背后，工具类别彩色标签，渐入渐出
 struct DanmakuView: View {
     var sessionManager: SessionManager
 
     @State private var items: [DanmakuItem] = []
     @State private var lastToolEventId = 0
     @State private var lastSessionEventId = 0
+
+    private static func toolColor(for tool: String) -> Color {
+        ToolColors.color(for: tool)
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
@@ -48,19 +52,19 @@ struct DanmakuView: View {
             lastToolEventId = newId
             spawnItem(text: sessionManager.danmakuToolEvent.tool)
 
-            // ~30% 概率附带一条上下文信息
+            // ~30% 概率附带一条上下文信息（更暗的灰色风格）
             if Double.random(in: 0...1) < 0.3, let info = randomContextInfo() {
                 let delay = Double.random(in: 0.3...0.8)
                 Task {
                     try? await Task.sleep(for: .seconds(delay))
-                    spawnItem(text: info)
+                    spawnItem(text: info, isContext: true)
                 }
             }
         }
         .onChange(of: sessionManager.danmakuSessionEvent.id) { _, newId in
             guard newId != lastSessionEventId else { return }
             lastSessionEventId = newId
-            spawnItem(text: sessionManager.danmakuSessionEvent.name)
+            spawnItem(text: sessionManager.danmakuSessionEvent.name, isContext: true)
         }
         .task {
             while !Task.isCancelled {
@@ -83,10 +87,15 @@ struct DanmakuView: View {
         let padH: CGFloat = px * 3
         let padV: CGFloat = px * 1.5
 
+        // 工具弹幕：类别色文字 / 上下文弹幕：暗灰文字
+        let textColor: Color = item.isContext
+            ? Color.white.opacity(0.4)
+            : item.color.opacity(0.85)
+
         let resolved = context.resolve(
             Text(item.text)
                 .font(.system(size: item.fontSize, weight: .medium, design: .monospaced))
-                .foregroundColor(Color.white.opacity(0.75))
+                .foregroundColor(textColor)
         )
         let textSize = resolved.measure(in: CGSize(width: 200, height: 30))
 
@@ -102,8 +111,13 @@ struct DanmakuView: View {
         var ctx = context
         ctx.opacity = opacity
 
+        // 工具弹幕：类别色底 / 上下文弹幕：微弱白底
+        let bgColor: Color = item.isContext
+            ? Color.white.opacity(0.08)
+            : item.color.opacity(0.2)
+
         let path = pixelRoundedRect(rect: rect, px: px)
-        ctx.fill(path, with: .color(Color.black.opacity(0.4)))
+        ctx.fill(path, with: .color(bgColor))
         ctx.draw(resolved, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
     }
 
@@ -134,8 +148,6 @@ struct DanmakuView: View {
         var candidates: [String] = []
         let project = session.cwdName
         if !project.isEmpty { candidates.append(project) }
-        let meta = CLIHookConfig.metadata(for: session.source)
-        candidates.append(meta.displayName)
         if let terminal = session.matchedTerminal?.appName {
             candidates.append(terminal)
         }
@@ -144,19 +156,19 @@ struct DanmakuView: View {
 
     // MARK: - 弹幕生成
 
-    private func spawnItem(text: String) {
-        let fontSize: CGFloat = CGFloat.random(in: 7...9)
+    private func spawnItem(text: String, isContext: Bool = false) {
+        let fontSize: CGFloat = isContext ? 8.5 : 9.5
+        let color: Color = isContext ? .white : Self.toolColor(for: text)
         let charWidth = fontSize * 0.65
         let textWidth = charWidth * CGFloat(text.count)
         let padH: CGFloat = 1.0 * 3 * 2
         let bubbleWidth = textWidth + padH + 2
 
-        // y 位置：离散档位 + 小抖动，避免聚集
-        // 弹幕区域很矮（petSize * 0.35），yRatio 上限需留出弹幕自身高度
-        let slots: [CGFloat] = [0.15, 0.40, 0.65]
+        // 4 档 y 位置 + 小抖动，避免聚集
+        let slots: [CGFloat] = [0.12, 0.32, 0.52, 0.72]
         let baseY = slots.randomElement()!
-        let jitter = CGFloat.random(in: -0.06...0.06)
-        let yRatio = min(max(baseY + jitter, 0.10), 0.75)
+        let jitter = CGFloat.random(in: -0.05...0.05)
+        let yRatio = min(max(baseY + jitter, 0.08), 0.80)
 
         let item = DanmakuItem(
             text: text,
@@ -165,7 +177,9 @@ struct DanmakuView: View {
             yRatio: yRatio,
             fontSize: fontSize,
             bubbleWidth: bubbleWidth,
-            startOffset: CGFloat.random(in: 0...20)
+            startOffset: CGFloat.random(in: 0...20),
+            color: color,
+            isContext: isContext
         )
         items.append(item)
     }
@@ -182,4 +196,6 @@ private struct DanmakuItem: Identifiable {
     let fontSize: CGFloat
     let bubbleWidth: CGFloat
     let startOffset: CGFloat
+    let color: Color
+    let isContext: Bool
 }

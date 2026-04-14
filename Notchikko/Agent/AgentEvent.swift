@@ -93,6 +93,21 @@ enum AgentEvent {
     case error(sessionId: String, message: String)
 }
 
+extension AgentEvent {
+    var sessionId: String {
+        switch self {
+        case .sessionStart(let sid, _, _, _, _): sid
+        case .sessionEnd(let sid): sid
+        case .prompt(let sid, _): sid
+        case .toolUse(let sid, _, _): sid
+        case .notification(let sid, _, _): sid
+        case .compact(let sid): sid
+        case .stop(let sid, _): sid
+        case .error(let sid, _): sid
+        }
+    }
+}
+
 enum ToolPhase {
     case pre
     case post(success: Bool)
