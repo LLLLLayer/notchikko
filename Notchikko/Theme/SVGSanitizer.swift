@@ -19,6 +19,9 @@ enum SVGSanitizer {
     private static let dangerousValuePatterns = [
         "javascript:",
         "data:text/html",
+        "data:text/javascript",
+        "data:application/javascript",
+        "data:image/svg+xml",          // SVG 可嵌入 <script>
         "vbscript:",
     ]
 
@@ -47,15 +50,21 @@ enum SVGSanitizer {
         }
 
         // 2. 移除事件处理器属性 (on*)
-        if let onAttrRegex = try? NSRegularExpression(
-            pattern: "\\s+on\\w+\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)",
-            options: .caseInsensitive
-        ) {
-            result = onAttrRegex.stringByReplacingMatches(
-                in: result,
-                range: NSRange(result.startIndex..., in: result),
-                withTemplate: ""
-            )
+        // 匹配普通形式: onclick="..." 和 HTML 实体编码形式: on&#99;lick="..."
+        for onPattern in [
+            "\\s+on\\w+\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)",
+            "\\s+on[\\w&#;x]+\\w\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)",
+        ] {
+            if let onAttrRegex = try? NSRegularExpression(
+                pattern: onPattern,
+                options: .caseInsensitive
+            ) {
+                result = onAttrRegex.stringByReplacingMatches(
+                    in: result,
+                    range: NSRange(result.startIndex..., in: result),
+                    withTemplate: ""
+                )
+            }
         }
 
         // 3. 移除 javascript: / data:text/html URL
@@ -84,9 +93,10 @@ enum SVGSanitizer {
             if lower.contains("<\(tag)") { return true }
         }
         if lower.contains("on") {
-            // 更精确：检查是否有 on{event}= 模式
-            if let regex = try? NSRegularExpression(pattern: "\\son\\w+=", options: .caseInsensitive) {
-                if regex.firstMatch(in: svgContent, range: NSRange(svgContent.startIndex..., in: svgContent)) != nil {
+            // 检查 on{event}= 模式（含 HTML 实体编码形式如 on&#99;lick=）
+            for pattern in ["\\son\\w+=", "\\son[\\w&#;x]+\\w="] {
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                   regex.firstMatch(in: svgContent, range: NSRange(svgContent.startIndex..., in: svgContent)) != nil {
                     return true
                 }
             }

@@ -267,6 +267,7 @@ final class SessionManager {
                 idleTimer?.cancel()
                 sleepTimer?.cancel()
                 currentState = .approving
+                isApproving = true
                 SoundManager.shared.play(for: "approving")
             }
         }
@@ -303,6 +304,9 @@ final class SessionManager {
     /// 拖拽期间冻结所有状态变更
     private(set) var isDragging = false
 
+    /// 审批期间锁定 approving 状态，阻止其他事件切走动画
+    private(set) var isApproving = false
+
     /// 进入拖拽状态：冻结定时器和状态变更
     func beginDrag() {
         isDragging = true
@@ -328,6 +332,21 @@ final class SessionManager {
     func overrideState(_ state: NotchikkoState) {
         guard !isDragging else { return }
         currentState = state
+        if state == .approving {
+            isApproving = true
+        }
+    }
+
+    /// 结束审批锁定：恢复到当前 session 的实际状态
+    func endApproval() {
+        guard isApproving else { return }
+        isApproving = false
+        if let sid = activeSessionId, let session = sessions[sid] {
+            currentState = stateForPhase(session.phase)
+        } else {
+            currentState = .idle
+        }
+        resetTimers()
     }
 
     /// 缓存 session 匹配到的终端信息
@@ -420,6 +439,7 @@ final class SessionManager {
 
     private func transition(to newState: NotchikkoState) {
         guard !isDragging else { return }
+        guard !isApproving else { return }
         let oldState = currentState
         currentState = newState
         if oldState != newState {

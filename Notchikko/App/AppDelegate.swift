@@ -11,13 +11,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBarManager = MenuBarManager()
     private var approvalManager: ApprovalManager?
     private var settingsWindow: NSWindow?
-    private var approvalPanels: [String: NSPanel] = [:]  // requestId → panel
+    private var approvalPanels: [String: NSPanel] = [:]       // requestId → panel
+    private var cardFinalFrames: [String: NSRect] = [:]      // requestId → 展开后的目标 frame
     private let terminalJumper = TerminalJumper()
 
     private var screenObserver: NSObjectProtocol?
     private var prefsObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 忽略 SIGPIPE：写入已断开的 socket 时不要杀进程
+        signal(SIGPIPE, SIG_IGN)
+
         NSApplication.shared.setActivationPolicy(.accessory)
         setupMenuBar()
         setupNotchWindow(on: NSScreen.main)
@@ -104,6 +108,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hitTestView = NotchHitTestView()
         hitTestView.translatesAutoresizingMaskIntoConstraints = false
         hitTestView.addSubview(hostingView)
+
+        // 宠物悬浮检测区域（view 本地坐标）
+        let padding: CGFloat = 20
+        hitTestView.petLocalRect = NSRect(
+            x: geo.panelFrame.width / 2 - petSize / 2 - padding,
+            y: geo.panelFrame.height - geo.hiddenNotchHeight - petSize - padding,
+            width: petSize + padding * 2,
+            height: petSize + padding * 2
+        )
+        hitTestView.onPetHover = { [weak self] in
+            self?.restoreHiddenApprovalCards()
+        }
 
         panel.contentView = hitTestView
 
@@ -210,9 +226,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 卡片移除回调
         approval.onCardDismissed = { [weak self] requestId in
             self?.removeApprovalPanel(requestId: requestId)
+            // 无剩余阻塞式卡片 → 解锁 approving 状态
+            if !(self?.approvalManager?.pendingApprovals.values.contains(where: { !$0.requestId.isEmpty }) ?? false) {
+                self?.sessionManager.endApproval()
+            }
         }
         approval.onAllCardsDismissed = { [weak self] in
             self?.removeAllApprovalPanels()
+            self?.sessionManager.endApproval()
         }
 
         adapter.socketServerRef.onApprovalRequest = { [weak self] hookEvent in
@@ -280,6 +301,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 approvalManager?.onSessionEvent(sessionId: sid)
 
+                // 用户在终端操作了（新 prompt / 任务结束）→ 自动关闭过期审批卡片
+                switch event {
+                case .prompt, .stop, .sessionEnd:
+                    approvalManager?.dismissStaleApprovals(for: sid)
+                default: break
+                }
+
                 // Session 结束 → 清理会话级审批状态 + bypass flag
                 if case .sessionEnd(let endSid) = event {
                     approvalManager?.cleanupSession(endSid)
@@ -325,7 +353,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             timestamp: Date()
                         )
                         approvalManager?.addNotification(request)
-                        showApprovalPanel(for: request)
+
+                        // AskUserQuestion 消抖：PreToolUse 先到，PermissionRequest ~0.5s 后到
+                        // 延迟 1s 出卡片，如果期间 PermissionRequest 到达并替换了通知卡，panel 就不弹了
+                        if msg == "AskUserQuestion" {
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .seconds(1))
+                                guard self.approvalManager?.pendingApprovals[notifId] != nil else { return }
+                                self.showApprovalPanel(for: request)
+                            }
+                        } else {
+                            showApprovalPanel(for: request)
+                        }
                     }
                 }
             }
@@ -380,22 +419,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
         guard let screen = currentScreen ?? NSScreen.main else { return }
 
-        // 卡片居中在宠物正下方，多张卡片向下堆叠
+        // 卡片与宠物重叠，从宠物背后探出
+        let petSize = 80 * PreferencesStore.shared.preferences.petScale
         let stackIndex = min(CGFloat(approvalPanels.count), 5)
         let cardX = screen.frame.midX - cardWidth / 2
-        let petBottom = screen.frame.maxY - geo.notchSize.height - (80 * PreferencesStore.shared.preferences.petScale)
-        let cardY = petBottom - cardHeight - 8 - stackIndex * Self.cardStackOffset
+        let petBottom = screen.frame.maxY - geo.notchSize.height - petSize
+        let overlap: CGFloat = 15
+        let finalY = petBottom - cardHeight + overlap - stackIndex * Self.cardStackOffset
+        let finalFrame = NSRect(x: cardX, y: finalY, width: cardWidth, height: cardHeight)
 
+        // 初始位置 = 最终位置（透明），动画只做滑动+淡入
+        let startY = finalY + cardHeight * 0.4  // 从偏上方（靠近宠物）开始
         let panel = NSPanel(
-            contentRect: NSRect(x: cardX, y: cardY, width: cardWidth, height: cardHeight),
+            contentRect: NSRect(x: cardX, y: startY, width: cardWidth, height: cardHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1 + approvalPanels.count)
+        // 层级低于宠物（mainMenu+3），卡片视觉上在宠物背后
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
         panel.hasShadow = false
+        panel.alphaValue = 0
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
@@ -421,8 +467,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.orderFrontRegardless()
         approvalPanels[reqId] = panel
+        cardFinalFrames[reqId] = finalFrame
 
-        // 监听 isVisible 变化 → 淡入淡出
+        // 滑入 + 淡入：从宠物背后探出
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.3
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(finalFrame, display: true)
+            panel.animator().alphaValue = 1.0
+        })
+
+        // 监听 isVisible 变化 → 滑动+淡入淡出
         let panelRef = panel
         Task { @MainActor in
             var lastVisible = true
@@ -431,8 +486,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let visible = approval.pendingApprovals[reqId]?.isVisible ?? false
                 if visible != lastVisible {
                     lastVisible = visible
+                    let targetY = visible ? finalFrame.origin.y : finalFrame.origin.y + cardHeight * 0.4
+                    let targetFrame = NSRect(x: finalFrame.origin.x, y: targetY,
+                                             width: finalFrame.width, height: finalFrame.height)
                     NSAnimationContext.runAnimationGroup({ ctx in
-                        ctx.duration = visible ? 0.15 : 0.25
+                        ctx.duration = visible ? 0.25 : 0.2
+                        ctx.timingFunction = CAMediaTimingFunction(name: visible ? .easeOut : .easeIn)
+                        panelRef.animator().setFrame(targetFrame, display: true)
                         panelRef.animator().alphaValue = visible ? 1.0 : 0.0
                     }, completionHandler: {})
                 }
@@ -440,18 +500,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 移除指定 requestId 的审批面板
+    /// 鼠标悬浮在宠物上 → 恢复所有隐藏的审批卡片（滑下+淡入）
+    private func restoreHiddenApprovalCards() {
+        guard let approval = approvalManager else { return }
+        approval.restoreAllHiddenCards()
+        for (reqId, finalFrame) in cardFinalFrames {
+            guard let panel = approvalPanels[reqId] else { continue }
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.25
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(finalFrame, display: true)
+                panel.animator().alphaValue = 1.0
+            })
+        }
+    }
+
+    /// 移除指定 requestId 的审批面板（滑上+淡出再关闭）
     private func removeApprovalPanel(requestId: String) {
         guard let panel = approvalPanels.removeValue(forKey: requestId) else { return }
-        panel.close()
+        let finalFrame = cardFinalFrames.removeValue(forKey: requestId)
+
+        let hideY = (finalFrame?.origin.y ?? panel.frame.origin.y) + panel.frame.height * 0.4
+        var hiddenFrame = panel.frame
+        hiddenFrame.origin.y = hideY
+
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().setFrame(hiddenFrame, display: true)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            panel.close()
+        })
     }
 
     /// 移除所有审批面板（Allow All 时）
     private func removeAllApprovalPanels() {
-        for (_, panel) in approvalPanels {
-            panel.close()
+        for (reqId, _) in approvalPanels {
+            removeApprovalPanel(requestId: reqId)
         }
-        approvalPanels.removeAll()
     }
 
     // MARK: - 首次启动 Hook 安装引导

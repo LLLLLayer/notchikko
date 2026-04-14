@@ -45,6 +45,7 @@
 "settings.seconds_3" = "3 秒";
 "settings.seconds_5" = "5 秒";
 "settings.seconds_10" = "10 秒";
+"settings.seconds_15" = "15 秒";
 "settings.never_hide" = "永不隐藏";
 
 /* SettingsWindow - IDE Extensions */

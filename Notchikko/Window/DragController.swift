@@ -153,10 +153,10 @@ final class DragController {
             context.duration = 0.35
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
-        }, completionHandler: {
+        }, completionHandler: { [weak panel] in
             // 动画已将 frame 设到正确位置，不再重复 setFrame
             // 否则 constrainFrameRect 会把超出刘海安全区的 panel 推下来
-            panel.disableFrameConstraint = false
+            panel?.disableFrameConstraint = false
             completion?()
         })
     }

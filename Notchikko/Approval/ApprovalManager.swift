@@ -230,21 +230,48 @@ final class ApprovalManager {
         startHideTimer(for: requestId)
     }
 
+    /// 恢复所有已隐藏的卡片（鼠标悬浮在宠物上时调用）
+    func restoreAllHiddenCards() {
+        for reqId in pendingApprovals.keys {
+            guard pendingApprovals[reqId]?.isVisible == false else { continue }
+            onMouseEnter(requestId: reqId)
+        }
+    }
+
     /// Session 结束时清理会话级状态
     func cleanupSession(_ sessionId: String) {
         autoApprovedSessions.remove(sessionId)
+    }
+
+    /// 用户在终端操作了（新 prompt / stop），清理该 session 的过期审批卡片
+    /// hook 连接可能已断开，只做 app 侧清理
+    func dismissStaleApprovals(for sessionId: String) {
+        let stale = pendingApprovals.values.filter {
+            $0.sessionId == sessionId && !$0.requestId.isEmpty
+        }
+        guard !stale.isEmpty else { return }
+        Log("dismissStaleApprovals: sid=\(sessionId.prefix(8)), closing \(stale.count) stale card(s)", tag: "Approval")
+        for card in stale {
+            socketServer?.closePending(requestId: card.requestId)
+            dismiss(requestId: card.id)
+        }
     }
 
     /// 收到后续事件 → 只清理通知卡片，保留阻塞式审批/AskUser 卡片
     /// 阻塞式卡片由用户操作或 staleTimer 清理
     func onSessionEvent(sessionId: String) {
         let toRemove = pendingApprovals.values.filter {
-            $0.sessionId == sessionId && $0.isNotification
+            $0.sessionId == sessionId && $0.requestId.isEmpty
         }.map { $0.id }
         if !toRemove.isEmpty {
             Log("onSessionEvent: sid=\(sessionId.prefix(8)), clearing \(toRemove.count) notification card(s)", tag: "Approval")
         }
         for id in toRemove {
+            // 二次校验：确保不误删阻塞式审批卡片
+            guard let card = pendingApprovals[id], card.requestId.isEmpty else {
+                Log("onSessionEvent: SKIP non-notification card id=\(id.prefix(8))", tag: "Approval")
+                continue
+            }
             dismiss(requestId: id)
         }
     }

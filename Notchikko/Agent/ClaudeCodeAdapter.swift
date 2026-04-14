@@ -7,6 +7,8 @@ final class ClaudeCodeAdapter: AgentBridge {
     private var knownSessions: Set<String> = []
     /// 每个 session 的 subagent 嵌套深度（>0 时抑制工具/状态事件）
     private var subagentDepth: [String: Int] = [:]
+    /// 保护 knownSessions / subagentDepth 的并发访问（onEvent 在并发队列上调用）
+    private let stateLock = NSLock()
 
     /// 终端 PID 更新回调
     var onTerminalPidUpdate: ((String, Int) -> Void)?
@@ -25,51 +27,54 @@ final class ClaudeCodeAdapter: AgentBridge {
                 let sid = hookEvent.sessionId
 
                 // 首次见到的 session，自动补发一个 sessionStart（带 cwd/source）
-                if !self.knownSessions.contains(sid) {
-                    self.knownSessions.insert(sid)
-                    if hookEvent.event != "SessionStart" {
-                        let syntheticStart = AgentEvent.sessionStart(
-                            sessionId: sid,
-                            cwd: hookEvent.cwd,
-                            source: hookEvent.source ?? "claude-code",
-                            terminalPid: hookEvent.terminalPid,
-                            pidChain: hookEvent.pidChain
-                        )
-                        continuation.yield(syntheticStart)
-                    }
+                self.stateLock.lock()
+                let isNewSession = self.knownSessions.insert(sid).inserted
+                self.stateLock.unlock()
+
+                if isNewSession && hookEvent.event != "SessionStart" {
+                    let syntheticStart = AgentEvent.sessionStart(
+                        sessionId: sid,
+                        cwd: hookEvent.cwd,
+                        source: hookEvent.source ?? "claude-code",
+                        terminalPid: hookEvent.terminalPid,
+                        pidChain: hookEvent.pidChain
+                    )
+                    continuation.yield(syntheticStart)
                 }
 
                 // Subagent 嵌套深度追踪：深度 >0 时抑制工具/状态事件，
                 // 避免子代理的 tool 调用影响动画和声音
+                self.stateLock.lock()
+                var shouldEmitEvent = true
                 switch hookEvent.event {
                 case "SubagentStart":
                     self.subagentDepth[sid, default: 0] += 1
                     Log("SubagentStart: depth[\(sid.prefix(8))]=\(self.subagentDepth[sid]!)", tag: "Adapter")
-                    // 不产生任何 AgentEvent
+                    shouldEmitEvent = false
                 case "SubagentStop":
                     let d = max((self.subagentDepth[sid] ?? 1) - 1, 0)
                     self.subagentDepth[sid] = d
                     Log("SubagentStop: depth[\(sid.prefix(8))]=\(d)", tag: "Adapter")
-                    // 不产生任何 AgentEvent
+                    shouldEmitEvent = false
                 default:
                     let depth = self.subagentDepth[sid] ?? 0
                     if depth > 0 {
-                        // 子代理运行中：仅放行需要用户交互的事件（审批/通知）
                         let passthrough = ["Elicitation", "PermissionRequest", "AskUserQuestion"]
                         if !passthrough.contains(hookEvent.event) {
                             Log("Suppressed subagent event: \(hookEvent.event) (depth=\(depth))", tag: "Adapter")
-                            // 跳过 —— 但仍继续下方的 terminalPid 等回调更新
-                            break
+                            shouldEmitEvent = false
                         }
                     }
+                }
+                if hookEvent.event == "SessionEnd" {
+                    self.subagentDepth.removeValue(forKey: sid)
+                }
+                self.stateLock.unlock()
+
+                if shouldEmitEvent {
                     if let agentEvent = Self.convert(hookEvent) {
                         continuation.yield(agentEvent)
                     }
-                }
-
-                // Session 结束时清理 subagent 深度
-                if hookEvent.event == "SessionEnd" {
-                    self.subagentDepth.removeValue(forKey: sid)
                 }
 
                 // 每个事件都可能携带 terminalPid/tty/permissionMode，通知更新

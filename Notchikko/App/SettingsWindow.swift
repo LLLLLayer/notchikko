@@ -239,9 +239,7 @@ struct ApprovalSettingsView: View {
                     Divider()
                     settingsRow(String(localized: "settings.approval_delay")) {
                         Picker("", selection: hideDelayBinding) {
-                            Text(String(localized: "settings.seconds_3")).tag(3.0 as TimeInterval)
-                            Text(String(localized: "settings.seconds_5")).tag(5.0 as TimeInterval)
-                            Text(String(localized: "settings.seconds_10")).tag(10.0 as TimeInterval)
+                            Text(String(localized: "settings.seconds_15")).tag(15.0 as TimeInterval)
                             Text(String(localized: "settings.never_hide")).tag(0.0 as TimeInterval)
                         }
                     }
@@ -274,7 +272,10 @@ struct ApprovalSettingsView: View {
 
     private var hideDelayBinding: Binding<TimeInterval> {
         Binding(
-            get: { PreferencesStore.shared.preferences.approvalCardHideDelay },
+            get: {
+                let v = PreferencesStore.shared.preferences.approvalCardHideDelay
+                return v == 0 ? 0 : 15  // 旧值（3/5/10）映射到 15
+            },
             set: { PreferencesStore.shared.preferences.approvalCardHideDelay = $0 }
         )
     }

@@ -71,7 +71,7 @@ struct NotchikkoPreferences: Codable, Equatable {
     var soundVolume: Float = 0.3          // 0.0 = 静音, 1.0 = 最大
     var soundThemeId: String = "arcade"   // 声音主题
     var customSounds: [String: String] = [:]
-    var approvalCardHideDelay: TimeInterval = 5
+    var approvalCardHideDelay: TimeInterval = 15
     var approvalCardEnabled: Bool = false
     var installedHooks: [String: Bool] = [:]
     var themeId: String = "clawd"

@@ -63,13 +63,14 @@ enum KnownTerminal: String, CaseIterable {
         switch self {
         case .iterm2:
             guard let tty else { return nil }
+            let safeTty = Self.escapeAppleScript(tty)
             return """
             tell application "iTerm2"
                 activate
                 repeat with w in windows
                     repeat with t in tabs of w
                         repeat with s in sessions of t
-                            if tty of s is "\(tty)" then
+                            if tty of s is "\(safeTty)" then
                                 select t
                                 return
                             end if
@@ -82,12 +83,14 @@ enum KnownTerminal: String, CaseIterable {
         case .terminal:
             guard let tty else { return nil }
             let shortTty = tty.replacingOccurrences(of: "/dev/", with: "")
+            let safeShort = Self.escapeAppleScript(shortTty)
+            let safeFull = Self.escapeAppleScript("/dev/" + shortTty)
             return """
             tell application "Terminal"
                 activate
                 repeat with w in windows
                     repeat with t in tabs of w
-                        if tty of t is "\(shortTty)" or tty of t is "/dev/\(shortTty)" then
+                        if tty of t is "\(safeShort)" or tty of t is "\(safeFull)" then
                             set selected of t to true
                             set index of w to 1
                             return
@@ -99,6 +102,7 @@ enum KnownTerminal: String, CaseIterable {
 
         case .ghostty:
             guard let cwd else { return nil }
+            let safeCwd = Self.escapeAppleScript(cwd)
             return """
             tell application "Ghostty"
                 activate
@@ -109,7 +113,7 @@ enum KnownTerminal: String, CaseIterable {
                 repeat with s in allSurfaces
                     try
                         set surfaceCwd to working directory of s
-                        if surfaceCwd is "\(cwd)" then
+                        if surfaceCwd is "\(safeCwd)" then
                             focus s
                             return "matched"
                         end if
@@ -122,5 +126,12 @@ enum KnownTerminal: String, CaseIterable {
         default:
             return nil
         }
+    }
+
+    /// 转义 AppleScript 字符串字面量，防止注入
+    private static func escapeAppleScript(_ str: String) -> String {
+        str.replacingOccurrences(of: "\\", with: "\\\\")
+           .replacingOccurrences(of: "\"", with: "\\\"")
+           .components(separatedBy: .newlines).joined()
     }
 }

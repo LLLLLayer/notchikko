@@ -2,6 +2,7 @@ import AVFoundation
 import Foundation
 
 /// 管理状态转场音效，支持内置 + 自定义音效
+@MainActor
 final class SoundManager {
     static let shared = SoundManager()
 
