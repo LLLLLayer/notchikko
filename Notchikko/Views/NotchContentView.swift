@@ -10,7 +10,7 @@ struct NotchContentView: View {
             // 底层：弹幕（工具名飘过宠物背后）
             if PreferencesStore.shared.preferences.danmakuEnabled {
                 DanmakuView(sessionManager: sessionManager)
-                    .frame(width: petSize * 1.6, height: petSize * 0.35)
+                    .frame(height: petSize * 0.5)
                     .offset(y: petSize * 0.28)
             }
 

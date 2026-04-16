@@ -6,12 +6,16 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2B68AD5E2F8EB0BA00224871 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2B5C80C12F8B00010042CF6B /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		2B5C80A62F8A1D780042CF6B /* Notchikko.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Notchikko.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		2B5C80C22F8B00010042CF6B /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		2B5C80C22F8B00010042CF6B /* Exceptions for "Notchikko" folder in "Notchikko" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +28,7 @@
 		2B5C80A82F8A1D780042CF6B /* Notchikko */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2B5C80C22F8B00010042CF6B /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				2B5C80C22F8B00010042CF6B /* Exceptions for "Notchikko" folder in "Notchikko" target */,
 			);
 			path = Notchikko;
 			sourceTree = "<group>";
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2B68AD5E2F8EB0BA00224871 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,11 +114,11 @@
 			);
 			mainGroup = 2B5C809D2F8A1D780042CF6B;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 2B5C80A72F8A1D780042CF6B /* Products */;
 			packageReferences = (
 				2B5C80C02F8B00010042CF6B /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2B5C80A72F8A1D780042CF6B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -141,25 +146,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		2B5C80C02F8B00010042CF6B /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.9.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		2B5C80C12F8B00010042CF6B /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2B5C80C02F8B00010042CF6B /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		2B5C80AF2F8A1D7A0042CF6B /* Debug */ = {
@@ -370,6 +356,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2B5C80C02F8B00010042CF6B /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2B5C80C12F8B00010042CF6B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2B5C80C02F8B00010042CF6B /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2B5C809E2F8A1D780042CF6B /* Project object */;
 }

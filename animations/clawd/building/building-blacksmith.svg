@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 1.6s infinite ease-in-out;
+      }
+      .eye {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 5s infinite;
+      }
+      .body-forge {
+        transform-origin: 7.5px 15px;
+        animation: body-forge 1.6s infinite;
+      }
+      .body-squash {
+        transform-origin: 7.5px 15px;
+        animation: body-squash 1.6s infinite;
+      }
+      .hammer-arm {
+        transform-origin: 14px 9px;
+        animation: hammer-swing 1.6s infinite;
+      }
+      .spark { opacity: 0; }
+      .sp1 { animation: spark-1 1.6s infinite; }
+      .sp2 { animation: spark-2 1.6s infinite; }
+      .sp3 { animation: spark-3 1.6s infinite; }
+      .sp4 { animation: spark-4 1.6s infinite; }
+      .glow {
+        opacity: 0;
+        animation: anvil-glow 1.6s infinite;
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-forge 1.6s infinite;
+      }
+      .sweat {
+        opacity: 0;
+        animation: sweat-fly 5s infinite;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.03, 0.97) translate(0, 0.5px); }
+      }
+      @keyframes eye-blink {
+        0%, 6%, 100% { transform: scaleY(1); }
+        3% { transform: scaleY(0.1); }
+      }
+      @keyframes body-forge {
+        0%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-1.5px); }
+        45% { transform: translateY(0); }
+        50% { transform: translateY(1.5px); }
+        65% { transform: translateY(0); }
+      }
+      @keyframes body-squash {
+        0%, 100% { transform: scale(1, 1); }
+        30% { transform: scale(0.97, 1.03); }
+        50% { transform: scale(1.08, 0.92); }
+        65% { transform: scale(1, 1); }
+      }
+      @keyframes hammer-swing {
+        0%, 100% { transform: rotate(15deg); }
+        30% { transform: rotate(-50deg); }
+        45% { transform: rotate(25deg); }
+        50% { transform: rotate(70deg); }
+        65% { transform: rotate(35deg); }
+        80% { transform: rotate(15deg); }
+      }
+      @keyframes spark-1 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(-4px, 3px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes spark-2 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(3px, 4px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes spark-3 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(-2px, 5px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes spark-4 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(5px, 2px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes anvil-glow {
+        0%, 48% { opacity: 0; }
+        50%, 55% { opacity: 0.5; }
+        70%, 100% { opacity: 0; }
+      }
+      @keyframes shadow-forge {
+        0%, 45%, 65%, 100% { transform: scaleX(1); opacity: 0.4; }
+        30% { transform: scaleX(0.93); opacity: 0.35; }
+        50% { transform: scaleX(1.07); opacity: 0.5; }
+      }
+      @keyframes sweat-fly {
+        0%, 55% { opacity: 0; transform: translate(0,0) scale(0); }
+        60% { opacity: 1; transform: translate(0,0) scale(1); }
+        80% { opacity: 0; transform: translate(-4px, -4px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+    </style>
+    <g id="px-spark">
+      <rect x="0" y="0" width="1" height="1"/>
+    </g>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Anvil (to the right, below arm level) -->
+  <rect x="16" y="5" width="5" height="2" fill="#78909C"/>
+  <rect x="17" y="3" width="3" height="2" fill="#607D8B"/>
+  <rect x="18" y="7" width="1" height="2" fill="#546E7A"/>
+  <!-- Hot metal on anvil -->
+  <rect x="17" y="5" width="3" height="1" fill="#FF6F00"/>
+  <!-- Impact glow -->
+  <rect class="glow" x="16" y="4" width="5" height="2" fill="#FF9800"/>
+
+  <!-- Sparks (fly from anvil on impact) -->
+  <g fill="#FFC107" transform="translate(18, 5)">
+    <use href="#px-spark" class="spark sp1"/>
+    <use href="#px-spark" class="spark sp2"/>
+  </g>
+  <g fill="#FFEB3B" transform="translate(17, 4)">
+    <use href="#px-spark" class="spark sp3"/>
+    <use href="#px-spark" class="spark sp4"/>
+  </g>
+
+  <!-- Legs -->
+  <g fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <g class="body-forge">
+    <g class="breathe">
+
+      <!-- Sweat droplet -->
+      <g transform="translate(-2, 6)">
+        <g class="sweat" fill="#40C4FF">
+          <rect x="0" y="1" width="1.5" height="1.5"/>
+          <rect x="0.25" y="0" width="1" height="1"/>
+        </g>
+      </g>
+
+      <g class="body-squash">
+        <!-- Head stripe -->
+        <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+        <!-- Body -->
+        <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+        <!-- Leather apron -->
+        <rect x="3" y="7" width="9" height="4" fill="#795548"/>
+        <rect x="4" y="7" width="7" height="0.5" fill="#5D4037"/>
+        <!-- Apron strap -->
+        <rect x="6" y="5" width="1" height="2" fill="#5D4037"/>
+        <rect x="8" y="5" width="1" height="2" fill="#5D4037"/>
+        <!-- Left arm -->
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        <!-- Eyes (focused) -->
+        <rect class="eye" x="5" y="8" width="1" height="1" fill="#000"/>
+        <rect class="eye" x="10" y="8" width="1" height="1" fill="#000"/>
+      </g>
+
+      <!-- Right arm + hammer -->
+      <g class="hammer-arm">
+        <rect x="13" y="8" width="2" height="3" fill="#DE886D"/>
+        <!-- Hammer handle -->
+        <rect x="14" y="4" width="1" height="5" fill="#8D6E63"/>
+        <!-- Hammer head -->
+        <rect x="13" y="3" width="3" height="2" fill="#9E9E9E"/>
+        <rect x="13" y="3" width="3" height="0.5" fill="#BDBDBD"/>
+      </g>
+
+    </g>
+  </g>
+
+  </g>
+</svg>

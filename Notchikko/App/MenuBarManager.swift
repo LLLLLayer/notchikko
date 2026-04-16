@@ -35,13 +35,6 @@ final class MenuBarManager {
                 header.isEnabled = false
                 menu.addItem(header)
 
-                // Auto 选项
-                let autoItem = NSMenuItem(title: NSLocalizedString("menu.auto", comment: ""), action: #selector(pinSession(_:)), keyEquivalent: "")
-                autoItem.target = self
-                autoItem.representedObject = nil
-                autoItem.state = (sm.pinnedSessionId == nil) ? .on : .off
-                menu.addItem(autoItem)
-
                 for session in sessions {
                     let isPinned = session.id == sm.pinnedSessionId
 
@@ -67,6 +60,15 @@ final class MenuBarManager {
 
                     sub.addItem(.separator())
 
+                    // Token 用量（单行浓缩）
+                    if let usage = session.tokenUsage {
+                        let header = NSMenuItem(title: NSLocalizedString("menu.usage", comment: ""), action: nil, keyEquivalent: "")
+                        header.isEnabled = false
+                        sub.addItem(header)
+                        sub.addItem(Self.usageItem("  " + Self.compactUsageLine(usage: usage)))
+                        sub.addItem(.separator())
+                    }
+
                     let closeItem = NSMenuItem(title: NSLocalizedString("menu.close_session", comment: ""), action: #selector(closeSession(_:)), keyEquivalent: "")
                     closeItem.target = self
                     closeItem.representedObject = session.id
@@ -75,6 +77,13 @@ final class MenuBarManager {
                     item.submenu = sub
                     menu.addItem(item)
                 }
+
+                // Auto 选项放在 session 列表末尾，session 多时更易触达
+                let autoItem = NSMenuItem(title: NSLocalizedString("menu.auto", comment: ""), action: #selector(pinSession(_:)), keyEquivalent: "")
+                autoItem.target = self
+                autoItem.representedObject = nil
+                autoItem.state = (sm.pinnedSessionId == nil) ? .on : .off
+                menu.addItem(autoItem)
 
                 menu.addItem(.separator())
             }
@@ -170,6 +179,30 @@ final class MenuBarManager {
         onQuit?()
     }
 
+    private static func usageItem(_ title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    /// 压缩成单行：`12.3K in · 4.5K out · 94K cached`
+    private static func compactUsageLine(usage: HookEvent.TokenUsage) -> String {
+        var parts: [String] = []
+        parts.append("\(formatTokens(usage.inputTokens)) in")
+        parts.append("\(formatTokens(usage.outputTokens)) out")
+        let cached = usage.cacheRead + usage.cacheCreation
+        if cached > 0 {
+            parts.append("\(formatTokens(cached)) cached")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static func formatTokens(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
+    }
+
     /// 在指定位置弹出右键菜单
     func showContextMenu(in view: NSWindow, at point: NSPoint) {
         buildMenu()
@@ -192,6 +225,11 @@ private final class SessionMenuItemView: NSView {
         self.session = session
         self.isPinned = isPinned
         super.init(frame: NSRect(x: 0, y: 0, width: Self.viewWidth, height: Self.viewHeight))
+        setAccessibilityRole(.menuItem)
+        let agentName = Self.agentName(for: session.source)
+        let terminal = session.matchedTerminal?.appName ?? ""
+        let pinMark = isPinned ? "pinned, " : ""
+        setAccessibilityLabel("\(pinMark)\(agentName) \(terminal) · \(session.phaseDisplayName)")
     }
 
     @available(*, unavailable)

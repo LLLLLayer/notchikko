@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 4s infinite ease-in-out;
+      }
+      .eye-peek {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 6s infinite;
+      }
+      .eye-squint {
+        /* looking into eyepiece, no blink */
+      }
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-pulse 4s infinite ease-in-out;
+      }
+      .adjust-arm {
+        transform-origin: 0px 9px;
+        animation: knob-turn 3s infinite ease-in-out;
+      }
+      .specimen-glow {
+        animation: glow-pulse 2s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+      @keyframes eye-blink {
+        0%, 6%, 100% { transform: scaleY(1); }
+        3% { transform: scaleY(0.1); }
+      }
+      @keyframes shadow-pulse {
+        0%, 100% { transform: scaleX(1); opacity: 0.4; }
+        50% { transform: scaleX(0.98); opacity: 0.38; }
+      }
+      @keyframes knob-turn {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(-8deg); }
+      }
+      @keyframes glow-pulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.8; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000"/>
+
+  <!-- Microscope (to the right of the pig) -->
+  <!-- Base -->
+  <rect x="15" y="5" width="7" height="1" fill="#546E7A"/>
+  <rect x="16" y="4" width="5" height="1" fill="#607D8B"/>
+  <!-- Stage (specimen platform) -->
+  <rect x="16" y="6" width="5" height="1" fill="#78909C"/>
+  <!-- Specimen slide -->
+  <rect x="17" y="6" width="3" height="0.5" fill="#E3F2FD"/>
+  <!-- Specimen glow (pulsing) -->
+  <rect class="specimen-glow" x="18" y="6" width="1" height="0.5" fill="#4CAF50"/>
+  <!-- Arm (vertical pillar) -->
+  <rect x="20" y="7" width="1" height="5" fill="#607D8B"/>
+  <!-- Arm curve to eyepiece -->
+  <rect x="17" y="11" width="4" height="1" fill="#607D8B"/>
+  <!-- Eyepiece tube (angled toward pig) -->
+  <rect x="15" y="10" width="2" height="2" fill="#37474F"/>
+  <!-- Eyepiece lens -->
+  <rect x="14" y="10" width="1" height="2" fill="#263238"/>
+  <!-- Objective lens (under stage) -->
+  <rect x="18" y="7" width="1" height="1" fill="#37474F"/>
+  <!-- Focus knob -->
+  <rect x="21" y="8" width="1" height="2" fill="#78909C"/>
+
+  <!-- Legs -->
+  <g fill="#DE886D">
+    <rect x="3" y="12" width="1" height="3"/>
+    <rect x="5" y="12" width="1" height="3"/>
+    <rect x="9" y="12" width="1" height="3"/>
+    <rect x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <g class="breathe">
+    <!-- Head stripe -->
+    <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+    <!-- Body -->
+    <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+    <!-- Left eye (squinting, looking into eyepiece) -->
+    <rect class="eye-squint" x="5" y="8.3" width="1" height="0.4" fill="#000"/>
+    <!-- Right eye (open, peeking up) -->
+    <rect class="eye-peek" x="10" y="8" width="1" height="1" fill="#000"/>
+
+    <!-- Right arm (reaching to microscope, adjusting knob) -->
+    <g class="adjust-arm">
+      <rect x="13" y="8" width="2" height="3" fill="#DE886D"/>
+    </g>
+
+    <!-- Left arm (resting on table/body) -->
+    <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+  </g>
+
+  </g>
+</svg>

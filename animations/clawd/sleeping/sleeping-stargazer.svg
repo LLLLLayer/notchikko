@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 15px;
+        animation: breathe-slow 5s infinite ease-in-out;
+      }
+      .shadow-breathe {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-pulse 5s infinite ease-in-out;
+      }
+      .star {
+        opacity: 0;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .s1 { animation: twinkle 3s infinite ease-in-out; }
+      .s2 { animation: twinkle 3s 0.6s infinite ease-in-out; }
+      .s3 { animation: twinkle 3s 1.2s infinite ease-in-out; }
+      .s4 { animation: twinkle 3s 1.8s infinite ease-in-out; }
+      .s5 { animation: twinkle 3s 2.4s infinite ease-in-out; }
+
+      @keyframes breathe-slow {
+        0%, 80%, 100% { transform: scale(1, 1); }
+        30%, 40% { transform: scale(1.02, 1.15); }
+      }
+      @keyframes shadow-pulse {
+        0%, 80%, 100% { transform: scaleX(1); opacity: 0.4; }
+        30%, 40% { transform: scaleX(1.03); opacity: 0.45; }
+      }
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.1; transform: scale(0.6); }
+        50% { opacity: 1; transform: scale(1.2); }
+      }
+    </style>
+    <!-- Pixel star (cross shape) -->
+    <g id="px-star">
+      <rect x="0" y="-1" width="1" height="3"/>
+      <rect x="-1" y="0" width="3" height="1"/>
+    </g>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow (wide for sploot) -->
+  <rect class="shadow-breathe" x="-1" y="15" width="17" height="1" fill="#000"/>
+
+  <!-- Twinkling stars -->
+  <use href="#px-star" class="star s1" x="-2" y="5" fill="#FFC107"/>
+  <use href="#px-star" class="star s2" x="16" y="7" fill="#FFEB3B"/>
+  <use href="#px-star" class="star s3" x="-4" y="12" fill="#FFF176"/>
+  <use href="#px-star" class="star s4" x="18" y="11" fill="#FFC107"/>
+  <use href="#px-star" class="star s5" x="8" y="6" fill="#FFEB3B"/>
+
+  <!-- Splooted body -->
+  <g class="breathe">
+    <!-- Legs pointing up (relaxed sploot) -->
+    <g fill="#DE886D">
+      <rect x="3" y="9" width="1" height="1"/>
+      <rect x="5" y="9" width="1" height="1"/>
+      <rect x="9" y="9" width="1" height="1"/>
+      <rect x="11" y="9" width="1" height="1"/>
+    </g>
+
+    <!-- Flattened torso -->
+    <rect x="1" y="10" width="13" height="5" fill="#DE886D"/>
+
+    <!-- Arms spread flat -->
+    <rect x="-1" y="13" width="2" height="2" fill="#DE886D"/>
+    <rect x="14" y="13" width="2" height="2" fill="#DE886D"/>
+
+    <!-- Sleep mask (over eye area) -->
+    <rect x="2" y="12" width="11" height="1.5" fill="#3D3D8A"/>
+    <!-- Mask strap -->
+    <rect x="0" y="12.3" width="2" height="0.8" fill="#5858A8"/>
+    <rect x="13" y="12.3" width="2" height="0.8" fill="#5858A8"/>
+    <!-- Mask eye cups (darker) -->
+    <rect x="3.5" y="12.2" width="2" height="1" fill="#2D2D6A"/>
+    <rect x="9.5" y="12.2" width="2" height="1" fill="#2D2D6A"/>
+
+    <!-- Tiny content smile -->
+    <rect x="6.5" y="11.5" width="2" height="0.3" fill="#000" opacity="0.2"/>
+  </g>
+
+  </g>
+</svg>

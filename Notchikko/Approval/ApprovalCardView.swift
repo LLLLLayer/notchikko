@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ApprovalCardView: View {
     let request: ApprovalManager.ApprovalRequest
+    /// 自动隐藏倒计时秒数；> 0 时卡片底边显示进度条。
+    var hideDelay: Double = 0
     let onDeny: () -> Void
     let onApprove: () -> Void
     let onAlwaysAllow: () -> Void
@@ -13,11 +15,14 @@ struct ApprovalCardView: View {
 
     @State private var isPulsing = false
     @State private var cardScale: CGFloat = 0.88
+    @State private var shownAt: Date = .init()
 
     private static let tailHeight: CGFloat = 8
     private static let tailWidth: CGFloat = 16
     private static let cardCornerRadius: CGFloat = 12
     private static let cardBackground = Color(nsColor: NSColor(white: 0.11, alpha: 0.94))
+    /// 统一弹簧动画节拍
+    static let bubbleSpring: Animation = .spring(response: 0.35, dampingFraction: 0.82)
 
     private var agentMeta: (icon: String, displayName: String) {
         CLIHookConfig.metadata(for: request.source)
@@ -41,6 +46,11 @@ struct ApprovalCardView: View {
                     tailHeight: Self.tailHeight)
     }
 
+    /// Subagent 用 amber 左边条，主 session 用工具类别色
+    private var accentBarColor: Color {
+        request.isSubagent ? Color(red: 0.96, green: 0.62, blue: 0.08) : categoryColor
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // 气泡尾巴留白区域
@@ -48,12 +58,12 @@ struct ApprovalCardView: View {
 
             // 卡片主体
             HStack(spacing: 0) {
-                // 左侧彩色边条 + 发光
+                // 左侧彩色边条 + 发光（subagent 显示 amber 以示区分）
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(categoryColor)
-                    .frame(width: 3.5)
+                    .fill(accentBarColor)
+                    .frame(width: request.isSubagent ? 4.5 : 3.5)
                     .padding(.vertical, 10)
-                    .shadow(color: categoryColor.opacity(0.5), radius: 8)
+                    .shadow(color: accentBarColor.opacity(0.5), radius: 8)
                     .opacity(isPulsing ? 0.65 : 1.0)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -75,6 +85,12 @@ struct ApprovalCardView: View {
                 .padding(.trailing, 12)
                 .padding(.vertical, 10)
             }
+            .overlay(alignment: .bottom) {
+                if hideDelay > 0 {
+                    countdownBar
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .background(bubbleShape.fill(Self.cardBackground))
         .clipShape(bubbleShape)
@@ -83,14 +99,41 @@ struct ApprovalCardView: View {
         .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
         .scaleEffect(cardScale)
         .environment(\.colorScheme, .dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilitySummary)
         .onAppear {
-            withAnimation(.easeOut(duration: 0.3)) {
+            shownAt = Date()
+            withAnimation(Self.bubbleSpring) {
                 cardScale = 1.0
             }
             guard !request.isNotification else { return }
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 isPulsing = true
             }
+        }
+    }
+
+    // MARK: - VoiceOver 汇总
+    private var accessibilitySummary: String {
+        let scope = request.isSubagent ? "Subagent " : ""
+        let toolPart = request.tool.isEmpty ? "" : " · \(request.tool)"
+        let cwd = request.cwdName.isEmpty ? "Session" : request.cwdName
+        return "\(scope)\(agentMeta.displayName)\(toolPart) · \(cwd)"
+    }
+
+    // MARK: - 倒计时进度条
+
+    private var countdownBar: some View {
+        TimelineView(.animation(minimumInterval: 0.1, paused: false)) { ctx in
+            let elapsed = ctx.date.timeIntervalSince(shownAt)
+            let remaining = max(0, 1 - elapsed / hideDelay)
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(categoryColor.opacity(0.55))
+                    .frame(width: geo.size.width * CGFloat(remaining), height: 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 2)
         }
     }
 
@@ -105,6 +148,7 @@ struct ApprovalCardView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close")
             }
 
             Text(agentMeta.icon)
@@ -128,6 +172,7 @@ struct ApprovalCardView: View {
                     .foregroundColor(.accentColor)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "approval.jump_to_terminal"))
             }
         }
     }
@@ -139,11 +184,11 @@ struct ApprovalCardView: View {
             ToolPill(name: request.tool, color: categoryColor)
             if request.isSubagent {
                 Text("Subagent")
-                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(red: 1.0, green: 0.75, blue: 0.35))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.1))
+                    .background(Color(red: 0.96, green: 0.62, blue: 0.08).opacity(0.18))
                     .clipShape(Capsule())
             }
             if !request.terminalName.isEmpty {
@@ -161,12 +206,20 @@ struct ApprovalCardView: View {
     // MARK: - 内容预览
 
     private var contentPreview: some View {
+        // 阻塞期间禁用文本选择，避免与飞入手势冲突；通知卡可选
         ScrollView(.vertical, showsIndicators: false) {
-            Text(request.input)
-                .font(.system(size: 10.5, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            Group {
+                if request.isNotification {
+                    Text(request.input)
+                        .textSelection(.enabled)
+                } else {
+                    Text(request.input)
+                        .textSelection(.disabled)
+                }
+            }
+            .font(.system(size: 10.5, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxHeight: 80)
         .padding(.horizontal, 8)
@@ -183,38 +236,51 @@ struct ApprovalCardView: View {
             askUserActionRow
         } else if !request.isNotification {
             HStack(spacing: 5) {
-                // Deny: 紧凑图标按钮，与操作按钮分离
+                // Deny: 紧凑图标按钮
                 Button(action: onDeny) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary.opacity(0.5))
-                        .frame(width: 26, height: 24)
+                    VStack(spacing: 1) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("⌘N")
+                            .font(.system(size: 8, weight: .medium, design: .monospaced))
+                            .foregroundColor(.primary.opacity(0.4))
+                    }
+                    .foregroundColor(.primary.opacity(0.55))
+                    .frame(width: 30, height: 28)
                 }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .accessibilityLabel(String(localized: "approval.deny"))
+                .accessibilityHint("Command N")
 
                 Spacer()
 
+                // 按钮层级：Allow Once 主操作（primary），Always Allow 次要（light），Auto Approve 警告色（amber）
                 CardButton(
                     label: String(localized: "approval.allow_once"),
                     icon: "checkmark",
-                    style: .light,
+                    hotkey: "⌘Y",
+                    style: .primary,
                     action: onApprove
                 )
+                .accessibilityHint("Command Y")
                 CardButton(
                     label: String(localized: "approval.always_allow"),
                     icon: "checkmark.circle",
-                    style: .primary,
+                    hotkey: "⇧⌘Y",
+                    style: .light,
                     action: onAlwaysAllow
                 )
+                .accessibilityHint("Shift Command Y")
                 CardButton(
                     label: String(localized: "approval.auto_approve"),
                     icon: "bolt.fill",
+                    hotkey: "⇧⌘N",
                     style: .amber,
                     action: onAutoApprove
                 )
+                .accessibilityHint("Shift Command N · Auto approve all tools in this session")
             }
         }
     }
@@ -225,13 +291,17 @@ struct ApprovalCardView: View {
     private var askUserActionRow: some View {
         if let question = request.questions.first {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(question.options, id: \.self) { option in
+                ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
                     Button {
                         onAnswer?(question.text, option)
                     } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "circle")
-                                .font(.system(size: 8))
+                        HStack(spacing: 6) {
+                            Text("\(index + 1)")
+                                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.primary.opacity(0.5))
+                                .frame(width: 14, height: 14)
+                                .background(Color.primary.opacity(0.1))
+                                .clipShape(Circle())
                             Text(option)
                                 .font(.system(size: 10.5, weight: .medium))
                                 .lineLimit(2)
@@ -265,49 +335,28 @@ private struct BubbleShape: Shape {
 
         var p = Path()
 
-        // 左上角起始点
         p.move(to: CGPoint(x: rect.minX, y: bodyTop + cr))
-
-        // 左上角圆弧
         p.addArc(center: CGPoint(x: rect.minX + cr, y: bodyTop + cr),
                  radius: cr,
                  startAngle: .degrees(180),
                  endAngle: .degrees(270),
                  clockwise: false)
-
-        // 顶边 → 尾巴左侧
         p.addLine(to: CGPoint(x: tailCenterX - halfTail, y: bodyTop))
-
-        // 尾巴尖端
         p.addLine(to: CGPoint(x: tailCenterX, y: rect.minY))
-
-        // 尾巴右侧 → 顶边
         p.addLine(to: CGPoint(x: tailCenterX + halfTail, y: bodyTop))
-
-        // 顶边 → 右上角
         p.addLine(to: CGPoint(x: rect.maxX - cr, y: bodyTop))
-
-        // 右上角圆弧
         p.addArc(center: CGPoint(x: rect.maxX - cr, y: bodyTop + cr),
                  radius: cr,
                  startAngle: .degrees(270),
                  endAngle: .degrees(0),
                  clockwise: false)
-
-        // 右边缘 → 右下角
         p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - cr))
-
-        // 右下角圆弧
         p.addArc(center: CGPoint(x: rect.maxX - cr, y: rect.maxY - cr),
                  radius: cr,
                  startAngle: .degrees(0),
                  endAngle: .degrees(90),
                  clockwise: false)
-
-        // 底边 → 左下角
         p.addLine(to: CGPoint(x: rect.minX + cr, y: rect.maxY))
-
-        // 左下角圆弧
         p.addArc(center: CGPoint(x: rect.minX + cr, y: rect.maxY - cr),
                  radius: cr,
                  startAngle: .degrees(90),
@@ -354,18 +403,19 @@ private struct ToolPill: View {
     }
 }
 
-// MARK: - 按钮（渐进强调：light → primary → amber）
+// MARK: - 按钮（label + icon + 快捷键提示）
 
 private struct CardButton: View {
     let label: String
     let icon: String
+    let hotkey: String?
     let style: ButtonVariant
     let action: () -> Void
 
     enum ButtonVariant {
-        case light       // 允许一次
-        case primary     // 始终允许
-        case amber       // 自动批准
+        case light       // 次要：始终允许
+        case primary     // 主操作：允许一次
+        case amber       // 警告：自动批准（高风险）
     }
 
     private var bgColor: Color {
@@ -384,24 +434,41 @@ private struct CardButton: View {
         }
     }
 
+    private var hotkeyColor: Color {
+        switch style {
+        case .light: .primary.opacity(0.45)
+        case .primary: .white.opacity(0.7)
+        case .amber: .white.opacity(0.75)
+        }
+    }
+
     private var fontWeight: Font.Weight {
         style == .light ? .medium : .semibold
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 3) {
-                Image(systemName: icon)
-                    .font(.system(size: 9, weight: fontWeight))
-                Text(label)
-                    .font(.system(size: 10.5, weight: fontWeight))
+            VStack(spacing: 1) {
+                HStack(spacing: 3) {
+                    Image(systemName: icon)
+                        .font(.system(size: 9, weight: fontWeight))
+                    Text(label)
+                        .font(.system(size: 10.5, weight: fontWeight))
+                        .fixedSize()
+                }
+                if let hotkey {
+                    Text(hotkey)
+                        .font(.system(size: 8, weight: .medium, design: .monospaced))
+                        .foregroundColor(hotkeyColor)
+                }
             }
             .foregroundColor(fgColor)
             .padding(.horizontal, 9)
-            .frame(height: 24)
+            .frame(height: 28)
         }
         .buttonStyle(.plain)
         .background(bgColor)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityLabel(label)
     }
 }

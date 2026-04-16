@@ -37,6 +37,7 @@ final class SessionManager {
         var pidChain: [Int]?                 // hook→终端的 PID 链（VS Code 终端定位）
         var isBypassMode: Bool = false       // --dangerously-skip-permissions
         var tokenUsage: HookEvent.TokenUsage?  // Stop 事件携带的最终 token 用量
+        var detection: SessionDetection = .hook  // 发现方式
 
         var cwdName: String {
             (cwd as NSString).lastPathComponent
@@ -78,6 +79,13 @@ final class SessionManager {
         case runningTool(String)
         case compacting
         case ended
+    }
+
+    /// Session 发现方式（hook 优先级最高）
+    enum SessionDetection: String {
+        case hook         // 通过 CLI hook 连接（完整功能）
+        case transcript   // 通过 JSONL 转录文件发现（只读，无审批/终端跳转）
+        case discovered   // 通过进程扫描发现（最小信息，无状态）
     }
 
     // MARK: - 当前活跃 session
@@ -373,6 +381,33 @@ final class SessionManager {
     /// 更新 session 的 bypass 模式
     func setBypassMode(_ bypass: Bool, for sessionId: String) {
         sessions[sessionId]?.isBypassMode = bypass
+    }
+
+    /// 设置 session 的发现来源（不允许降级：hook > transcript > discovered）
+    func setDetection(_ detection: SessionDetection, for sessionId: String) {
+        guard let current = sessions[sessionId]?.detection else { return }
+        let priority: [SessionDetection] = [.discovered, .transcript, .hook]
+        guard let currentIdx = priority.firstIndex(of: current),
+              let newIdx = priority.firstIndex(of: detection),
+              newIdx >= currentIdx else { return }
+        sessions[sessionId]?.detection = detection
+    }
+
+    /// 升级 session 的发现来源（discovered/transcript → hook 时调用）
+    func upgradeDetection(_ detection: SessionDetection, for sessionId: String) {
+        guard let current = sessions[sessionId]?.detection else { return }
+        // 只允许升级：discovered → transcript → hook
+        let priority: [SessionDetection] = [.discovered, .transcript, .hook]
+        guard let currentIdx = priority.firstIndex(of: current),
+              let newIdx = priority.firstIndex(of: detection),
+              newIdx > currentIdx else { return }
+        sessions[sessionId]?.detection = detection
+        Log("Session \(sessionId.prefix(8)) upgraded: \(current) → \(detection)", tag: "Session")
+    }
+
+    /// 已通过 hook 连接的 session IDs
+    var hookSessionIds: Set<String> {
+        Set(sessions.values.filter { $0.detection == .hook }.map(\.id))
     }
 
     // MARK: - 内部

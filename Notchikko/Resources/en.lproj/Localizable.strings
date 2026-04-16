@@ -6,6 +6,12 @@
 "menu.unpin" = "Unpin";
 "menu.jump_to_terminal" = "Jump";
 "menu.close_session" = "Close";
+"menu.usage" = "Usage";
+"menu.usage.input" = "Input:";
+"menu.usage.output" = "Output:";
+"menu.usage.cache_read" = "Cache R:";
+"menu.usage.cache_write" = "Cache W:";
+"menu.usage.tokens_fmt" = "%@ tokens";
 "menu.settings" = "More Settings...";
 "menu.check_for_updates" = "Check for Updates…";
 "menu.quit" = "Quit Notchikko";

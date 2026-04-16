@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cardFinalFrames: [String: NSRect] = [:]      // requestId → 展开后的目标 frame
     private let terminalJumper = TerminalJumper()
     private let updateManager = UpdateManager()
+    private let hotkeyManager = HotkeyManager()
+    private let transcriptPoller = TranscriptPoller()
+    private let processDiscovery = ProcessDiscovery()
 
     private var screenObserver: NSObjectProtocol?
     private var prefsObserver: NSObjectProtocol?
@@ -40,6 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(obs)
         }
         dragController.teardown()
+        hotkeyManager.deactivate()
+        transcriptPoller.stop()
+        processDiscovery.stop()
     }
 
     private func setupMenuBar() {
@@ -236,10 +242,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !(self?.approvalManager?.pendingApprovals.values.contains(where: { !$0.requestId.isEmpty }) ?? false) {
                 self?.sessionManager.endApproval()
             }
+            self?.updateHotkeyState()
         }
         approval.onAllCardsDismissed = { [weak self] in
             self?.removeAllApprovalPanels()
             self?.sessionManager.endApproval()
+            self?.updateHotkeyState()
+        }
+
+        // 审批热键
+        hotkeyManager.onAction = { [weak self] action in
+            guard let self,
+                  let approval = self.approvalManager,
+                  let target = approval.mostRecentBlockingApproval else { return }
+            Log("Hotkey: \(action), target=\(target.id.prefix(8))", tag: "App")
+            switch action {
+            case .allowOnce:   approval.approve(requestId: target.id)
+            case .alwaysAllow: approval.alwaysAllowTool(requestId: target.id)
+            case .deny:        approval.deny(requestId: target.id)
+            case .autoApprove: approval.autoApproveSession(requestId: target.id)
+            }
+            self.updateHotkeyState()
         }
 
         // Hook 进程断开 → 自动关闭对应审批卡片（用户按 Esc 等场景）
@@ -275,14 +298,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             approval.handleApprovalRequest(from: hookEvent, session: session, isSubagent: isSubagent)
-            // subagent 审批不切换宠物动画（避免跳来跳去）
-            if !isSubagent {
-                self.sessionManager.overrideState(.approving)
-            }
             let requestId = hookEvent.requestId ?? ""
+            // 只有真的创建了卡片（非 autoApproved session 的直通）才切换动画
+            // subagent 审批也不切宠物动画（避免跳来跳去）
             if let request = approval.pendingApprovals[requestId] {
+                if !isSubagent {
+                    self.sessionManager.overrideState(.approving)
+                }
                 self.showApprovalPanel(for: request)
             }
+            self.updateHotkeyState()
         }
 
         // 终端 PID/tty 更新回调（每个 hook 事件都可能携带）
@@ -299,10 +324,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.sessionManager.setBypassMode(mode == "bypassPermissions", for: sessionId)
         }
 
+        // JSONL 转录回退
+        transcriptPoller.onEvent = { [weak self] event in
+            self?.sessionManager.handleEvent(event)
+        }
+        transcriptPoller.onSessionDiscovered = { [weak self] sessionId in
+            // handleEvent 创建的新 session 默认是 .hook，将其标记为 .transcript
+            self?.sessionManager.setDetection(.transcript, for: sessionId)
+        }
+        transcriptPoller.start()
+
+        // 进程发现
+        processDiscovery.onProcessFound = { [weak self] sessionId, source, pid in
+            guard let self else { return }
+            // discovered session ID 使用 "discovered-" 前缀，不与 hook UUID 冲突
+            self.sessionManager.handleEvent(.sessionStart(
+                sessionId: sessionId, cwd: "", source: source,
+                terminalPid: nil, pidChain: nil
+            ))
+            self.sessionManager.setDetection(.discovered, for: sessionId)
+        }
+        processDiscovery.onProcessExited = { [weak self] sessionId in
+            self?.sessionManager.handleEvent(.sessionEnd(sessionId: sessionId))
+        }
+        processDiscovery.start()
+
         Task {
             try? await adapter.start()
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)
+
+                // Hook 事件到达 → 升级对应 session 为 hook 来源，合并 transcript session
+                sessionManager.upgradeDetection(.hook, for: event.sessionId)
+                transcriptPoller.mergeWithHookSession(event.sessionId)
+                // 同步 hook session IDs 给 pollers（避免重复发现）
+                transcriptPoller.hookSessionIds = sessionManager.hookSessionIds
+                processDiscovery.hookSessionIds = sessionManager.hookSessionIds
 
                 let sid = event.sessionId
                 approvalManager?.onSessionEvent(sessionId: sid)
@@ -312,6 +369,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .prompt, .stop, .sessionEnd:
                     approvalManager?.dismissStaleApprovals(for: sid)
                 default: break
+                }
+
+                // 防御性清理：无任何待审批卡片时解除 approving 锁定
+                if approvalManager?.pendingApprovals.isEmpty == true,
+                   sessionManager.isApproving {
+                    sessionManager.endApproval()
                 }
 
                 // Session 结束 → 清理会话级审批状态 + bypass flag
@@ -377,6 +440,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - 审批热键状态
+
+    /// 根据当前审批状态激活或停用全局热键
+    private func updateHotkeyState() {
+        if approvalManager?.hasPendingBlockingApproval == true {
+            hotkeyManager.activate()
+        } else {
+            hotkeyManager.deactivate()
+        }
+    }
+
     // MARK: - 审批面板（叠加式，新卡片错位堆叠）
 
     /// 每张卡片的错位偏移量
@@ -390,6 +464,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let cardView = ApprovalCardView(
             request: request,
+            hideDelay: PreferencesStore.shared.preferences.approvalCardHideDelay,
             onDeny: {
                 approval.deny(requestId: reqId)
             },
@@ -553,7 +628,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 移除所有审批面板（Allow All 时）
     private func removeAllApprovalPanels() {
-        for (reqId, _) in approvalPanels {
+        let keys = Array(approvalPanels.keys)
+        for reqId in keys {
             removeApprovalPanel(requestId: reqId)
         }
     }

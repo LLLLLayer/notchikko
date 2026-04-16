@@ -215,10 +215,31 @@ final class ApprovalManager {
         onAllCardsDismissed?()
     }
 
+    // MARK: - 热键查询
+
+    /// 是否有待决的阻塞式审批（不含 AskUserQuestion 和通知卡）
+    var hasPendingBlockingApproval: Bool {
+        pendingApprovals.values.contains { !$0.requestId.isEmpty && !$0.isAskUser }
+    }
+
+    /// 最新的阻塞式审批卡片（热键作用目标）
+    var mostRecentBlockingApproval: ApprovalRequest? {
+        pendingApprovals.values
+            .filter { !$0.requestId.isEmpty && !$0.isAskUser }
+            .max(by: { $0.timestamp < $1.timestamp })
+    }
+
     // MARK: - 卡片显示控制
 
     func onMouseEnter(requestId: String) {
-        guard pendingApprovals[requestId] != nil else { return }
+        guard let req = pendingApprovals[requestId] else { return }
+        // 阻塞式卡片：先确认对端 hook 仍活着，若已断开直接 dismiss 不再飘出
+        if !req.requestId.isEmpty,
+           socketServer?.isRequestAlive(requestId: req.requestId) == false {
+            Log("onMouseEnter: hook gone, dismissing \(requestId.prefix(8))", tag: "Approval")
+            dismiss(requestId: requestId)
+            return
+        }
         pendingApprovals[requestId]?.isVisible = true
         hideTimers[requestId]?.cancel()
         hideTimers[requestId] = nil

@@ -47,6 +47,21 @@ final class SocketServer {
         unlink(Self.socketPath)
     }
 
+    /// 探测 fd 是否还活着（非阻塞 peek）。fd 不存在或已 EOF 返回 false。
+    func isRequestAlive(requestId: String) -> Bool {
+        pendingLock.lock()
+        guard let fd = pendingResponses[requestId] else {
+            pendingLock.unlock()
+            return false
+        }
+        var buf: UInt8 = 0
+        let n = recv(fd, &buf, 1, MSG_PEEK | MSG_DONTWAIT)
+        pendingLock.unlock()
+        // n == 0 → EOF（对端关闭）；n == -1 && errno == EAGAIN/EWOULDBLOCK → 活着无数据
+        if n == 0 { return false }
+        return true
+    }
+
     /// 关闭待响应连接但不发送数据（超时清理用）
     func closePending(requestId: String) {
         pendingLock.lock()

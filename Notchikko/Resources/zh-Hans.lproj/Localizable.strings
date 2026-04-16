@@ -6,6 +6,12 @@
 "menu.unpin" = "取消固定";
 "menu.jump_to_terminal" = "跳转";
 "menu.close_session" = "关闭";
+"menu.usage" = "用量";
+"menu.usage.input" = "输入:";
+"menu.usage.output" = "输出:";
+"menu.usage.cache_read" = "缓存读:";
+"menu.usage.cache_write" = "缓存写:";
+"menu.usage.tokens_fmt" = "%@ tokens";
 "menu.settings" = "更多设置...";
 "menu.check_for_updates" = "检查更新…";
 "menu.quit" = "退出 Notchikko";
