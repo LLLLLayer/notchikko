@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.deactivate()
         transcriptPoller.stop()
         processDiscovery.stop()
+        // 关闭 socket server + finish event stream
+        adapter?.socketServerRef.stop()
+        // 把排队中的日志刷到磁盘，防止最后 N 行丢失
+        FileLogger.shared.flush()
     }
 
     private func setupMenuBar() {
@@ -248,6 +252,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.removeAllApprovalPanels()
             self?.sessionManager.endApproval()
             self?.updateHotkeyState()
+        }
+        approval.onCardVisibilityChanged = { [weak self] reqId, visible in
+            self?.animatePanelVisibility(requestId: reqId, visible: visible)
         }
 
         // 审批热键
@@ -530,8 +537,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wrapper = ApprovalTrackingView(frame: panel.contentView?.bounds ?? panel.frame)
         wrapper.autoresizingMask = [.width, .height]
         wrapper.onMouseEnter = { [weak self] in
+            // 滑入/淡入动画由 ApprovalManager.onCardVisibilityChanged → animatePanelVisibility 驱动
             self?.approvalManager?.onMouseEnter(requestId: reqId)
-            self?.approvalPanels[reqId]?.alphaValue = 1.0
         }
         wrapper.onMouseExit = { [weak self] in
             self?.approvalManager?.onMouseExit(requestId: reqId)
@@ -560,27 +567,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.animator().setFrame(finalFrame, display: true)
             panel.animator().alphaValue = 1.0
         })
+        // 后续 isVisible 变化由 ApprovalManager.onCardVisibilityChanged → animatePanelVisibility 驱动
+    }
 
-        // 监听 isVisible 变化 → 滑动+淡入淡出
-        let panelRef = panel
-        Task { @MainActor in
-            var lastVisible = true
-            while approvalPanels[reqId] != nil {
-                try? await Task.sleep(for: .milliseconds(300))
-                let visible = approval.pendingApprovals[reqId]?.isVisible ?? false
-                if visible != lastVisible {
-                    lastVisible = visible
-                    let targetY = visible ? finalFrame.origin.y : finalFrame.origin.y + cardHeight * 0.4
-                    let targetFrame = NSRect(x: finalFrame.origin.x, y: targetY,
-                                             width: finalFrame.width, height: finalFrame.height)
-                    NSAnimationContext.runAnimationGroup({ ctx in
-                        ctx.duration = visible ? 0.25 : 0.2
-                        ctx.timingFunction = CAMediaTimingFunction(name: visible ? .easeOut : .easeIn)
-                        panelRef.animator().setFrame(targetFrame, display: true)
-                        panelRef.animator().alphaValue = visible ? 1.0 : 0.0
-                    }, completionHandler: {})
-                }
-            }
+    /// hideTimer/mouseEnter 触发的滑下隐藏 / 滑上恢复动画
+    private func animatePanelVisibility(requestId: String, visible: Bool) {
+        guard let panel = approvalPanels[requestId],
+              let finalFrame = cardFinalFrames[requestId] else { return }
+        let targetY = visible ? finalFrame.origin.y : finalFrame.origin.y + finalFrame.height * 0.4
+        let targetFrame = NSRect(x: finalFrame.origin.x, y: targetY,
+                                 width: finalFrame.width, height: finalFrame.height)
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = visible ? 0.25 : 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: visible ? .easeOut : .easeIn)
+            panel.animator().setFrame(targetFrame, display: true)
+            panel.animator().alphaValue = visible ? 1.0 : 0.0
         }
     }
 

@@ -53,6 +53,14 @@ final class FileLogger {
         logDir.path
     }
 
+    /// 同步 flush：等待所有排队写入完成 + fsync 到磁盘。
+    /// applicationWillTerminate 调用，避免最后 N 条日志丢失。
+    func flush() {
+        queue.sync {
+            try? fileHandle?.synchronize()
+        }
+    }
+
     // MARK: - Private
 
     private func write(_ entry: String) {

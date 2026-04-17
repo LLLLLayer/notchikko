@@ -16,6 +16,8 @@ final class ApprovalManager {
     var onCardDismissed: ((String) -> Void)?
     /// 全部移除回调（Allow All / Auto Approve 时）
     var onAllCardsDismissed: (() -> Void)?
+    /// 卡片可见性变化回调（用于驱动滑入/淡出动画，替代 300ms 轮询）
+    var onCardVisibilityChanged: ((String, Bool) -> Void)?
 
     struct ApprovalRequest: Identifiable {
         let id: String             // 同 requestId，用于卡片标识
@@ -240,9 +242,16 @@ final class ApprovalManager {
             dismiss(requestId: requestId)
             return
         }
-        pendingApprovals[requestId]?.isVisible = true
+        setVisibility(true, for: requestId)
         hideTimers[requestId]?.cancel()
         hideTimers[requestId] = nil
+    }
+
+    /// 统一可见性变更入口：去重后触发回调，驱动 NSPanel 动画
+    private func setVisibility(_ visible: Bool, for requestId: String) {
+        guard let current = pendingApprovals[requestId]?.isVisible, current != visible else { return }
+        pendingApprovals[requestId]?.isVisible = visible
+        onCardVisibilityChanged?(requestId, visible)
     }
 
     func onMouseExit(requestId: String) {
@@ -356,7 +365,7 @@ final class ApprovalManager {
         hideTimers[requestId] = Task {
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
-            pendingApprovals[requestId]?.isVisible = false
+            setVisibility(false, for: requestId)
         }
     }
 
