@@ -94,6 +94,9 @@
 "settings.disable_bypass" = "关闭";
 "settings.coming_soon" = "Coming Soon";
 "settings.title" = "Notchikko 设置";
+"settings.hooks_outdated_title" = "Hook 需要重装";
+"settings.hooks_outdated_body" = "App 升级过，磁盘上的 hook 文件已过期。重装后才能恢复审批和状态追踪。";
+"settings.hooks_reinstall_all" = "全部重装";
 
 /* ApprovalCardView */
 "approval.deny" = "拒绝";

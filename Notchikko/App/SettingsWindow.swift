@@ -291,12 +291,38 @@ struct IntegrationSettingsView: View {
     @State private var hookInstaller = HookInstaller()
     @State private var hookStatuses: [String: Bool] = [:]
     @State private var ideStatuses: [String: IDEExtensionInstaller.ExtensionStatus] = [:]
+    @State private var hooksOutdated: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text(String(localized: "settings.integration"))
                     .font(.title2.bold())
+
+                // 升级提示：老版 inline-python .sh 或 .py 丢失时显示
+                if hooksOutdated {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "settings.hooks_outdated_title"))
+                                .font(.body.bold())
+                            Text(String(localized: "settings.hooks_outdated_body"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(String(localized: "settings.hooks_reinstall_all")) {
+                            hookInstaller.reinstallAllOutdatedHooks()
+                            refreshStatuses()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding(10)
+                    .background(.orange.opacity(0.12))
+                    .cornerRadius(8)
+                }
 
                 // CLI Hooks
                 GroupBox("CLI Hooks") {
@@ -366,6 +392,7 @@ struct IntegrationSettingsView: View {
         for cli in HookInstaller.supportedCLIs {
             hookStatuses[cli.name] = hookInstaller.isInstalled(for: cli)
         }
+        hooksOutdated = hookInstaller.isInstalledHookOutdated
         Task {
             for target in IDEExtensionInstaller.targets {
                 let status = await IDEExtensionInstaller.checkStatus(for: target)

@@ -94,6 +94,9 @@
 "settings.disable_bypass" = "Disable";
 "settings.coming_soon" = "Coming Soon";
 "settings.title" = "Notchikko Settings";
+"settings.hooks_outdated_title" = "Hooks need reinstall";
+"settings.hooks_outdated_body" = "App updated — hook files on disk are stale. Reinstall to restore approval + state tracking.";
+"settings.hooks_reinstall_all" = "Reinstall all";
 
 /* ApprovalCardView */
 "approval.deny" = "Deny";

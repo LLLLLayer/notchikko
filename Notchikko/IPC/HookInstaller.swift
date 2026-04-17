@@ -103,6 +103,35 @@ final class HookInstaller {
 
     // MARK: - 检测
 
+    /// 已安装的 hook 是否需要升级。
+    /// 触发条件:
+    /// - 老版 inline Python 格式（.sh 里包含 `python3 -c`），还没分成两个文件
+    /// - 或者 .sh 存在但 .py 缺失（升级过程中途失败 / 用户手工删文件）
+    ///
+    /// 返回 true 表示 Settings 应提示用户重装 hook。
+    var isInstalledHookOutdated: Bool {
+        let shPath = hookDir.appendingPathComponent("notchikko-hook.sh").path
+        let pyPath = hookDir.appendingPathComponent("notchikko-hook.py").path
+        guard FileManager.default.fileExists(atPath: shPath) else {
+            return false  // 全新用户，未装 hook — 不是"需要升级"
+        }
+        // 任何一个 CLI 在 preferences 里标记为 installed，但 .py 缺失 → 需要重装
+        if !FileManager.default.fileExists(atPath: pyPath) { return true }
+        // .sh 含 inline Python → 旧格式
+        if let content = try? String(contentsOfFile: shPath, encoding: .utf8),
+           content.contains("python3 -c") {
+            return true
+        }
+        return false
+    }
+
+    /// 批量重装所有当前已安装的 CLI hooks（Settings 的 "Update All" 按钮用）
+    func reinstallAllOutdatedHooks() {
+        for cli in Self.supportedCLIs where isInstalled(for: cli) {
+            try? install(for: cli)
+        }
+    }
+
     func isInstalled(for cli: CLIHookConfig) -> Bool {
         let settingsURL = expandPath(cli.settingsPath)
         guard let content = try? String(contentsOf: settingsURL, encoding: .utf8) else {
