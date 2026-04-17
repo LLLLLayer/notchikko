@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 // MARK: - 设置面板主窗口（侧边栏导航）
 
 enum SettingsTab: String, CaseIterable {
-    case display, sound, approval, integration
+    case display, sound, approval, integration, shortcuts
 
     var displayName: String {
         switch self {
@@ -12,6 +12,7 @@ enum SettingsTab: String, CaseIterable {
         case .sound: return String(localized: "settings.sound")
         case .approval: return String(localized: "settings.approval")
         case .integration: return String(localized: "settings.integration")
+        case .shortcuts: return String(localized: "settings.shortcuts")
         }
     }
 
@@ -21,6 +22,7 @@ enum SettingsTab: String, CaseIterable {
         case .sound: return "speaker.wave.2"
         case .approval: return "checkmark.shield"
         case .integration: return "terminal"
+        case .shortcuts: return "keyboard"
         }
     }
 }
@@ -46,6 +48,8 @@ struct SettingsWindowView: View {
                     ApprovalSettingsView()
                 case .integration:
                     IntegrationSettingsView()
+                case .shortcuts:
+                    ShortcutsSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -372,6 +376,121 @@ struct IntegrationSettingsView: View {
         }
     }
 
+}
+
+// MARK: - 快捷键
+
+struct ShortcutsSettingsView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(String(localized: "settings.shortcuts"))
+                    .font(.title2.bold())
+
+                GroupBox(String(localized: "settings.shortcuts.group_approval")) {
+                    VStack(spacing: 0) {
+                        ShortcutRow(
+                            keys: ["⌘", "Y"],
+                            label: String(localized: "approval.allow_once")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: ["⌘", "⇧", "Y"],
+                            label: String(localized: "approval.always_allow")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: ["⌘", "N"],
+                            label: String(localized: "approval.deny")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: ["⌘", "⇧", "N"],
+                            label: String(localized: "approval.auto_approve")
+                        )
+                    }
+                    .padding(.vertical, 4)
+                }
+                Text(String(localized: "settings.shortcuts.approval_hint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                GroupBox(String(localized: "settings.shortcuts.group_app")) {
+                    VStack(spacing: 0) {
+                        ShortcutRow(
+                            keys: ["⌘", ","],
+                            label: String(localized: "settings.shortcuts.app_open_settings")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: ["⌘", "Q"],
+                            label: String(localized: "settings.shortcuts.app_quit")
+                        )
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                GroupBox(String(localized: "settings.shortcuts.group_pet")) {
+                    VStack(spacing: 0) {
+                        ShortcutRow(
+                            keys: [String(localized: "settings.shortcuts.mouse_click")],
+                            label: String(localized: "settings.shortcuts.pet_click")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: [String(localized: "settings.shortcuts.mouse_right_click")],
+                            label: String(localized: "settings.shortcuts.pet_right_click")
+                        )
+                        Divider()
+                        ShortcutRow(
+                            keys: [String(localized: "settings.shortcuts.mouse_drag")],
+                            label: String(localized: "settings.shortcuts.pet_drag")
+                        )
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+private struct ShortcutRow: View {
+    let keys: [String]
+    let label: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.body)
+            Spacer()
+            HStack(spacing: 4) {
+                ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
+                    KeyCap(text: key)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+    }
+}
+
+private struct KeyCap: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(.caption, design: .monospaced).weight(.medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.quaternary.opacity(0.6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(.secondary.opacity(0.3), lineWidth: 0.5)
+            )
+            .cornerRadius(4)
+    }
 }
 
 // MARK: - 子组件

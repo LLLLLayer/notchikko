@@ -21,6 +21,21 @@
 "settings.sound" = "声音";
 "settings.approval" = "审批";
 "settings.integration" = "集成";
+"settings.shortcuts" = "快捷键";
+
+/* SettingsWindow - Shortcuts */
+"settings.shortcuts.group_approval" = "审批";
+"settings.shortcuts.approval_hint" = "仅当审批卡片可见时生效，不会影响其他 App 的 ⌘Y/⌘N。";
+"settings.shortcuts.group_app" = "应用";
+"settings.shortcuts.app_open_settings" = "打开设置";
+"settings.shortcuts.app_quit" = "退出 Notchikko";
+"settings.shortcuts.group_pet" = "Clawd 交互";
+"settings.shortcuts.mouse_click" = "单击";
+"settings.shortcuts.mouse_right_click" = "右键";
+"settings.shortcuts.mouse_drag" = "拖拽";
+"settings.shortcuts.pet_click" = "跳转到 session 终端";
+"settings.shortcuts.pet_right_click" = "打开 session 菜单";
+"settings.shortcuts.pet_drag" = "移动到其他屏幕";
 
 /* SettingsWindow - Display */
 "settings.pet_size" = "Notchikko 大小";

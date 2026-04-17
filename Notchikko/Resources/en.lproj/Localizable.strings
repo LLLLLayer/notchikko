@@ -21,6 +21,21 @@
 "settings.sound" = "Sound";
 "settings.approval" = "Approval";
 "settings.integration" = "Integration";
+"settings.shortcuts" = "Shortcuts";
+
+/* SettingsWindow - Shortcuts */
+"settings.shortcuts.group_approval" = "Approval";
+"settings.shortcuts.approval_hint" = "Only active while an approval card is visible — won't steal ⌘Y/⌘N from other apps.";
+"settings.shortcuts.group_app" = "App";
+"settings.shortcuts.app_open_settings" = "Open Settings";
+"settings.shortcuts.app_quit" = "Quit Notchikko";
+"settings.shortcuts.group_pet" = "Clawd Interaction";
+"settings.shortcuts.mouse_click" = "Click";
+"settings.shortcuts.mouse_right_click" = "Right-click";
+"settings.shortcuts.mouse_drag" = "Drag";
+"settings.shortcuts.pet_click" = "Jump to session terminal";
+"settings.shortcuts.pet_right_click" = "Open session menu";
+"settings.shortcuts.pet_drag" = "Move to another screen";
 
 /* SettingsWindow - Display */
 "settings.pet_size" = "Notchikko size";
