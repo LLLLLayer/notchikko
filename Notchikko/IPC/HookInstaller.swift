@@ -317,24 +317,34 @@ final class HookInstaller {
     // MARK: - Private
 
     private func installHookScript() throws {
-        guard let bundleURL = Bundle.main.url(forResource: "notchikko-hook", withExtension: "sh") else {
+        try FileManager.default.createDirectory(at: hookDir, withIntermediateDirectories: true)
+
+        // 从 v2 开始分成两个文件：.sh 是薄 wrapper，.py 是 Python 主体
+        // (避免"bash 里塞 inline python + f-string 引号打架"的历史坑)
+        try copyBundleResource(name: "notchikko-hook", ext: "sh",
+                               to: hookDir.appendingPathComponent("notchikko-hook.sh"),
+                               executable: true)
+        try copyBundleResource(name: "notchikko-hook", ext: "py",
+                               to: hookDir.appendingPathComponent("notchikko-hook.py"),
+                               executable: false)
+    }
+
+    private func copyBundleResource(name: String, ext: String, to dest: URL, executable: Bool) throws {
+        guard let bundleURL = Bundle.main.url(forResource: name, withExtension: ext) else {
             throw HookError.scriptNotFound
         }
-
-        try FileManager.default.createDirectory(at: hookDir, withIntermediateDirectories: true)
-        let dest = hookDir.appendingPathComponent(hookScriptName)
-
         // 总是覆盖（确保最新版本）
         if FileManager.default.fileExists(atPath: dest.path) {
             try FileManager.default.removeItem(at: dest)
         }
         try FileManager.default.copyItem(at: bundleURL, to: dest)
 
-        // 设置可执行权限
-        try FileManager.default.setAttributes(
-            [.posixPermissions: 0o755],
-            ofItemAtPath: dest.path
-        )
+        if executable {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: dest.path
+            )
+        }
     }
 
     private func expandPath(_ path: String) -> URL {
