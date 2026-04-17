@@ -82,6 +82,23 @@ enum SVGSanitizer {
             }
         }
 
+        // 4. 拦截 url(...) 里的危险 scheme（style 属性 / CSS / xlink:href 绕过向量）
+        // 覆盖场景：style="fill: url(javascript:alert(1))"
+        //          style="background-image: url(data:text/html,...)"
+        for scheme in dangerousValuePatterns {
+            let escaped = NSRegularExpression.escapedPattern(for: scheme)
+            if let regex = try? NSRegularExpression(
+                pattern: "url\\s*\\(\\s*[\"']?\\s*\(escaped)[^)]*\\)",
+                options: .caseInsensitive
+            ) {
+                result = regex.stringByReplacingMatches(
+                    in: result,
+                    range: NSRange(result.startIndex..., in: result),
+                    withTemplate: "url(#safe)"
+                )
+            }
+        }
+
         return result
     }
 
@@ -103,6 +120,12 @@ enum SVGSanitizer {
         }
         for pattern in dangerousValuePatterns {
             if lower.contains(pattern) { return true }
+        }
+        // url(...) + 危险 scheme 组合（属性值正则覆盖不到的场景）
+        if lower.contains("url(") {
+            for pattern in dangerousValuePatterns where lower.contains(pattern) {
+                return true
+            }
         }
 
         return false

@@ -69,8 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menuBarManager.onRemoveSession = { [weak self] sessionId in
+            // sessionManager.onSessionRemoved 回调会负责调 approvalManager.cleanupSession
             self?.sessionManager.removeSession(sessionId)
-            self?.approvalManager?.cleanupSession(sessionId)
         }
 
         menuBarManager.onCheckForUpdates = { [weak self] in
@@ -238,6 +238,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 审批面板（受 Settings 开关控制）
         let approval = ApprovalManager(socketServer: adapter.socketServerRef)
         self.approvalManager = approval
+
+        // Session 被移除（菜单关闭 / LRU 淘汰）时同步清理 approval 侧 session 级状态
+        sessionManager.onSessionRemoved = { [weak approval] sessionId in
+            approval?.cleanupSession(sessionId)
+        }
 
         // 卡片移除回调
         approval.onCardDismissed = { [weak self] requestId in

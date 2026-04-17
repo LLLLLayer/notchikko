@@ -21,6 +21,10 @@ final class SessionManager {
     private var returnTimer: Task<Void, Never>?
     private var sessionCleanupTasks: [String: Task<Void, Never>] = [:]
 
+    /// Session 被移除时触发（菜单关闭 / LRU 淘汰）。
+    /// 订阅者应清理自己持有的 session 级状态（e.g. ApprovalManager.autoApprovedSessions）
+    var onSessionRemoved: ((String) -> Void)?
+
     struct SessionInfo {
         let id: String
         let cwd: String
@@ -119,7 +123,8 @@ final class SessionManager {
     func removeSession(_ sessionId: String) {
         sessionCleanupTasks[sessionId]?.cancel()
         sessionCleanupTasks.removeValue(forKey: sessionId)
-        sessions.removeValue(forKey: sessionId)
+        guard sessions.removeValue(forKey: sessionId) != nil else { return }
+        onSessionRemoved?(sessionId)
         if pinnedSessionId == sessionId {
             pinnedSessionId = nil
         }
@@ -447,14 +452,23 @@ final class SessionManager {
     }
 
     private func evictOldestSession() {
-        // 优先淘汰已结束的 session
+        // 1. 优先淘汰已结束的 session
         if let oldest = sessions.values.filter({ $0.phase == .ended }).min(by: { $0.lastEvent < $1.lastEvent }) {
             sessions.removeValue(forKey: oldest.id)
+            onSessionRemoved?(oldest.id)
             return
         }
-        // 没有 ended session，淘汰最旧的 idle session
+        // 2. 再淘汰最旧的 idle session
         if let oldest = sessions.values.filter({ $0.phase == .waitingForInput }).min(by: { $0.lastEvent < $1.lastEvent }) {
             sessions.removeValue(forKey: oldest.id)
+            onSessionRemoved?(oldest.id)
+            return
+        }
+        // 3. 极端情况：全在 working。淘汰最旧的任意 session，避免 dict 突破上限。
+        if let oldest = sessions.values.min(by: { $0.lastEvent < $1.lastEvent }) {
+            Log("Evicting working session under pressure: \(oldest.id.prefix(8))", tag: "Session")
+            sessions.removeValue(forKey: oldest.id)
+            onSessionRemoved?(oldest.id)
         }
     }
 
