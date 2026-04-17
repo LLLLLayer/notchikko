@@ -10,12 +10,15 @@ final class PreferencesStore {
             let needsRefresh = oldValue.petScale != preferences.petScale
                 || oldValue.themeId != preferences.themeId
                 || oldValue.notchDetectionMode != preferences.notchDetectionMode
-            scheduleSave(notifyUI: needsRefresh)
+            // 累积 notifyUI：debounce 窗口内只要有一次 true，最终写盘就要通知 UI rebuild
+            pendingNotifyUI = pendingNotifyUI || needsRefresh
+            scheduleSave()
         }
     }
 
     private let fileURL: URL
     private var saveTask: Task<Void, Never>?
+    private var pendingNotifyUI: Bool = false
 
     private init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -31,19 +34,23 @@ final class PreferencesStore {
         }
     }
 
-    /// 防抖保存：100ms 内多次修改只写盘一次
-    private func scheduleSave(notifyUI: Bool) {
+    /// 防抖保存：100ms 内多次修改只写盘一次。
+    /// pendingNotifyUI 跨 debounce 窗口累积，避免后续 notifyUI=false 的修改覆盖前面 true 的修改。
+    private func scheduleSave() {
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(100))
             guard !Task.isCancelled else { return }
-            persist(notifyUI: notifyUI)
+            let shouldNotify = pendingNotifyUI
+            pendingNotifyUI = false
+            persist(notifyUI: shouldNotify)
         }
     }
 
     /// 立即写盘 + 发通知
     func save() {
         saveTask?.cancel()
+        pendingNotifyUI = false
         persist(notifyUI: true)
     }
 

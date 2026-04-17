@@ -349,7 +349,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         processDiscovery.start()
 
-        Task {
+        Task { @MainActor in
             try? await adapter.start()
             for await event in adapter.eventStream {
                 sessionManager.handleEvent(event)

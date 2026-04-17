@@ -491,8 +491,8 @@ final class SessionManager {
         returnTimer?.cancel()
         returnTimer = Task {
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, !isDragging else { return }
-            currentState = state
+            guard !Task.isCancelled else { return }
+            transition(to: state)
         }
     }
 
@@ -501,7 +501,7 @@ final class SessionManager {
         returnTimer?.cancel()
         returnTimer = Task {
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, !isDragging else { return }
+            guard !Task.isCancelled else { return }
 
             // 如果绑定的就是这个 session，自动解绑
             if pinnedSessionId == sid {
@@ -510,10 +510,10 @@ final class SessionManager {
 
             // 切换到下一个活跃 session 的状态
             if let nextId = activeSessionId, let next = sessions[nextId] {
-                currentState = stateForPhase(next.phase)
+                transition(to: stateForPhase(next.phase))
                 emitSessionDanmaku(next)
             } else {
-                currentState = .idle
+                transition(to: .idle)
             }
         }
     }
