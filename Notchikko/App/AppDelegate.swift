@@ -10,9 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let dragController = DragController()
     private let menuBarManager = MenuBarManager()
     private var approvalManager: ApprovalManager?
+    private var approvalPanelCoordinator: ApprovalPanelCoordinator?
     private var settingsWindow: NSWindow?
-    private var approvalPanels: [String: NSPanel] = [:]       // requestId → panel
-    private var cardFinalFrames: [String: NSRect] = [:]      // requestId → 展开后的目标 frame
     private let terminalJumper = TerminalJumper()
     private let updateManager = UpdateManager()
     private var hotkeyBridge: ApprovalHotkeyBridge?
@@ -135,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             height: petSize + padding * 2
         )
         hitTestView.onPetHover = { [weak self] in
-            self?.restoreHiddenApprovalCards()
+            self?.approvalPanelCoordinator?.restoreHidden()
         }
 
         panel.contentView = hitTestView
@@ -249,9 +248,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bridge = ApprovalHotkeyBridge(approvalManager: approval)
         self.hotkeyBridge = bridge
 
+        // 审批面板 coordinator（NSPanel 全生命周期 + 动画）
+        approvalPanelCoordinator = ApprovalPanelCoordinator(
+            sessionManager: sessionManager,
+            terminalJumper: terminalJumper,
+            approvalManager: approval,
+            geometryProvider: { [weak self] in self?.geometry },
+            currentScreenProvider: { [weak self] in self?.currentScreen }
+        )
+
         // 卡片移除回调
         approval.onCardDismissed = { [weak self] requestId in
-            self?.removeApprovalPanel(requestId: requestId)
+            self?.approvalPanelCoordinator?.remove(requestId: requestId)
             // 无剩余阻塞式卡片 → 解锁 approving 状态
             if !(self?.approvalManager?.pendingApprovals.values.contains(where: { !$0.requestId.isEmpty }) ?? false) {
                 self?.sessionManager.endApproval()
@@ -259,12 +267,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.hotkeyBridge?.refresh()
         }
         approval.onAllCardsDismissed = { [weak self] in
-            self?.removeAllApprovalPanels()
+            self?.approvalPanelCoordinator?.removeAll()
             self?.sessionManager.endApproval()
             self?.hotkeyBridge?.refresh()
         }
         approval.onCardVisibilityChanged = { [weak self] reqId, visible in
-            self?.animatePanelVisibility(requestId: reqId, visible: visible)
+            self?.approvalPanelCoordinator?.animateVisibility(requestId: reqId, visible: visible)
         }
 
         // Hook 进程断开 → 自动关闭对应审批卡片（用户按 Esc 等场景）
@@ -307,7 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !isSubagent {
                     self.sessionManager.overrideState(.approving)
                 }
-                self.showApprovalPanel(for: request)
+                self.approvalPanelCoordinator?.show(request: request)
             }
             self.hotkeyBridge?.refresh()
         }
@@ -431,191 +439,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             Task { @MainActor in
                                 try? await Task.sleep(for: .seconds(1))
                                 guard self.approvalManager?.pendingApprovals[notifId] != nil else { return }
-                                self.showApprovalPanel(for: request)
+                                self.approvalPanelCoordinator?.show(request: request)
                             }
                         } else {
-                            showApprovalPanel(for: request)
+                            approvalPanelCoordinator?.show(request: request)
                         }
                     }
                 }
             }
-        }
-    }
-
-    // MARK: - 审批面板（叠加式，新卡片错位堆叠）
-
-    /// 每张卡片的错位偏移量
-    private static let cardStackOffset: CGFloat = 8
-
-    private func showApprovalPanel(for request: ApprovalManager.ApprovalRequest) {
-        guard let geo = geometry,
-              let approval = approvalManager else { return }
-
-        let reqId = request.id
-
-        let cardView = ApprovalCardView(
-            request: request,
-            hideDelay: PreferencesStore.shared.preferences.approvalCardHideDelay,
-            onDeny: {
-                approval.deny(requestId: reqId)
-            },
-            onApprove: {
-                approval.approve(requestId: reqId)
-            },
-            onAlwaysAllow: {
-                approval.alwaysAllowTool(requestId: reqId)
-            },
-            onAutoApprove: {
-                approval.autoApproveSession(requestId: reqId)
-            },
-            onAnswer: { questionText, answer in
-                approval.answerQuestion(requestId: reqId, questionText: questionText, answer: answer)
-            },
-            onJump: { [weak self] in
-                guard let self,
-                      let session = self.sessionManager.sessions[request.sessionId] else { return }
-                self.terminalJumper.jumpToSession(session: session)
-            },
-            onClose: {
-                // 关闭按钮：审批卡 = deny，通知卡 = 直接关闭
-                approval.closeCard(requestId: reqId)
-            }
-        )
-
-        let hostingView = NSHostingView(rootView: cardView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-
-        let cardWidth: CGFloat = 340
-        // 让 hostingView 计算实际高度，避免空白过多
-        let fittingSize = hostingView.fittingSize
-        let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
-        guard let screen = currentScreen ?? NSScreen.main else { return }
-
-        // 气泡尾巴从宠物底部探出，微量重叠确保视觉连接
-        let petSize = 80 * PreferencesStore.shared.preferences.petScale
-        let stackIndex = min(CGFloat(approvalPanels.count), 5)
-        let cardX = screen.frame.midX - cardWidth / 2
-        let petBottom = screen.frame.maxY - geo.notchSize.height - petSize
-        let overlap: CGFloat = 40
-        let finalY = petBottom - cardHeight + overlap - stackIndex * Self.cardStackOffset
-        let finalFrame = NSRect(x: cardX, y: finalY, width: cardWidth, height: cardHeight)
-
-        // 初始位置 = 最终位置（透明），动画只做滑动+淡入
-        let startY = finalY + cardHeight * 0.4  // 从偏上方（靠近宠物）开始
-        let panel = NSPanel(
-            contentRect: NSRect(x: cardX, y: startY, width: cardWidth, height: cardHeight),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        // 层级低于宠物（mainMenu+3），卡片视觉上在宠物背后
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
-        panel.hasShadow = false
-        panel.alphaValue = 0
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = false
-        panel.isReleasedWhenClosed = false
-
-        let wrapper = ApprovalTrackingView(frame: panel.contentView?.bounds ?? panel.frame)
-        wrapper.autoresizingMask = [.width, .height]
-        wrapper.onMouseEnter = { [weak self] in
-            // 滑入/淡入动画由 ApprovalManager.onCardVisibilityChanged → animatePanelVisibility 驱动
-            self?.approvalManager?.onMouseEnter(requestId: reqId)
-        }
-        wrapper.onMouseExit = { [weak self] in
-            self?.approvalManager?.onMouseExit(requestId: reqId)
-        }
-        wrapper.addSubview(hostingView)
-        panel.contentView = wrapper
-
-        NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-            hostingView.topAnchor.constraint(equalTo: wrapper.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
-        ])
-
-        // 启用 layer 以支持退场缩放动画
-        wrapper.wantsLayer = true
-
-        panel.orderFrontRegardless()
-        approvalPanels[reqId] = panel
-        cardFinalFrames[reqId] = finalFrame
-
-        // 滑入 + 淡入（入场缩放由 SwiftUI scaleEffect 处理，避免动画系统冲突）
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.3
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(finalFrame, display: true)
-            panel.animator().alphaValue = 1.0
-        })
-        // 后续 isVisible 变化由 ApprovalManager.onCardVisibilityChanged → animatePanelVisibility 驱动
-    }
-
-    /// hideTimer/mouseEnter 触发的滑下隐藏 / 滑上恢复动画
-    private func animatePanelVisibility(requestId: String, visible: Bool) {
-        guard let panel = approvalPanels[requestId],
-              let finalFrame = cardFinalFrames[requestId] else { return }
-        let targetY = visible ? finalFrame.origin.y : finalFrame.origin.y + finalFrame.height * 0.4
-        let targetFrame = NSRect(x: finalFrame.origin.x, y: targetY,
-                                 width: finalFrame.width, height: finalFrame.height)
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = visible ? 0.25 : 0.2
-            ctx.timingFunction = CAMediaTimingFunction(name: visible ? .easeOut : .easeIn)
-            panel.animator().setFrame(targetFrame, display: true)
-            panel.animator().alphaValue = visible ? 1.0 : 0.0
-        }
-    }
-
-    /// 鼠标悬浮在宠物上 → 恢复所有隐藏的审批卡片（滑下+淡入）
-    private func restoreHiddenApprovalCards() {
-        guard let approval = approvalManager else { return }
-        approval.restoreAllHiddenCards()
-        for (reqId, finalFrame) in cardFinalFrames {
-            guard let panel = approvalPanels[reqId] else { continue }
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.25
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().setFrame(finalFrame, display: true)
-                panel.animator().alphaValue = 1.0
-            })
-        }
-    }
-
-    /// 移除指定 requestId 的审批面板（滑上+淡出再关闭）
-    private func removeApprovalPanel(requestId: String) {
-        guard let panel = approvalPanels.removeValue(forKey: requestId) else { return }
-        let finalFrame = cardFinalFrames.removeValue(forKey: requestId)
-
-        let hideY = (finalFrame?.origin.y ?? panel.frame.origin.y) + panel.frame.height * 0.4
-        var hiddenFrame = panel.frame
-        hiddenFrame.origin.y = hideY
-
-        // 滑出 + 淡出 + 缩小（display:false 避免和 layer 缩放动画冲突）
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.2
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().setFrame(hiddenFrame, display: false)
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            panel.close()
-        })
-        let scaleOut = CABasicAnimation(keyPath: "transform")
-        scaleOut.fromValue = CATransform3DIdentity
-        scaleOut.toValue = CATransform3DMakeScale(0.88, 0.88, 1.0)
-        scaleOut.duration = 0.2
-        scaleOut.timingFunction = CAMediaTimingFunction(name: .easeIn)
-        panel.contentView?.layer?.add(scaleOut, forKey: "scaleOut")
-        panel.contentView?.layer?.transform = CATransform3DMakeScale(0.88, 0.88, 1.0)
-    }
-
-    /// 移除所有审批面板（Allow All 时）
-    private func removeAllApprovalPanels() {
-        let keys = Array(approvalPanels.keys)
-        for reqId in keys {
-            removeApprovalPanel(requestId: reqId)
         }
     }
 
@@ -638,29 +469,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// MARK: - 审批卡片鼠标追踪
-
-private final class ApprovalTrackingView: NSView {
-    var onMouseEnter: (() -> Void)?
-    var onMouseExit: (() -> Void)?
-    private var trackingArea: NSTrackingArea?
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let old = trackingArea { removeTrackingArea(old) }
-        trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self
-        )
-        addTrackingArea(trackingArea!)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        onMouseEnter?()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        onMouseExit?()
-    }
-}
