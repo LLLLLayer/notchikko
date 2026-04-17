@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cardFinalFrames: [String: NSRect] = [:]      // requestId → 展开后的目标 frame
     private let terminalJumper = TerminalJumper()
     private let updateManager = UpdateManager()
-    private let hotkeyManager = HotkeyManager()
+    private var hotkeyBridge: ApprovalHotkeyBridge?
     private let transcriptPoller = TranscriptPoller()
     private let processDiscovery = ProcessDiscovery()
     private let hookOnboarding = HookOnboardingCoordinator()
@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(obs)
         }
         dragController.teardown()
-        hotkeyManager.deactivate()
+        hotkeyBridge?.deactivate()
         transcriptPoller.stop()
         processDiscovery.stop()
         // 关闭 socket server + finish event stream
@@ -245,6 +245,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             approval?.cleanupSession(sessionId)
         }
 
+        // 热键桥接（Cmd+Y/N 到 approve/deny 路由，仅在有阻塞式卡片时激活）
+        let bridge = ApprovalHotkeyBridge(approvalManager: approval)
+        self.hotkeyBridge = bridge
+
         // 卡片移除回调
         approval.onCardDismissed = { [weak self] requestId in
             self?.removeApprovalPanel(requestId: requestId)
@@ -252,30 +256,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !(self?.approvalManager?.pendingApprovals.values.contains(where: { !$0.requestId.isEmpty }) ?? false) {
                 self?.sessionManager.endApproval()
             }
-            self?.updateHotkeyState()
+            self?.hotkeyBridge?.refresh()
         }
         approval.onAllCardsDismissed = { [weak self] in
             self?.removeAllApprovalPanels()
             self?.sessionManager.endApproval()
-            self?.updateHotkeyState()
+            self?.hotkeyBridge?.refresh()
         }
         approval.onCardVisibilityChanged = { [weak self] reqId, visible in
             self?.animatePanelVisibility(requestId: reqId, visible: visible)
-        }
-
-        // 审批热键
-        hotkeyManager.onAction = { [weak self] action in
-            guard let self,
-                  let approval = self.approvalManager,
-                  let target = approval.mostRecentBlockingApproval else { return }
-            Log("Hotkey: \(action), target=\(target.id.prefix(8))", tag: "App")
-            switch action {
-            case .allowOnce:   approval.approve(requestId: target.id)
-            case .alwaysAllow: approval.alwaysAllowTool(requestId: target.id)
-            case .deny:        approval.deny(requestId: target.id)
-            case .autoApprove: approval.autoApproveSession(requestId: target.id)
-            }
-            self.updateHotkeyState()
         }
 
         // Hook 进程断开 → 自动关闭对应审批卡片（用户按 Esc 等场景）
@@ -320,7 +309,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 self.showApprovalPanel(for: request)
             }
-            self.updateHotkeyState()
+            self.hotkeyBridge?.refresh()
         }
 
         // 终端 PID/tty 更新回调（每个 hook 事件都可能携带）
@@ -450,17 +439,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-        }
-    }
-
-    // MARK: - 审批热键状态
-
-    /// 根据当前审批状态激活或停用全局热键
-    private func updateHotkeyState() {
-        if approvalManager?.hasPendingBlockingApproval == true {
-            hotkeyManager.activate()
-        } else {
-            hotkeyManager.deactivate()
         }
     }
 
