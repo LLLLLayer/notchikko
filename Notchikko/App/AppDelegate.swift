@@ -230,14 +230,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let adapter = ClaudeCodeAdapter()
         self.adapter = adapter
 
+        let approval = ApprovalManager(socketServer: adapter.socketServerRef)
+        self.approvalManager = approval
+
+        wireApprovalInfrastructure(adapter: adapter, approval: approval)
+        wireSocketApproval(adapter: adapter, approval: approval)
+        wireAdapterMetadata(adapter: adapter)
+        wireDetectionFallbacks()
+
+        Task { @MainActor in
+            try? await adapter.start()
+            for await event in adapter.eventStream {
+                handleAgentEvent(event)
+            }
+        }
+    }
+
+    /// 1. 搭建审批基础设施：approval manager → bridge → panel coordinator + 3 个卡片生命周期回调
+    private func wireApprovalInfrastructure(adapter: ClaudeCodeAdapter, approval: ApprovalManager) {
         // 终端匹配缓存回调
         terminalJumper.onTerminalMatched = { [weak self] sessionId, match in
             self?.sessionManager.setTerminalMatch(match, for: sessionId)
         }
-
-        // 审批面板（受 Settings 开关控制）
-        let approval = ApprovalManager(socketServer: adapter.socketServerRef)
-        self.approvalManager = approval
 
         // Session 被移除（菜单关闭 / LRU 淘汰）时同步清理 approval 侧 session 级状态
         sessionManager.onSessionRemoved = { [weak approval] sessionId in
@@ -245,8 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 热键桥接（Cmd+Y/N 到 approve/deny 路由，仅在有阻塞式卡片时激活）
-        let bridge = ApprovalHotkeyBridge(approvalManager: approval)
-        self.hotkeyBridge = bridge
+        hotkeyBridge = ApprovalHotkeyBridge(approvalManager: approval)
 
         // 审批面板 coordinator（NSPanel 全生命周期 + 动画）
         approvalPanelCoordinator = ApprovalPanelCoordinator(
@@ -274,7 +287,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         approval.onCardVisibilityChanged = { [weak self] reqId, visible in
             self?.approvalPanelCoordinator?.animateVisibility(requestId: reqId, visible: visible)
         }
+    }
 
+    /// 2. Socket → approval 的审批请求/断连桥接
+    private func wireSocketApproval(adapter: ClaudeCodeAdapter, approval: ApprovalManager) {
         // Hook 进程断开 → 自动关闭对应审批卡片（用户按 Esc 等场景）
         adapter.socketServerRef.onApprovalDisconnect = { [weak self] requestId in
             Log("Hook disconnected, dismissing card: \(requestId.prefix(8))", tag: "App")
@@ -319,8 +335,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self.hotkeyBridge?.refresh()
         }
+    }
 
-        // 终端 PID/tty 更新回调（每个 hook 事件都可能携带）
+    /// 3. 每个 hook 事件都可能携带的终端 PID/tty/pidChain/permissionMode 更新
+    private func wireAdapterMetadata(adapter: ClaudeCodeAdapter) {
         adapter.onTerminalPidUpdate = { [weak self] sessionId, pid in
             self?.sessionManager.setTerminalPid(pid, for: sessionId)
         }
@@ -333,8 +351,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         adapter.onPermissionModeUpdate = { [weak self] sessionId, mode in
             self?.sessionManager.setBypassMode(mode == "bypassPermissions", for: sessionId)
         }
+    }
 
-        // JSONL 转录回退
+    /// 4. 无 hook 时的兜底 session 发现：JSONL 转录轮询 + ps 进程扫描
+    private func wireDetectionFallbacks() {
         transcriptPoller.onEvent = { [weak self] event in
             self?.sessionManager.handleEvent(event)
         }
@@ -344,7 +364,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         transcriptPoller.start()
 
-        // 进程发现
         processDiscovery.onProcessFound = { [weak self] sessionId, source, pid in
             guard let self else { return }
             // discovered session ID 使用 "discovered-" 前缀，不与 hook UUID 冲突
@@ -358,95 +377,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.sessionManager.handleEvent(.sessionEnd(sessionId: sessionId))
         }
         processDiscovery.start()
+    }
 
-        Task { @MainActor in
-            try? await adapter.start()
-            for await event in adapter.eventStream {
-                sessionManager.handleEvent(event)
+    /// 5. adapter.eventStream 每个 AgentEvent 到达时执行：session 更新 + 跨模块同步 + 通知卡弹出决策
+    private func handleAgentEvent(_ event: AgentEvent) {
+        sessionManager.handleEvent(event)
 
-                // Hook 事件到达 → 升级对应 session 为 hook 来源，合并 transcript session
-                sessionManager.upgradeDetection(.hook, for: event.sessionId)
-                transcriptPoller.mergeWithHookSession(event.sessionId)
-                // 同步 hook session IDs 给 pollers（避免重复发现）
-                transcriptPoller.hookSessionIds = sessionManager.hookSessionIds
-                processDiscovery.hookSessionIds = sessionManager.hookSessionIds
+        // Hook 事件到达 → 升级对应 session 为 hook 来源，合并 transcript session
+        sessionManager.upgradeDetection(.hook, for: event.sessionId)
+        transcriptPoller.mergeWithHookSession(event.sessionId)
+        // 同步 hook session IDs 给 pollers（避免重复发现）
+        transcriptPoller.hookSessionIds = sessionManager.hookSessionIds
+        processDiscovery.hookSessionIds = sessionManager.hookSessionIds
 
-                let sid = event.sessionId
-                approvalManager?.onSessionEvent(sessionId: sid)
+        let sid = event.sessionId
+        approvalManager?.onSessionEvent(sessionId: sid)
 
-                // 用户在终端操作了（新 prompt / 任务结束）→ 自动关闭过期审批卡片
-                switch event {
-                case .prompt, .stop, .sessionEnd:
-                    approvalManager?.dismissStaleApprovals(for: sid)
-                default: break
-                }
+        // 用户在终端操作了（新 prompt / 任务结束）→ 自动关闭过期审批卡片
+        switch event {
+        case .prompt, .stop, .sessionEnd:
+            approvalManager?.dismissStaleApprovals(for: sid)
+        default: break
+        }
 
-                // 防御性清理：无任何待审批卡片时解除 approving 锁定
-                if approvalManager?.pendingApprovals.isEmpty == true,
-                   sessionManager.isApproving {
-                    sessionManager.endApproval()
-                }
+        // 防御性清理：无任何待审批卡片时解除 approving 锁定
+        if approvalManager?.pendingApprovals.isEmpty == true,
+           sessionManager.isApproving {
+            sessionManager.endApproval()
+        }
 
-                // Session 结束 → 清理会话级审批状态 + bypass flag
-                if case .sessionEnd(let endSid) = event {
-                    approvalManager?.cleanupSession(endSid)
-                }
+        // Session 结束 → 清理会话级审批状态 + bypass flag
+        if case .sessionEnd(let endSid) = event {
+            approvalManager?.cleanupSession(endSid)
+        }
 
-                // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
-                if case .notification(let sid, let msg, let detail) = event {
-                    let session = sessionManager.sessions[sid]
-                    let isBypass = session?.isBypassMode ?? false
-                    let prevState = sessionManager.previousState
+        // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
+        if case .notification(let sid, let msg, let detail) = event {
+            showNotificationCardIfNeeded(sessionId: sid, message: msg, detail: detail)
+        }
+    }
 
-                    // 决定是否弹卡片：
-                    // 1. 纯 Notification（空 msg）和未知事件 → 不弹
-                    // 2. PermissionRequest + bypass on → 不弹
-                    // 3. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
-                    // 4. Elicitation / AskUserQuestion → 始终弹（不受 approvalCardEnabled 影响）
-                    // 5. PermissionRequest (non-bypass) → 受 approvalCardEnabled 控制
-                    let needsCard: Bool = {
-                        guard msg == "Elicitation" || msg == "AskUserQuestion"
-                                || msg == "PermissionRequest" else { return false }
-                        // bypass 模式下 PermissionRequest 不弹
-                        if isBypass && msg == "PermissionRequest" { return false }
-                        // PermissionRequest 受 approvalCardEnabled 控制
-                        if msg == "PermissionRequest"
-                            && !PreferencesStore.shared.preferences.approvalCardEnabled { return false }
-                        // 过时检查
-                        if session == nil || session?.phase == .ended { return false }
-                        if prevState == .happy || prevState == .sleeping { return false }
-                        return true
-                    }()
+    /// 决定是否为 .notification 事件弹出非阻塞通知卡片。
+    /// 规则：
+    /// 1. 纯 Notification（空 msg）和未知事件 → 不弹
+    /// 2. PermissionRequest + bypass on → 不弹
+    /// 3. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
+    /// 4. Elicitation / AskUserQuestion → 始终弹（不受 approvalCardEnabled 影响）
+    /// 5. PermissionRequest (non-bypass) → 受 approvalCardEnabled 控制
+    private func showNotificationCardIfNeeded(sessionId sid: String, message msg: String, detail: String) {
+        let session = sessionManager.sessions[sid]
+        let isBypass = session?.isBypassMode ?? false
+        let prevState = sessionManager.previousState
 
-                    if needsCard {
-                        let notifId = UUID().uuidString
-                        let request = ApprovalManager.ApprovalRequest(
-                            id: notifId,
-                            requestId: "",
-                            source: session?.source ?? "unknown",
-                            tool: msg,
-                            input: detail,
-                            sessionId: sid,
-                            cwdName: session?.cwdName ?? "",
-                            terminalName: session?.matchedTerminal?.appName ?? "",
-                            timestamp: Date()
-                        )
-                        approvalManager?.addNotification(request)
+        let needsCard: Bool = {
+            guard msg == "Elicitation" || msg == "AskUserQuestion"
+                    || msg == "PermissionRequest" else { return false }
+            if isBypass && msg == "PermissionRequest" { return false }
+            if msg == "PermissionRequest"
+                && !PreferencesStore.shared.preferences.approvalCardEnabled { return false }
+            if session == nil || session?.phase == .ended { return false }
+            if prevState == .happy || prevState == .sleeping { return false }
+            return true
+        }()
+        guard needsCard else { return }
 
-                        // AskUserQuestion 消抖：PreToolUse 先到，PermissionRequest ~0.5s 后到
-                        // 延迟 1s 出卡片，如果期间 PermissionRequest 到达并替换了通知卡，panel 就不弹了
-                        if msg == "AskUserQuestion" {
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .seconds(1))
-                                guard self.approvalManager?.pendingApprovals[notifId] != nil else { return }
-                                self.approvalPanelCoordinator?.show(request: request)
-                            }
-                        } else {
-                            approvalPanelCoordinator?.show(request: request)
-                        }
-                    }
-                }
+        let notifId = UUID().uuidString
+        let request = ApprovalManager.ApprovalRequest(
+            id: notifId,
+            requestId: "",
+            source: session?.source ?? "unknown",
+            tool: msg,
+            input: detail,
+            sessionId: sid,
+            cwdName: session?.cwdName ?? "",
+            terminalName: session?.matchedTerminal?.appName ?? "",
+            timestamp: Date()
+        )
+        approvalManager?.addNotification(request)
+
+        // AskUserQuestion 消抖：PreToolUse 先到，PermissionRequest ~0.5s 后到
+        // 延迟 1s 出卡片，如果期间 PermissionRequest 到达并替换了通知卡，panel 就不弹了
+        if msg == "AskUserQuestion" {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                guard self.approvalManager?.pendingApprovals[notifId] != nil else { return }
+                self.approvalPanelCoordinator?.show(request: request)
             }
+        } else {
+            approvalPanelCoordinator?.show(request: request)
         }
     }
 
