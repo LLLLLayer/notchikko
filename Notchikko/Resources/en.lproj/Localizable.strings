@@ -76,7 +76,7 @@
 "settings.ext_installed" = "Extension: ✅ Installed (not running)";
 "settings.ext_running" = "Extension: ✅ Running";
 "settings.ext_update_available" = "Extension: 🔄 Update available";
-"settings.ext_restart_hint" = "Restart VS Code for the extension to take effect";
+"settings.ext_restart_hint" = "Restart the IDE for the extension to take effect";
 "settings.ext_update" = "Update";
 
 /* SettingsWindow - Integration */

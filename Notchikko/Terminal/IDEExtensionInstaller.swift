@@ -49,6 +49,9 @@ struct IDEExtensionInstaller {
 
     static let targets: [IDETarget] = [
         IDETarget(id: "vscode", name: "VS Code", extensionDir: "~/.vscode/extensions"),
+        IDETarget(id: "vscode-insiders", name: "VS Code Insiders", extensionDir: "~/.vscode-insiders/extensions"),
+        IDETarget(id: "cursor", name: "Cursor", extensionDir: "~/.cursor/extensions"),
+        IDETarget(id: "windsurf", name: "Windsurf", extensionDir: "~/.windsurf/extensions"),
     ]
 
     // MARK: - 安装/卸载

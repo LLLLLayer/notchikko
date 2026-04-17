@@ -76,7 +76,7 @@
 "settings.ext_installed" = "扩展: ✅ 已安装（未运行）";
 "settings.ext_running" = "扩展: ✅ 运行中";
 "settings.ext_update_available" = "扩展: 🔄 有更新";
-"settings.ext_restart_hint" = "需要重启 VS Code 才能生效";
+"settings.ext_restart_hint" = "需要重启 IDE 才能生效";
 "settings.ext_update" = "更新";
 
 /* SettingsWindow - Integration */
