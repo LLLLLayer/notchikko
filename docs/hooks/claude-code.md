@@ -8,7 +8,7 @@ Claude Code fires hook commands at well-defined lifecycle points. Each invocatio
 
 - Runs the configured shell command with the event's JSON on stdin.
 - Reads stdout for a structured `hookSpecificOutput` decision object.
-- Honors a `timeout` field on the hook entry (default is short; `PermissionRequest` needs long).
+- Honors a `timeout` field on the hook entry. Default is **600s** for `type: command` hooks (per [upstream docs](https://code.claude.com/docs/en/hooks)); `PermissionRequest` entries explicitly override to `86400` (24h) so the user has all day to answer an approval card.
 
 ### Events Notchikko registers for
 
@@ -53,6 +53,15 @@ For `PermissionRequest`, Claude Code reads the hook's stdout and respects:
                "updatedPermissions": [...]}   // optional, persistent rule changes
 }}
 ```
+
+Note the **two distinct output schemas** Claude Code understands — do not confuse them:
+
+| Event | Output key | Values |
+|---|---|---|
+| `PermissionRequest` | `decision.behavior` | `"allow"` / `"deny"` (two-valued) |
+| `PreToolUse` | `permissionDecision` | `"allow"` / `"deny"` / `"ask"` / `"defer"` (four-valued) |
+
+Notchikko only writes the `PermissionRequest` shape. `PreToolUse` exists in the same pipeline but Notchikko never uses its stdout decision — see [README §"PreToolUse is NOT an approval gate"](./README.md#pretooluse-is-not-an-approval-gate).
 
 If the hook exits non-zero or prints garbage, Claude Code falls back to its **built-in in-terminal prompt** — the yellow "Do you want to proceed?" UI that asks the user in the CLI directly. This is the mechanism that caused the "card stays until end of task" bug: if the user answers in the terminal, Claude Code proceeds; the hook is still blocked on socket read; Notchikko's card is stuck until the hook process eventually dies.
 
@@ -118,7 +127,7 @@ The Python hook (`handle_standard` path) maps `hook_event_name` → `status`:
 
 ### SubagentStart / SubagentStop — why they're dropped
 
-Claude Code's subagents fire their own `PreToolUse` / `PostToolUse` events, which would cause the main pet to thrash while a subagent grinds. `ClaudeCodeAdapter` maintains a per-session `subagentDepth` counter; while depth > 0, tool events are suppressed. Two passthroughs: `Elicitation` and `AskUserQuestion`, because subagents can still ask the user questions that warrant a card.
+Claude Code's subagents fire their own `PreToolUse` / `PostToolUse` events, which would cause the main pet to thrash while a subagent grinds. `ClaudeCodeAdapter` maintains a per-session `subagentDepth` counter; while depth > 0, tool events are suppressed. The passthrough set (`subagentPassthroughEvents` in `ClaudeCodeAdapter.swift`) is `{"Elicitation", "AskUserQuestion"}`. `Elicitation` is the one that actually fires — `AskUserQuestion` is defensive: Claude Code never delivers it as a top-level `hook_event_name` (questions arrive wrapped inside `PreToolUse` or `PermissionRequest` with `tool_name == "AskUserQuestion"`), so the passthrough entry is effectively dead code we keep in case upstream ever starts emitting it directly.
 
 ### Tool → pet-state mapping
 
@@ -135,10 +144,11 @@ Non-tool phases (`processing` → `thinking`, `compacting` → `sweeping`) are h
 
 Only `PermissionRequest` blocks. The hook:
 
-1. Generates a UUID `request_id`.
-2. Sends `{event: "PermissionRequest", tool, tool_input, request_id, ...}` over the socket.
-3. Keeps the socket fd open, waits up to 3600s (then client-side) / 86400s (declared to Claude Code) for a JSON response.
-4. Translates the response into the `hookSpecificOutput.decision` format and prints to stdout.
+1. Checks the app's `approvalCardEnabled` preference. If off, the hook **does not block** on Bash/Edit/Write/NotebookEdit — it sends the event fire-and-forget and exits, letting Claude Code fall back to its in-terminal prompt. `AskUserQuestion` still blocks regardless of this toggle (it's a user-input channel, not a policy gate).
+2. Generates a UUID `request_id`.
+3. Sends `{event: "PermissionRequest", tool, tool_input, request_id, ...}` over the socket.
+4. Keeps the socket fd open, waits up to **3600s client-side** for the app's JSON response. The hook entry declares **86400s (24h)** to Claude Code — so the two numbers diverge: if the user ignores a card for more than an hour, the hook's own socket timeout fires first, `emit_fallback_allow()` prints `{behavior: "allow"}`, the tool proceeds silently, and Claude Code never hits its 24h limit. If you want the full 24h to actually be honored, bump the client-side `sock.settimeout(3600)` in `notchikko-hook.py` to match.
+5. Translates the response into the `hookSpecificOutput.decision` format and prints to stdout.
 
 ### Response shapes Notchikko sends
 

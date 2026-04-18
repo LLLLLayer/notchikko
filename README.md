@@ -14,13 +14,11 @@
   <a href="README.ko.md">한국어</a>
 </p>
 
-The notch at the top of your screen has long been a dark zone to be carefully avoided. Notchikko turns it into a tiny island, where a small creature settles in — pondering when you summon an Agent, scrambling when tools are called, quietly celebrating when a task completes; and when you've been gone too long, it tucks in its tail and dozes off in a corner of the island. Look up, and there it is.
-
-Notchikko understands what AI Agents are doing. It sniffs out installed CLIs and asks gently — "Want to plug in their hooks?" From then on, everything flows through it: session start, tool calls, task completion, errors, pauses — every move maps to the small creature's gestures on the island. Above the screen, life always stirs.
+The notch at the top of your screen has long been a dark zone to be carefully avoided. Notchikko turns it into a tiny island where Notchikko settles in — pondering when you summon an Agent, scrambling when tools are called, quietly celebrating when a task completes; and when you've been gone too long, it tucks in its tail and dozes off in a corner of the island. Look up, and there it is. Notchikko understands what AI Agents are doing. It sniffs out installed CLIs and asks gently — "Want to plug in their hooks?" From then on, everything flows through it: session start, tool calls, task completion, errors, pauses — every move maps to Notchikko's gestures on the island. Above the screen, life always stirs.
 
 ## Animations
 
-Notchikko drives 11 states in real time, triggered by hook events. Each state can include multiple SVG variants, picked at random on entry — the table below shows each state's trigger and a sample form.
+Notchikko has 12 animated states — 11 driven by hook events, 1 by a direct mouse interaction. Each state can include multiple SVG variants, picked at random on entry; the table below shows each state's trigger and a sample form. Brush your mouse across it and a bashful blush blooms up, the trackpad thrums with a heartbeat, and an `×N` combo counter drifts past the notch's edge; tug it gently and it wobbles dizzily around this little world, stars dancing over its eyes.
 
 <table>
   <tr>
@@ -28,24 +26,39 @@ Notchikko drives 11 states in real time, triggered by hook events. Each state ca
     <td align="center" width="120"><img src="assets/states/reading.svg" width="100"><br><sub><b>Reading</b></sub><br><sub>Read / Grep / Glob</sub></td>
     <td align="center" width="120"><img src="assets/states/typing.svg" width="100"><br><sub><b>Typing</b></sub><br><sub>Edit / Write / NotebookEdit</sub></td>
     <td align="center" width="120"><img src="assets/states/building.svg" width="100"><br><sub><b>Building</b></sub><br><sub>Bash</sub></td>
+    <td align="center" width="120"><img src="assets/states/thinking.svg" width="100"><br><sub><b>Thinking</b></sub><br><sub>LLM generating</sub></td>
   </tr>
   <tr>
-    <td align="center" width="120"><img src="assets/states/thinking.svg" width="100"><br><sub><b>Thinking</b></sub><br><sub>LLM generating</sub></td>
     <td align="center" width="120"><img src="assets/states/sweeping.svg" width="100"><br><sub><b>Sweeping</b></sub><br><sub>Context compaction</sub></td>
     <td align="center" width="120"><img src="assets/states/happy.svg" width="100"><br><sub><b>Happy</b></sub><br><sub>Task complete</sub></td>
     <td align="center" width="120"><img src="assets/states/error.svg" width="100"><br><sub><b>Error</b></sub><br><sub>Tool error</sub></td>
-  </tr>
-  <tr>
     <td align="center" width="120"><img src="assets/states/sleeping.svg" width="100"><br><sub><b>Sleeping</b></sub><br><sub>Long idle</sub></td>
     <td align="center" width="120"><img src="assets/states/approving.svg" width="100"><br><sub><b>Approving</b></sub><br><sub>PermissionRequest</sub></td>
+  </tr>
+  <tr>
     <td align="center" width="120"><img src="assets/states/dragging.svg" width="100"><br><sub><b>Dragging</b></sub><br><sub>User drag</sub></td>
-    <td align="center" width="120"><sub>More variants tucked away in theme packs</sub></td>
+    <td align="center" width="120"><img src="assets/states/petting.svg" width="100"><br><sub><b>Petting</b></sub><br><sub>Mouse rub</sub></td>
+    <td align="center" width="120"><sub><b>???</b></sub><br><sub>A secret easter egg — find it yourself</sub></td>
+    <td align="center" width="120"><sub><b>Coming soon</b></sub><br><sub>More interactions...</sub></td>
+    <td align="center" width="120"></td>
   </tr>
 </table>
 
 ## Session Behavior
 
-Each agent session enters Notchikko's view via `SessionStart`, flows through tool calls, thinking, approval, errors, and completion, and is finally archived by `Stop`; idle and sleep are taken over by timers. The lifecycle:
+Each agent session enters Notchikko's view via `SessionStart`, flows through tool calls, thinking, approval, errors, and completion, and is finally archived by `Stop`; idle and sleep are taken over by timers.
+Notchikko mounts up to 32 sessions concurrently, shared across agents, with LRU eviction beyond that. Click Notchikko to focus the terminal of the current session; right-click to pin, jump, or close any session. Token usage is shown in the menu bar.
+
+When the Agent issues a `PermissionRequest`, an approval bubble floats out from beneath the notch with four actions:
+
+- **Allow Once**: approves just this one call — the Agent will stop to ask again next time. Good for one-off destructive ops.
+- **Always Allow**: approves this call AND writes the tool into the current project's `settings.local.json` (via the hook's `addRules`), so the same tool never needs to ask again in this project. Persists across sessions.
+- **Auto Approve (this session)**: switches the current session into `bypassPermissions` mode (equivalent to `--dangerously-skip-permissions`) and simultaneously releases every other pending approval for this session. Applies until the session ends.
+- **Deny**: rejects the request, returning "Denied by Notchikko" as the reason to the Agent.
+
+Claude Code's `AskUserQuestion` (the Agent asking you to pick from a few options rather than requesting permission) flows through the same approval bubble, but instead of allow/deny buttons, Notchikko renders the choices as clickable chips — tap one and the answer is relayed verbatim back to the Agent so it can keep going.
+
+The full lifecycle:
 
 ```mermaid
 stateDiagram-v2
@@ -60,39 +73,44 @@ stateDiagram-v2
     Done --> [*]: Archived
 ```
 
-Approval bubbles offer four actions: Allow Once, Always Allow, Auto Approve (this session), Deny; Claude Code's `AskUserQuestion` is recognized and rendered as clickable options.
-
-Notchikko mounts up to 32 sessions concurrently, shared across agents, with LRU eviction beyond that. Click the creature to focus the terminal of the current session; right-click to pin, jump, or close any session. Token usage is shown in the menu bar.
-
 ## Support & Limitations
 
-### CLI Support
+The table below merges CLI integration with terminal focus precision: the CLI decides whether Hook / approval / jump / Token are available, while the terminal decides whether a jump lands on a tab, a window, or simply activates the app.
 
-| CLI | Hook | Approval | Terminal Jump | Token Usage | Status |
-| --- | :---: | :---: | :---: | :---: | --- |
-| **Claude Code** | ✓ | ✓ | ✓ | ✓ | Full |
-| **OpenAI Codex CLI** | ✓ | ✓ | ✓ | — | Full |
-| **Gemini CLI** | ✓ | ✓ | ✓ | — | Full |
-| **Trae CLI** | ✓ | ✓ | ✓ | — | Full |
-| Cursor Agent | — | — | — | — | Planned |
-| GitHub Copilot CLI | — | — | — | — | Planned |
-| opencode | — | — | — | — | Planned |
+<table>
+  <thead>
+    <tr>
+      <th align="left">Component</th>
+      <th align="center">Hook</th>
+      <th align="center">Approval</th>
+      <th align="center">Jump</th>
+      <th align="center">Token</th>
+      <th align="center">Focus</th>
+      <th align="left">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="7"><sub><b>CLI</b></sub></td></tr>
+    <tr><td><b>Claude Code</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td>Full</td></tr>
+    <tr><td><b>OpenAI Codex CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>Full</td></tr>
+    <tr><td><b>Gemini CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>Full</td></tr>
+    <tr><td><b>Trae CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>Full</td></tr>
+    <tr><td>Cursor Agent</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>Planned</td></tr>
+    <tr><td>GitHub Copilot CLI</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>Planned</td></tr>
+    <tr><td>opencode</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>Planned</td></tr>
+    <tr><td colspan="7"><sub><b>Terminal</b></sub></td></tr>
+    <tr><td>iTerm2</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Terminal.app</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Ghostty</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Kitty</td><td colspan="4" align="center">—</td><td align="center">Window</td><td></td></tr>
+    <tr><td>VS Code / VS Code Insiders / Cursor / Windsurf</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Other terminals</td><td colspan="4" align="center">—</td><td align="center">App</td><td></td></tr>
+  </tbody>
+</table>
 
-✓ supported, — not yet covered. Token usage is currently only readable from Claude Code's transcript; other agents will be picked up once they expose comparable fields.
-
-### Terminal Focus
-
-| Terminal | Focus Precision |
-| --- | --- |
-| iTerm2 | Tab |
-| Terminal.app | Tab |
-| Ghostty | Tab |
-| Kitty | Window |
-| VS Code | Tab |
-| VS Code Insiders | Tab |
-| Cursor | Tab |
-| Windsurf | Tab |
-| Other terminals | App |
+> ✓ supported, — not applicable or not yet covered.
+> Token usage is currently only readable from Claude Code's transcript; other agents will be picked up once they expose comparable fields.
+> Focus precision: "Tab" = precise to the terminal tab, "Window" = to the window, "App" = just activates the app.
 
 ## Install & Run
 

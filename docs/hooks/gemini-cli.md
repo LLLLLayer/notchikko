@@ -4,7 +4,13 @@ Gemini CLI has a hook surface comparable to Claude Code's in *shape*, but uses *
 
 ## Hook contract (upstream)
 
-Config file: `~/.gemini/settings.json`. Same nested JSON shape Claude Code uses — one entry per event, each with a `matcher` and a list of `command` hooks.
+Config file: `~/.gemini/settings.json` (user-level). Gemini also supports project-level `.gemini/settings.json`; when both exist, **project overrides user** per [upstream precedence](https://geminicli.com/docs/hooks/reference/). Same nested JSON shape Claude Code uses — one entry per event, each with a `matcher` and a list of `command` hooks.
+
+### Matcher syntax (NOT wildcard glob)
+
+Unlike Claude Code and Codex (where `matcher` is effectively a glob/exact string), Gemini treats `BeforeTool` / `AfterTool` matchers as **regular expressions** and lifecycle event matchers as exact strings. Valid patterns: `"read_.*"`, `"run_shell_command"`, `""` (empty = match all). **`"*"` is not a valid regex** — it's a leading quantifier with no preceding atom.
+
+Notchikko's current installer writes `"*"` for every CLI, including Gemini; this appears to be tolerated (Gemini's regex compiler either fail-opens or treats it as match-all) but is a latent bug. If Gemini tightens regex validation, the installer will need to emit `""` or `".*"` for Gemini entries specifically.
 
 ### Events Notchikko registers for
 
@@ -17,6 +23,15 @@ Notification, PreCompress
 ```
 
 The naming convention is *Before/After* instead of *Pre/Post*. Gemini also uses `PreCompress` instead of `PreCompact`. `SessionStart` and `SessionEnd` align with Claude Code. There is **no** `PermissionRequest`, `Elicitation`, or subagent event.
+
+### Events Notchikko does NOT register for
+
+Upstream Gemini exposes more hooks than Notchikko currently wires up:
+
+- `BeforeModel` / `AfterModel` — fires around every LLM request/response.
+- `BeforeToolSelection` — fires before the LLM decides which tool to call.
+
+These are deliberately skipped because they fire too often to drive meaningful pet state and there's no unified `AgentEvent` case that maps cleanly. If a future need arises (e.g. token-streaming animations), they're the hooks to register for.
 
 ### Event-name translation table
 
@@ -105,7 +120,9 @@ Gemini's `AfterAgent` is normalized to `Stop`. The `extract_token_usage()` helpe
 
 ## Caveats
 
-- **Tool-name map is a patch, not a contract.** If Gemini adds a new tool or renames one, it falls through unmapped and the pet defaults to "typing". Not catastrophic, but the danmaku label will show the raw snake_case name until `GEMINI_TOOL_MAP` is updated.
+- **Regex matcher, not wildcard.** See the earlier section. Today's `"*"` installer default is technically ill-formed for Gemini and survives only by upstream leniency.
+- **Tool-name map is a patch, not a contract.** If Gemini adds a new tool or renames one, it falls through unmapped and the pet defaults to "typing". Not catastrophic, but the danmaku label will show the raw snake_case name until `GEMINI_TOOL_MAP` is updated. MCP tools arrive as `mcp_<server>_<tool>` per upstream convention — none of those are mapped.
 - **No approval surface.** Gemini enforces its own confirmation prompts inline in the terminal. The pet sees `BeforeTool` and `AfterTool` but cannot intercept the decision.
 - **Subagents invisible.** Gemini doesn't emit subagent lifecycle events, so any orchestration Gemini runs internally appears as if the main session did it.
 - **`Notification` is the only "pet grabs attention" signal.** No `Elicitation` distinction — non-blocking cards for Gemini are strictly from `Notification` events, with a 15s auto-hide.
+- **Hook env vars are unused.** Gemini injects `GEMINI_PROJECT_DIR`, `GEMINI_PLANS_DIR`, `GEMINI_SESSION_ID`, `GEMINI_CWD` into the hook process; Notchikko reads everything from stdin JSON instead and ignores them. If `session_id` ever drops from the JSON payload, `GEMINI_SESSION_ID` is the natural fallback.

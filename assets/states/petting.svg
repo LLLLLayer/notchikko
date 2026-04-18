@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      /* 背景巨型爱心 — 慢呼吸 + 透明度脉动 */
+      .bg-heart {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: bg-heart-pulse 2.4s infinite ease-in-out;
+      }
+      @keyframes bg-heart-pulse {
+        0%, 100% { transform: scale(0.92); opacity: 0.18; }
+        50%      { transform: scale(1.08); opacity: 0.36; }
+      }
+
+      /* 整身随节奏摇摆 */
+      .body-sway {
+        transform-origin: 7.5px 10px;
+        animation: body-sway 2.4s infinite ease-in-out;
+      }
+      @keyframes body-sway {
+        0%, 100% { transform: rotate(-3deg) translate(-0.4px, 0); }
+        50%      { transform: rotate(3deg) translate(0.4px, 0); }
+      }
+
+      /* 头部大幅蹭手 */
+      .head-tilt {
+        transform-origin: 7.5px 8px;
+        animation: head-tilt 2.4s infinite ease-in-out;
+      }
+      @keyframes head-tilt {
+        0%, 100% { transform: rotate(-12deg) translate(-1px, 0.3px); }
+        50%      { transform: rotate(12deg) translate(1px, 0.3px); }
+      }
+
+      /* 双手快速挥动 — 相反相位制造"挥手"节奏 */
+      .arm-wave-l {
+        transform-origin: 2px 11px;
+        animation: wave-l 0.5s infinite ease-in-out;
+      }
+      @keyframes wave-l {
+        0%, 100% { transform: rotate(-30deg); }
+        50%      { transform: rotate(20deg); }
+      }
+      .arm-wave-r {
+        transform-origin: 13px 11px;
+        animation: wave-r 0.5s infinite ease-in-out;
+      }
+      @keyframes wave-r {
+        0%, 100% { transform: rotate(30deg); }
+        50%      { transform: rotate(-20deg); }
+      }
+
+      /* 四只脚错峰小幅上下晃 — 像兴奋时蹬腿 */
+      .foot {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .foot-1 { animation: foot-bob 0.4s infinite ease-in-out; }
+      .foot-2 { animation: foot-bob 0.4s infinite ease-in-out; animation-delay: 0.1s; }
+      .foot-3 { animation: foot-bob 0.4s infinite ease-in-out; animation-delay: 0.2s; }
+      .foot-4 { animation: foot-bob 0.4s infinite ease-in-out; animation-delay: 0.3s; }
+      @keyframes foot-bob {
+        0%, 100% { transform: translate(0, -0.4px); }
+        50%      { transform: translate(0, 0.5px); }
+      }
+
+      /* 脸颊脉动 */
+      .blush {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: blush-pulse 2.4s infinite ease-in-out;
+      }
+      @keyframes blush-pulse {
+        0%, 100% { opacity: 0.55; transform: scale(1); }
+        50%      { opacity: 0.95; transform: scale(1.2); }
+      }
+
+      /* 6 颗飘升爱心 */
+      .heart {
+        opacity: 0;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .h1 { animation: heart-up-r 3.0s infinite ease-out; }
+      .h2 { animation: heart-up-l 3.0s infinite ease-out; animation-delay: 0.5s; }
+      .h3 { animation: heart-up-r 3.0s infinite ease-out; animation-delay: 1.0s; }
+      .h4 { animation: heart-up-l 3.0s infinite ease-out; animation-delay: 1.5s; }
+      .h5 { animation: heart-up-r 3.0s infinite ease-out; animation-delay: 2.0s; }
+      .h6 { animation: heart-up-l 3.0s infinite ease-out; animation-delay: 2.5s; }
+
+      @keyframes heart-up-r {
+        0%   { opacity: 0; transform: translate(0, 6px) scale(0.3); }
+        15%  { opacity: 1; transform: translate(1px, 4px) scale(0.7); }
+        50%  { opacity: 1; transform: translate(3px, 0px) scale(1.0); }
+        85%  { opacity: 0.9; transform: translate(5px, -4px) scale(1.1); }
+        100% { opacity: 0; transform: translate(7px, -7px) scale(1.2); }
+      }
+      @keyframes heart-up-l {
+        0%   { opacity: 0; transform: translate(0, 6px) scale(0.3); }
+        15%  { opacity: 1; transform: translate(-1px, 4px) scale(0.7); }
+        50%  { opacity: 1; transform: translate(-3px, 0px) scale(1.0); }
+        85%  { opacity: 0.9; transform: translate(-5px, -4px) scale(1.1); }
+        100% { opacity: 0; transform: translate(-7px, -7px) scale(1.2); }
+      }
+    </style>
+
+    <!-- 干净的 5x5 像素心：两个圆瓣顶 + 单像素尖底 -->
+    <!-- 注意 scale(1,-1) 翻转后，源 y=4 是渲染后的"顶部"，源 y=0 是"底部尖" -->
+    <g id="px-heart" fill="#FF6B7A">
+      <rect x="2" y="0" width="1" height="1"/>          <!-- 尖底 -->
+      <rect x="1" y="1" width="3" height="1"/>          <!-- 收窄过渡 -->
+      <rect x="0" y="2" width="5" height="2"/>          <!-- 中段最宽 -->
+      <rect x="1" y="4" width="1" height="1"/>          <!-- 左圆瓣 -->
+      <rect x="3" y="4" width="1" height="1"/>          <!-- 右圆瓣 -->
+    </g>
+
+    <!-- 大粉爱心（深色） -->
+    <g id="px-heart-big" fill="#FF4D6B">
+      <rect x="2" y="0" width="1" height="1"/>
+      <rect x="1" y="1" width="3" height="1"/>
+      <rect x="0" y="2" width="5" height="2"/>
+      <rect x="1" y="4" width="1" height="1"/>
+      <rect x="3" y="4" width="1" height="1"/>
+    </g>
+
+    <!-- 9x8 巨型背景爱心 -->
+    <g id="huge-heart" fill="#FFB6C1">
+      <rect x="4" y="0" width="1" height="1"/>          <!-- 尖底 -->
+      <rect x="3" y="1" width="3" height="1"/>
+      <rect x="2" y="2" width="5" height="1"/>
+      <rect x="1" y="3" width="7" height="1"/>
+      <rect x="0" y="4" width="9" height="2"/>          <!-- 中段最宽 (y=4-5) -->
+      <rect x="0" y="6" width="4" height="1"/>          <!-- 左半带（中央"V"槽） -->
+      <rect x="5" y="6" width="4" height="1"/>          <!-- 右半带 -->
+      <rect x="1" y="7" width="2" height="1"/>          <!-- 左圆瓣 -->
+      <rect x="6" y="7" width="2" height="1"/>          <!-- 右圆瓣 -->
+    </g>
+  </defs>
+
+  <g transform="scale(1, -1)">
+
+    <!-- ============= 背景巨型爱心（在身体之前画 = 渲染于身后）============= -->
+    <use href="#huge-heart" class="bg-heart" x="3" y="4.5"/>
+
+    <!-- 地面阴影 -->
+    <rect x="3" y="15" width="9" height="1" fill="#000000" opacity="0.4"/>
+
+    <!-- ============= 6 颗小爱心，左右错峰飘起 ============= -->
+    <g>
+      <use href="#px-heart-big" class="heart h1" x="11" y="9"/>
+      <use href="#px-heart"     class="heart h2" x="-2" y="9"/>
+      <use href="#px-heart"     class="heart h3" x="13" y="11"/>
+      <use href="#px-heart-big" class="heart h4" x="-3" y="11"/>
+      <use href="#px-heart"     class="heart h5" x="10" y="7"/>
+      <use href="#px-heart"     class="heart h6" x="-1" y="7"/>
+    </g>
+
+    <g class="body-sway">
+
+      <!-- ============= 头 + 脸（蹭手节奏）============= -->
+      <g class="head-tilt">
+        <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+        <rect x="2" y="6" width="11" height="3" fill="#DE886D"/>
+
+        <g class="blush" fill="#F47A8A">
+          <rect x="2" y="7" width="1" height="1"/>
+          <rect x="12" y="7" width="1" height="1"/>
+        </g>
+
+        <g fill="#000000">
+          <rect x="4" y="8" width="1" height="0.4"/>
+          <rect x="5" y="8.3" width="1" height="0.4"/>
+          <rect x="6" y="8" width="1" height="0.4"/>
+
+          <rect x="9" y="8" width="1" height="0.4"/>
+          <rect x="10" y="8.3" width="1" height="0.4"/>
+          <rect x="11" y="8" width="1" height="0.4"/>
+        </g>
+      </g>
+
+      <!-- 下半身 -->
+      <rect x="2" y="9" width="11" height="3" fill="#DE886D"/>
+
+      <!-- ============= 双手快速挥动（独立旋转）============= -->
+      <g class="arm-wave-l">
+        <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+      <g class="arm-wave-r">
+        <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+      </g>
+
+      <!-- ============= 脚（缩短，脱离地面，错峰晃动）============= -->
+      <g class="foot foot-1">
+        <rect x="3" y="12" width="1" height="2" fill="#DE886D"/>
+      </g>
+      <g class="foot foot-2">
+        <rect x="5" y="12" width="1" height="2" fill="#DE886D"/>
+      </g>
+      <g class="foot foot-3">
+        <rect x="9" y="12" width="1" height="2" fill="#DE886D"/>
+      </g>
+      <g class="foot foot-4">
+        <rect x="11" y="12" width="1" height="2" fill="#DE886D"/>
+      </g>
+
+    </g>
+  </g>
+</svg>

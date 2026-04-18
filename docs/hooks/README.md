@@ -10,12 +10,12 @@ This folder documents, for each supported CLI agent:
 4. Which events can block the agent, and the response format Notchikko sends back.
 5. Caveats and places where the integration is lossy or best-effort.
 
-| Agent | File | Config file | Approval support |
-|---|---|---|---|
-| Claude Code | [`claude-code.md`](./claude-code.md) | `~/.claude/settings.json` | Full (blocking `PermissionRequest`) |
-| OpenAI Codex | [`codex.md`](./codex.md) | `~/.codex/hooks.json` | None (observation only) |
-| Gemini CLI | [`gemini-cli.md`](./gemini-cli.md) | `~/.gemini/settings.json` | None (observation only) |
-| Trae CLI | [`trae-cli.md`](./trae-cli.md) | `~/.trae/traecli.yaml` | None (observation only) |
+| Agent | File | Config file | Tool coverage | Approval support |
+|---|---|---|---|---|
+| Claude Code | [`claude-code.md`](./claude-code.md) | `~/.claude/settings.json` | All tools | Full (blocking `PermissionRequest`) |
+| OpenAI Codex | [`codex.md`](./codex.md) | `~/.codex/hooks.json` | **Bash only** (upstream) | None used (Notchikko chooses not to block; `PreToolUse` is blockable upstream) |
+| Gemini CLI | [`gemini-cli.md`](./gemini-cli.md) | `~/.gemini/settings.json` | All tools | None (no approval event upstream) |
+| Trae CLI | [`trae-cli.md`](./trae-cli.md) | `~/.trae/traecli.yaml` | All tools | None (non-blocking contract) |
 
 ## Shared pipeline
 
@@ -52,7 +52,7 @@ Both files live at `~/.notchikko/hooks/`. An app update does **not** auto-sync t
 
 ### Fail-open everywhere
 
-The hook is designed to never block the agent on Notchikko's account. Missing socket, missing Python interpreter, malformed JSON, socket timeout — every error path exits 0 and (for blocking events) emits a synthetic `{"decision": {"behavior": "allow"}}` to stdout so the CLI proceeds normally. Users who quit Notchikko while hooks are still installed lose the pet, not their agent workflow.
+The hook is designed to never block the agent on Notchikko's account. Missing socket, missing Python interpreter, malformed JSON, socket timeout — every error path exits 0. For the **blocking branch specifically** (`PermissionRequest` on an approval-eligible tool while `approvalCardEnabled` is on), the hook also emits a synthetic `{"hookSpecificOutput": {"decision": {"behavior": "allow"}}}` on stdout so Claude Code doesn't fall back to its in-terminal prompt. For non-blocking events, errors simply exit 0 with no stdout — there's no decision surface to emit into. Users who quit Notchikko while hooks are still installed lose the pet, not their agent workflow.
 
 ### PreToolUse is NOT an approval gate
 

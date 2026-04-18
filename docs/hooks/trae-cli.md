@@ -2,7 +2,9 @@
 
 Trae CLI (a.k.a. Coco) is the outlier among the four agents. Its hook system uses **YAML** (not JSON), a **nested event-body** payload shape, **snake_case event names**, and does **not emit a session ID**. The integration handles all of this with a dedicated Python path (`handle_trae_cli`) that sidesteps the standard pipeline entirely.
 
-## Hook contract (upstream)
+> **Integration-source disclaimer.** The public [`bytedance/trae-agent`](https://github.com/bytedance/trae-agent) repo (as of 2026-04) documents configuration via `trae_config.yaml` and does not mention a hook system, `traecli.yaml`, `event_type`, or `pre_tool_use` / `post_tool_use` events anywhere in its README or linked docs. The contract documented below was reverse-engineered from runtime payloads observed against the ByteDance internal Trae / Coco build that Notchikko was integrated with. If the public build differs, this page is the one that's wrong — the hook script is authoritative either way.
+
+## Hook contract (as integrated)
 
 Config file: `~/.trae/traecli.yaml`. Trae CLI reads hooks from YAML, not JSON, and groups multiple event matchers under a single hook entry:
 

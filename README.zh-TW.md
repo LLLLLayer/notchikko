@@ -14,13 +14,11 @@
   <a href="README.ko.md">한국어</a>
 </p>
 
-螢幕頂端的 Notch 區域，長久以來不過是一塊需要小心避讓的暗色禁區。Notchikko 卻將它化作一座微型島嶼，讓一隻小生靈在此安家落戶 —— 它會在你喚起 Agent 時凝神沉思，在工具被呼叫時伏案飛轉，在任務完成時悄然雀躍；而當你久未歸來，它便收起尾巴，在島嶼一角安靜地打起盹來。抬眼，它便在那裡。
-
-Notchikko 聽得懂 AI Agent 在做什麼。它會嗅探已安裝的 CLI，輕聲問你一句 ——「要替它們接上電話（Hook）嗎？」此後一切由它傳遞：工作階段開啟、工具呼叫、任務完成、報錯或暫停，每一種動靜都會映射為島上那隻小生靈的一舉一動。螢幕之上，始終有生機。
+螢幕頂端的 Notch 區域，長久以來不過是一塊需要小心避讓的暗色禁區。Notchikko（諾奇可）卻將它化作一座微型島嶼，讓 Notchikko 在此安家落戶 —— 它會在你喚起 Agent 時凝神沉思，在工具被呼叫時伏案飛轉，在任務完成時悄然雀躍；而當你久未歸來，它便收起尾巴，在島嶼一角安靜地打起盹來。抬眼，它便在那裡。Notchikko 聽得懂 AI Agent 在做什麼。它會嗅探已安裝的 CLI，輕聲問你一句 ——「要替它們接上電話（Hook）嗎？」此後一切由它傳遞：工作階段開啟、工具呼叫、任務完成、報錯或暫停，每一種動靜都會映射為島上 Notchikko 的一舉一動。螢幕之上，始終有生機。
 
 ## 動畫狀態
 
-Notchikko 透過 hook 事件即時驅動 11 種狀態切換。每種狀態可包含多張 SVG 變體，進入時隨機抽選 —— 下表列出每種狀態的觸發來源與示例形象。
+Notchikko 共有 12 種動畫狀態 —— 其中 11 種由 hook 事件驅動，1 種由滑鼠互動觸發。每種狀態可包含多張 SVG 變體，進入時隨機抽選 —— 下表列出每種狀態的觸發來源與示例形象。以滑鼠輕拂而過，牠便悄然暈染出一抹羞怯的緋紅，觸控板隨之心跳般輕顫，連擊計數 ×N 自 Notch 邊緣緩緩掠過；若將牠輕輕拖曳，牠便眼冒金星，暈乎乎地晃悠在這片小小天地間。
 
 <table>
   <tr>
@@ -28,24 +26,39 @@ Notchikko 透過 hook 事件即時驅動 11 種狀態切換。每種狀態可包
     <td align="center" width="120"><img src="assets/states/reading.svg" width="100"><br><sub><b>閱讀</b></sub><br><sub>Read / Grep / Glob</sub></td>
     <td align="center" width="120"><img src="assets/states/typing.svg" width="100"><br><sub><b>輸入</b></sub><br><sub>Edit / Write / NotebookEdit</sub></td>
     <td align="center" width="120"><img src="assets/states/building.svg" width="100"><br><sub><b>建置</b></sub><br><sub>Bash</sub></td>
+    <td align="center" width="120"><img src="assets/states/thinking.svg" width="100"><br><sub><b>思考</b></sub><br><sub>LLM 生成中</sub></td>
   </tr>
   <tr>
-    <td align="center" width="120"><img src="assets/states/thinking.svg" width="100"><br><sub><b>思考</b></sub><br><sub>LLM 生成中</sub></td>
     <td align="center" width="120"><img src="assets/states/sweeping.svg" width="100"><br><sub><b>清掃</b></sub><br><sub>上下文壓縮</sub></td>
     <td align="center" width="120"><img src="assets/states/happy.svg" width="100"><br><sub><b>開心</b></sub><br><sub>任務完成</sub></td>
     <td align="center" width="120"><img src="assets/states/error.svg" width="100"><br><sub><b>錯誤</b></sub><br><sub>工具報錯</sub></td>
-  </tr>
-  <tr>
     <td align="center" width="120"><img src="assets/states/sleeping.svg" width="100"><br><sub><b>睡眠</b></sub><br><sub>長時閒置</sub></td>
     <td align="center" width="120"><img src="assets/states/approving.svg" width="100"><br><sub><b>審批</b></sub><br><sub>PermissionRequest</sub></td>
+  </tr>
+  <tr>
     <td align="center" width="120"><img src="assets/states/dragging.svg" width="100"><br><sub><b>拖曳</b></sub><br><sub>使用者拖動</sub></td>
-    <td align="center" width="120"><sub>更多變體藏在主題包內</sub></td>
+    <td align="center" width="120"><img src="assets/states/petting.svg" width="100"><br><sub><b>撫摸</b></sub><br><sub>滑鼠來回撫</sub></td>
+    <td align="center" width="120"><sub><b>???</b></sub><br><sub>神秘彩蛋 — 留給你自己發現</sub></td>
+    <td align="center" width="120"><sub><b>敬請期待</b></sub><br><sub>更多互動…</sub></td>
+    <td align="center" width="120"></td>
   </tr>
 </table>
 
 ## 工作階段行為
 
-每一個 agent 工作階段從 `SessionStart` 進入 Notchikko 的視野，在工具呼叫、思考、審批、報錯、完成之間流轉，最終由 `Stop` 事件歸檔；閒置與睡眠由計時器接管。整個生命週期大致如下：
+每一個 Agent 工作階段從 `SessionStart` 進入 Notchikko 的視野，在工具呼叫、思考、審批、報錯、完成之間流轉，最終由 `Stop` 事件歸檔；閒置與睡眠由計時器接管。
+Notchikko 同時最多掛載 32 個工作階段，跨 agent 共享，超出按 LRU 淘汰。點擊 Notchikko 聚焦目前工作階段所在的終端機，右鍵選單可固定、跳轉或關閉任意工作階段；token 用量同步顯示在選單列。
+
+當 Agent 發來 `PermissionRequest`，notch 下方會飄出一張審批氣泡，承載四種動作：
+
+- **本次允許**：只放行這一次呼叫，Agent 下次再想動手仍會停下來問你，適合一次性的破壞性操作。
+- **永遠允許**：放行本次，並把該工具寫入目前專案的 `settings.local.json`（透過 hook 的 `addRules`），從此在這個專案裡呼叫同一工具都無需再問，跨工作階段生效。
+- **本工作階段自動核准**：把目前工作階段切到 `bypassPermissions` 模式（等同於 `--dangerously-skip-permissions`），同時把這個工作階段裡其他積壓的待審批一併放行；自此它可以隨意動手，直到工作階段結束便失效。
+- **拒絕**：駁回本次請求，並附上「Denied by Notchikko」作為原因回傳給 Agent。
+
+Claude Code 獨有的 `AskUserQuestion` 也會走審批氣泡的同一條通道，但不會渲染成允許/拒絕按鈕 —— Notchikko 把候選項直接變成可點選的膠囊，點一下便把答案原樣回傳給 Agent，讓牠繼續往下走。
+
+整個生命週期大致如下：
 
 ```mermaid
 stateDiagram-v2
@@ -60,39 +73,44 @@ stateDiagram-v2
     完成 --> [*]: 工作階段歸檔
 ```
 
-審批氣泡承載四種動作：本次允許、永遠允許、本工作階段自動核准、拒絕；Claude Code 的 `AskUserQuestion` 會被識別並渲染為可點選的選項。
-
-Notchikko 同時最多掛載 32 個工作階段，跨 agent 共享，超出按 LRU 淘汰。點擊小生靈聚焦目前工作階段所在的終端機，右鍵選單可固定、跳轉或關閉任意工作階段；token 用量同步顯示在選單列。
-
 ## 支援與限制
 
-### CLI 支援
+下面這張表把 CLI 的整合程度與終端機的聚焦粒度合到一起：CLI 決定 Hook/審批/跳轉/Token 是否可用，終端機決定跳轉時能精確到分頁、視窗還是僅啟用應用程式。
 
-| CLI | Hook 整合 | 審批氣泡 | 終端機跳轉 | Token 用量 | 狀態 |
-| --- | :---: | :---: | :---: | :---: | --- |
-| **Claude Code** | ✓ | ✓ | ✓ | ✓ | 完整支援 |
-| **OpenAI Codex CLI** | ✓ | ✓ | ✓ | — | 完整支援 |
-| **Gemini CLI** | ✓ | ✓ | ✓ | — | 完整支援 |
-| **Trae CLI** | ✓ | ✓ | ✓ | — | 完整支援 |
-| Cursor Agent | — | — | — | — | 計劃中 |
-| GitHub Copilot CLI | — | — | — | — | 計劃中 |
-| opencode | — | — | — | — | 計劃中 |
+<table>
+  <thead>
+    <tr>
+      <th align="left">組件</th>
+      <th align="center">Hook</th>
+      <th align="center">審批</th>
+      <th align="center">跳轉</th>
+      <th align="center">Token</th>
+      <th align="center">聚焦精度</th>
+      <th align="left">狀態</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="7"><sub><b>CLI</b></sub></td></tr>
+    <tr><td><b>Claude Code</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td>完整支援</td></tr>
+    <tr><td><b>OpenAI Codex CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>完整支援</td></tr>
+    <tr><td><b>Gemini CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>完整支援</td></tr>
+    <tr><td><b>Trae CLI</b></td><td align="center">✓</td><td align="center">✓</td><td align="center">✓</td><td align="center">—</td><td align="center">—</td><td>完整支援</td></tr>
+    <tr><td>Cursor Agent</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>計劃中</td></tr>
+    <tr><td>GitHub Copilot CLI</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>計劃中</td></tr>
+    <tr><td>opencode</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td align="center">—</td><td>計劃中</td></tr>
+    <tr><td colspan="7"><sub><b>終端機</b></sub></td></tr>
+    <tr><td>iTerm2</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Terminal.app</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Ghostty</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>Kitty</td><td colspan="4" align="center">—</td><td align="center">Window</td><td></td></tr>
+    <tr><td>VS Code / VS Code Insiders / Cursor / Windsurf</td><td colspan="4" align="center">—</td><td align="center">Tab</td><td></td></tr>
+    <tr><td>其他終端機</td><td colspan="4" align="center">—</td><td align="center">App</td><td></td></tr>
+  </tbody>
+</table>
 
-✓ 表示已支援，— 表示尚未涵蓋。Token 用量目前只能從 Claude Code 的 transcript 中讀取，其他 agent 等它們自己暴露同等欄位後會跟進。
-
-### 終端機聚焦
-
-| 終端機 | 聚焦精度 |
-| --- | --- |
-| iTerm2 | Tab |
-| Terminal.app | Tab |
-| Ghostty | Tab |
-| Kitty | Window |
-| VS Code | Tab |
-| VS Code Insiders | Tab |
-| Cursor | Tab |
-| Windsurf | Tab |
-| 其他終端機 | 應用程式 |
+> ✓ 表示已支援，— 表示不適用或尚未涵蓋。
+> Token 用量目前只能從 Claude Code 的 transcript 中讀取，其他 agent 後會跟進。
+> 聚焦精度「Tab」= 精確到終端機分頁，「Window」= 精確到視窗，「App」= 僅啟用應用程式本身。
 
 ## 安裝與執行
 
