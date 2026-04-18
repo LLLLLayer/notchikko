@@ -140,9 +140,12 @@ final class ClaudeCodeAdapter: AgentBridge {
             return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)
         case "PermissionRequest":
             let detail = Self.extractPermissionDetail(from: hook)
-            // AskUserQuestion 可能以 PermissionRequest 到达，用更具体的 message
-            let msg = (hook.tool == "AskUserQuestion") ? "AskUserQuestion" : hook.event
-            return .notification(sessionId: hook.sessionId, message: msg, detail: detail)
+            // AskUserQuestion 走 .notification（它的"问答"语义和审批不同）
+            if hook.tool == "AskUserQuestion" {
+                return .notification(sessionId: hook.sessionId, message: "AskUserQuestion", detail: detail)
+            }
+            // 此处只处理非阻塞的 PermissionRequest——阻塞式直通 onApprovalRequest，不走这条路径
+            return .permissionRequest(sessionId: hook.sessionId, tool: hook.tool ?? "", detail: detail)
         case "AskUserQuestion":
             let detail = Self.extractAskUserDetail(from: hook.toolInput)
             return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)

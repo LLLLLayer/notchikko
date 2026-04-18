@@ -57,6 +57,23 @@ final class ApprovalManager {
         let requestId = hookEvent.requestId ?? ""
         Log("handleApproval: tool=\(hookEvent.tool ?? "?"), sid=\(hookEvent.sessionId.prefix(8)), reqId=\(requestId.prefix(8))", tag: "Approval")
 
+        // 主路径补齐：新的 PermissionRequest 抵达 → 同 session 之前悬挂的阻塞卡必然作废
+        // （用户已在终端对前一张做了决定：拒绝 → 此处是 Claude 重问；允许 → 已被 PostToolUse 路径清理过）
+        // 关闭旧卡 fd 让它们的 hook 解除阻塞，dismiss 卡片
+        let stale = pendingApprovals.values.filter {
+            $0.sessionId == hookEvent.sessionId
+                && !$0.requestId.isEmpty
+                && !$0.isAskUser
+                && $0.requestId != requestId
+        }
+        if !stale.isEmpty {
+            Log("handleApproval: superseded by new request, closing \(stale.count) stale card(s)", tag: "Approval")
+            for card in stale {
+                socketServer?.closePending(requestId: card.requestId)
+                dismiss(requestId: card.id)
+            }
+        }
+
         // 如果该 session 已设为"全部允许"，直接放行
         if autoApprovedSessions.contains(hookEvent.sessionId) {
             let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
@@ -211,10 +228,10 @@ final class ApprovalManager {
         for id in allIds {
             cleanupTimers(for: id)
             pendingApprovals.removeValue(forKey: id)
+            onCardDismissed?(id)
         }
 
         SoundManager.shared.play(for: "nod")
-        onAllCardsDismissed?()
     }
 
     // MARK: - 热键查询
@@ -270,6 +287,20 @@ final class ApprovalManager {
     /// Session 结束时清理会话级状态
     func cleanupSession(_ sessionId: String) {
         autoApprovedSessions.remove(sessionId)
+    }
+
+    /// 工具已在外部被放行（用户走了 CLI 内置授权而非卡片）→ 同 session+tool 的阻塞卡片是僵尸
+    /// 关闭 socket fd 让阻塞中的 hook 退出，再 dismiss 卡片
+    func dismissStaleApprovals(for sessionId: String, tool: String) {
+        let stale = pendingApprovals.values.filter {
+            $0.sessionId == sessionId && $0.tool == tool && !$0.requestId.isEmpty && !$0.isAskUser
+        }
+        guard !stale.isEmpty else { return }
+        Log("dismissStaleApprovals: sid=\(sessionId.prefix(8)), tool=\(tool), closing \(stale.count) stale card(s)", tag: "Approval")
+        for card in stale {
+            socketServer?.closePending(requestId: card.requestId)
+            dismiss(requestId: card.id)
+        }
     }
 
     /// 用户在终端操作了（新 prompt / stop），清理该 session 的过期审批卡片

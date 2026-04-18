@@ -126,9 +126,15 @@ final class ThemeProvider {
         if let cached = currentSVGCache[state] {
             return cached
         }
-        let url = resolveSVGURL(for: state)
-        if let url { currentSVGCache[state] = url }
-        return url
+        if let url = resolveSVGURL(for: state) {
+            currentSVGCache[state] = url
+            return url
+        }
+        // 资源缺失 → 走 fallback 链（如 .petting 兜底到 .happy）
+        if let fallback = state.fallbackState {
+            return svgURL(for: fallback)
+        }
+        return nil
     }
 
     private func resolveSVGURL(for state: NotchikkoState) -> URL? {

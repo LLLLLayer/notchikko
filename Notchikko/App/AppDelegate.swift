@@ -180,6 +180,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.sessionManager.beginDrag()
         }
+        dragController.onPetStart = { [weak self] in
+            self?.sessionManager.beginPetting()
+        }
+        dragController.onPetEnd = { [weak self] in
+            self?.sessionManager.endPetting()
+        }
+        dragController.onPetCombo = { [weak self] in
+            self?.sessionManager.registerPettingCombo()
+        }
         dragController.onDragEnd = { [weak self] targetScreen in
             guard let self else { return }
 
@@ -397,6 +406,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch event {
         case .prompt, .stop, .sessionEnd:
             approvalManager?.dismissStaleApprovals(for: sid)
+        case .toolUse(_, let tool, .post):
+            // 工具已被外部放行（用户走 CLI 内置授权）→ 同 session+tool 的卡片是僵尸
+            approvalManager?.dismissStaleApprovals(for: sid, tool: tool)
         default: break
         }
 
@@ -411,7 +423,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             approvalManager?.cleanupSession(endSid)
         }
 
-        // Elicitation / AskUserQuestion / PermissionRequest → 弹通知卡片
+        // Elicitation / AskUserQuestion → 弹信息性通知卡片
+        // PermissionRequest 升格为独立 case：阻塞式走 onApprovalRequest 直通，非阻塞已被 hook 放行无需弹卡
         if case .notification(let sid, let msg, let detail) = event {
             showNotificationCardIfNeeded(sessionId: sid, message: msg, detail: detail)
         }
@@ -420,21 +433,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 决定是否为 .notification 事件弹出非阻塞通知卡片。
     /// 规则：
     /// 1. 纯 Notification（空 msg）和未知事件 → 不弹
-    /// 2. PermissionRequest + bypass on → 不弹
-    /// 3. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
-    /// 4. Elicitation / AskUserQuestion → 始终弹（不受 approvalCardEnabled 影响）
-    /// 5. PermissionRequest (non-bypass) → 受 approvalCardEnabled 控制
+    /// 2. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
+    /// 3. Elicitation / AskUserQuestion → 弹（不受 approvalCardEnabled 影响）
     private func showNotificationCardIfNeeded(sessionId sid: String, message msg: String, detail: String) {
         let session = sessionManager.sessions[sid]
-        let isBypass = session?.isBypassMode ?? false
         let prevState = sessionManager.previousState
 
         let needsCard: Bool = {
-            guard msg == "Elicitation" || msg == "AskUserQuestion"
-                    || msg == "PermissionRequest" else { return false }
-            if isBypass && msg == "PermissionRequest" { return false }
-            if msg == "PermissionRequest"
-                && !PreferencesStore.shared.preferences.approvalCardEnabled { return false }
+            guard msg == "Elicitation" || msg == "AskUserQuestion" else { return false }
             if session == nil || session?.phase == .ended { return false }
             if prevState == .happy || prevState == .sleeping { return false }
             return true

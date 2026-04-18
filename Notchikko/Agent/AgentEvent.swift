@@ -87,7 +87,12 @@ enum AgentEvent {
     case sessionEnd(sessionId: String)
     case prompt(sessionId: String, text: String?)
     case toolUse(sessionId: String, tool: String, phase: ToolPhase)
+    /// 信息性通知（Elicitation、Notification、AskUserQuestion 等）。
+    /// 注意：阻塞式 PermissionRequest 不走这里，走 `SocketServer.onApprovalRequest` 直通；
+    /// 非阻塞 PermissionRequest 走下面的 .permissionRequest case。
     case notification(sessionId: String, message: String, detail: String = "")
+    /// 非阻塞 PermissionRequest（hook 没生成 request_id：approvalCard 关 / bypass / 非审批工具）。
+    case permissionRequest(sessionId: String, tool: String, detail: String)
     case compact(sessionId: String)
     case stop(sessionId: String, usage: HookEvent.TokenUsage?)
     case error(sessionId: String, message: String)
@@ -101,6 +106,7 @@ extension AgentEvent {
         case .prompt(let sid, _): sid
         case .toolUse(let sid, _, _): sid
         case .notification(let sid, _, _): sid
+        case .permissionRequest(let sid, _, _): sid
         case .compact(let sid): sid
         case .stop(let sid, _): sid
         case .error(let sid, _): sid

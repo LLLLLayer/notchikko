@@ -12,6 +12,7 @@ enum NotchikkoState: String, CaseIterable {
     case error
     case dragging
     case approving
+    case petting
 
     var revealAmount: CGFloat {
         switch self {
@@ -26,6 +27,7 @@ enum NotchikkoState: String, CaseIterable {
         case .error: 0.50
         case .dragging: 1.0
         case .approving: 0.80
+        case .petting: 0.70
         }
     }
 
@@ -36,6 +38,7 @@ enum NotchikkoState: String, CaseIterable {
         switch self {
         case .dragging: 100
         case .approving: 95
+        case .petting: 92
         case .error: 90
         case .happy: 80
         case .building: 70
@@ -45,6 +48,14 @@ enum NotchikkoState: String, CaseIterable {
         case .thinking: 50
         case .idle: 20
         case .sleeping: 10
+        }
+    }
+
+    /// 资源缺失时的视觉兜底（用于过渡期、用户主题尚未提供该状态资源时）
+    var fallbackState: NotchikkoState? {
+        switch self {
+        case .petting: return .happy
+        default: return nil
         }
     }
 }

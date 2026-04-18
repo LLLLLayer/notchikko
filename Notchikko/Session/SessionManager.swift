@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 @MainActor @Observable
 final class SessionManager {
@@ -11,6 +12,8 @@ final class SessionManager {
     private(set) var danmakuToolEvent: (id: Int, tool: String) = (0, "")
     /// 弹幕事件：session 切换时递增，附带项目名
     private(set) var danmakuSessionEvent: (id: Int, name: String) = (0, "")
+    /// 弹幕事件：撸猫 combo，附带计数
+    private(set) var danmakuPettingEvent: (id: Int, combo: Int) = (0, 0)
     private var danmakuCounter = 0
 
     /// nil = 自动跟踪最新活跃 session
@@ -175,7 +178,7 @@ final class SessionManager {
                 lastEvent: Date(), phase: .waitingForInput,
                 terminalPid: terminalPid, pidChain: pidChain
             )
-            SoundManager.shared.play(for: "session-start")
+            SoundManager.shared.play(for: "session-start", cooldownKey: "session-start:\(sid)")
             emitSessionDanmaku(sessions[sid]!)
             // 只在没有其他工作中 session 时切到 idle，避免打断正在工作的 session
             if !hadWorkingSession {
@@ -267,22 +270,34 @@ final class SessionManager {
                 transition(to: .sleeping)
             }
 
-        case .notification(let sid, let msg, _):
+        case .notification(_, let msg, _):
+            // 阻塞式 PermissionRequest 走 onApprovalRequest 直通，这里只处理信息性通知
+            // PermissionRequest 升格为 .permissionRequest case，不再用字符串判等识别
+            let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion")
+            guard needsUserAction else { break }
+            triggerApprovingState(forSession: event.sessionId)
+
+        case .permissionRequest(let sid, _, _):
+            // 非阻塞 PermissionRequest（hook 没生成 request_id）：approvalCard 关或 bypass 已让 hook 直通放行
+            // 此处仅在 approvalCard 开 + 非 bypass 的边缘场景下转动画（理论上很少发生，因为 approvalCard 开
+            // 时 hook 通常会走阻塞路径），其余情况静默
             let isBypass = sessions[sid]?.isBypassMode ?? false
             let approvalOn = PreferencesStore.shared.preferences.approvalCardEnabled
-            // 只有需要用户操作的事件才更新 session 和切状态
-            let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion"
-                || (msg == "PermissionRequest" && !isBypass && approvalOn))
-            guard needsUserAction else { break }
-            sessions[sid]?.lastEvent = Date()
-            sessions[sid]?.phase = .waitingForInput
-            if sid == activeSessionId {
-                idleTimer?.cancel()
-                sleepTimer?.cancel()
-                currentState = .approving
-                isApproving = true
-                SoundManager.shared.play(for: "approving")
-            }
+            guard !isBypass && approvalOn else { break }
+            triggerApprovingState(forSession: sid)
+        }
+    }
+
+    /// 切到 approving 视觉状态 + 标记 session 等待输入
+    private func triggerApprovingState(forSession sid: String) {
+        sessions[sid]?.lastEvent = Date()
+        sessions[sid]?.phase = .waitingForInput
+        if sid == activeSessionId {
+            idleTimer?.cancel()
+            sleepTimer?.cancel()
+            currentState = .approving
+            isApproving = true
+            SoundManager.shared.play(for: "approving")
         }
     }
 
@@ -320,8 +335,12 @@ final class SessionManager {
     /// 审批期间锁定 approving 状态，阻止其他事件切走动画
     private(set) var isApproving = false
 
-    /// 进入拖拽状态：冻结定时器和状态变更
+    /// 撸宠物期间锁定 petting 状态，阻止其他事件切走动画。优先级低于 dragging/approving
+    private(set) var isPetting = false
+
+    /// 进入拖拽状态：冻结定时器和状态变更（优先级最高，撸猫被打断）
     func beginDrag() {
+        if isPetting { isPetting = false }
         isDragging = true
         idleTimer?.cancel()
         sleepTimer?.cancel()
@@ -335,9 +354,78 @@ final class SessionManager {
         restoreActiveState()
     }
 
-    /// 直接设置状态（外部控制用，拖拽期间被阻止）
+    /// 进入撸猫状态：drag/approving 期间不允许进入
+    func beginPetting() {
+        guard !isDragging && !isApproving else { return }
+        isPetting = true
+        idleTimer?.cancel()
+        sleepTimer?.cancel()
+        returnTimer?.cancel()
+        currentState = .petting
+        SoundManager.shared.play(for: "petting")
+    }
+
+    /// 结束撸猫：解锁并恢复到 session 当前实际状态；combo 立即清零
+    func endPetting() {
+        guard isPetting else { return }
+        isPetting = false
+        pettingCombo = 0
+        lastComboTime = nil
+        restoreActiveState()
+    }
+
+    // MARK: - 撸猫 Combo
+
+    private var pettingCombo: Int = 0
+    private var lastComboTime: Date?
+    private static let comboBaseThrottle: TimeInterval = 0.2        // 初始节流 200ms（黄金段 5Hz 响）
+    private static let comboMaxThrottle: TimeInterval = 0.4         // 节流封顶 400ms（高连击仍有节奏）
+    private static let comboThrottleGrowthStart: Int = 10           // combo > 10 之后节流才开始变长
+    private static let comboThrottleGrowthPerCombo: TimeInterval = 0.03  // 每 +1 combo 节流 +30ms
+    private static let maxComboVariants: Int = 8                    // sfx-petting-1..8
+    /// 里程碑 combo — 这些特殊点用专门的 sfx-petting-milestone.wav 增加新鲜感
+    private static let comboMilestones: Set<Int> = [10, 15, 20, 30, 50, 75, 100]
+
+    /// 一次方向反转到达 — 递增 combo（带动态节流），播对应升调音 + 发弹幕
+    /// 注意：combo 重置 = endPetting 时清零（中断即重来）
+    func registerPettingCombo() {
+        let now = Date()
+
+        // 动态节流：combo 越高，间隔越长，避免高连击段响声疲惫
+        let extraDelay = max(0, pettingCombo - Self.comboThrottleGrowthStart)
+        let throttle = min(
+            Self.comboBaseThrottle + Double(extraDelay) * Self.comboThrottleGrowthPerCombo,
+            Self.comboMaxThrottle
+        )
+        if let last = lastComboTime, now.timeIntervalSince(last) < throttle {
+            return
+        }
+
+        pettingCombo += 1
+        lastComboTime = now
+
+        // 里程碑 combo → 专门的 fanfare 音效；其他用 variant 升调
+        let soundKey: String
+        if Self.comboMilestones.contains(pettingCombo) {
+            soundKey = "petting-milestone"
+        } else {
+            let variant = min(pettingCombo, Self.maxComboVariants)
+            soundKey = "petting-\(variant)"
+        }
+        SoundManager.shared.play(for: soundKey, cooldownKey: "petting-\(pettingCombo)")
+
+        danmakuCounter += 1
+        danmakuPettingEvent = (danmakuCounter, pettingCombo)
+    }
+
+    /// 直接设置状态（外部控制用，拖拽 / 撸猫期间被阻止；approving 例外它本身就是审批入口）
     func overrideState(_ state: NotchikkoState) {
         guard !isDragging else { return }
+        // approving 是来自审批的强制状态，可以打断撸猫
+        if isPetting && state == .approving {
+            isPetting = false
+        }
+        guard !isPetting else { return }
         currentState = state
         if state == .approving {
             isApproving = true
@@ -475,7 +563,13 @@ final class SessionManager {
 
     private func transition(to newState: NotchikkoState) {
         guard !isDragging else { return }
+        // active session 已结束 → approval 必然过期，强制解锁
+        // Why: 防御 dismiss 链路漏调 endApproval 导致 isApproving 永久卡 true
+        if newState == .happy && isApproving {
+            isApproving = false
+        }
         guard !isApproving else { return }
+        guard !isPetting else { return }
         let oldState = currentState
         currentState = newState
         if oldState != newState {

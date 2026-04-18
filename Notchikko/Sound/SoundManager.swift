@@ -38,17 +38,20 @@ final class SoundManager {
     // MARK: - 播放
 
     /// 根据状态名播放对应音效（带冷却 + fallback）
-    func play(for stateName: String) {
+    /// - Parameter cooldownKey: 自定义冷却键。多 agent 场景下传 sessionId 避免并发吞声；
+    ///   不传则按 stateName 去重（同状态 2s 内不重复）。
+    func play(for stateName: String, cooldownKey: String? = nil) {
         let prefs = PreferencesStore.shared.preferences
         guard prefs.soundVolume > 0 else { return }
 
-        // 冷却检查：同一状态 2 秒内不重复播放
+        // 冷却检查：默认按状态名去重 2s；多 agent 并发可传 sessionId 拓宽
+        let key = cooldownKey ?? stateName
         let now = Date()
-        if let lastTime = lastPlayTimes[stateName],
+        if let lastTime = lastPlayTimes[key],
            now.timeIntervalSince(lastTime) < Self.cooldownInterval {
             return
         }
-        lastPlayTimes[stateName] = now
+        lastPlayTimes[key] = now
 
         let volume = prefs.soundVolume
 
@@ -139,8 +142,9 @@ final class SoundManager {
     }
 
     /// 内置音效（bundle 资源）
+    /// defaultSoundMap 显式映射优先；未映射的键默认按 `sfx-<stateName>` 查找（供 combo 变体如 petting-1..8 用）
     private func builtinSoundURL(for stateName: String) -> URL? {
-        guard let bundleName = defaultSoundMap[stateName] else { return nil }
+        let bundleName = defaultSoundMap[stateName] ?? "sfx-\(stateName)"
         return Bundle.main.url(forResource: bundleName, withExtension: "wav")
     }
 
