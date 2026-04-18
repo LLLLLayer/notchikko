@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# notchikko-hook-version: 1
 """
 Notchikko Hook — forwards CLI agent events via Unix socket.
 

@@ -104,25 +104,53 @@ final class HookInstaller {
     // MARK: - 检测
 
     /// 已安装的 hook 是否需要升级。
-    /// 触发条件:
-    /// - 老版 inline Python 格式（.sh 里包含 `python3 -c`），还没分成两个文件
-    /// - 或者 .sh 存在但 .py 缺失（升级过程中途失败 / 用户手工删文件）
     ///
-    /// 返回 true 表示 Settings 应提示用户重装 hook。
+    /// 检测逻辑：读两个文件首部的 `# notchikko-hook-version: N` 戳，与 bundle 里的版本比对。
+    /// 任意文件缺失 / 缺戳 / 版本不一致 → outdated。覆盖：
+    /// - 老版 inline Python（无戳）
+    /// - .py 缺失（升级中断）
+    /// - .sh 与 .py 版本不同步（只更新了一个）
+    /// - 用户降级 app 但 hook 没回退
+    /// - 用户手工乱改文件
+    ///
+    /// 返回 true → Settings 应提示用户重装 hook。
     var isInstalledHookOutdated: Bool {
         let shPath = hookDir.appendingPathComponent("notchikko-hook.sh").path
         let pyPath = hookDir.appendingPathComponent("notchikko-hook.py").path
         guard FileManager.default.fileExists(atPath: shPath) else {
             return false  // 全新用户，未装 hook — 不是"需要升级"
         }
-        // 任何一个 CLI 在 preferences 里标记为 installed，但 .py 缺失 → 需要重装
-        if !FileManager.default.fileExists(atPath: pyPath) { return true }
-        // .sh 含 inline Python → 旧格式
-        if let content = try? String(contentsOfFile: shPath, encoding: .utf8),
-           content.contains("python3 -c") {
-            return true
+        guard FileManager.default.fileExists(atPath: pyPath) else { return true }
+
+        let installedSh = Self.readHookVersion(atPath: shPath)
+        let installedPy = Self.readHookVersion(atPath: pyPath)
+        let bundledSh = Self.bundleHookVersion(name: "notchikko-hook", ext: "sh")
+        let bundledPy = Self.bundleHookVersion(name: "notchikko-hook", ext: "py")
+        return installedSh != bundledSh || installedPy != bundledPy
+    }
+
+    /// 从 hook 文件首 5 行里抽取 `# notchikko-hook-version: N` 的 N。找不到返回 nil（视为旧版）。
+    private static func readHookVersion(atPath path: String) -> Int? {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+        return parseHookVersion(content)
+    }
+
+    private static func bundleHookVersion(name: String, ext: String) -> Int? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: ext),
+              let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return parseHookVersion(content)
+    }
+
+    private static func parseHookVersion(_ content: String) -> Int? {
+        for line in content.split(separator: "\n").prefix(5) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("#") else { continue }
+            if let range = trimmed.range(of: "notchikko-hook-version:") {
+                let tail = trimmed[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                return Int(tail)
+            }
         }
-        return false
+        return nil
     }
 
     /// 批量重装所有当前已安装的 CLI hooks（Settings 的 "Update All" 按钮用）
