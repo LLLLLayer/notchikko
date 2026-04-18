@@ -17,10 +17,43 @@ final class MenuBarManager {
     func setup(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "ladybug.fill", accessibilityDescription: "Notchikko")
-        }
+        statusItem?.button?.image = currentMenubarImage()
         statusItem?.menu = buildMenu()
+        observeStateChanges()
+    }
+
+    /// 重新读取 SessionManager.currentState → 切换状态栏图标。
+    /// 通过 withObservationTracking 重订阅，每次状态变化触发一次。
+    private func observeStateChanges() {
+        guard let sm = sessionManager else { return }
+        withObservationTracking {
+            _ = sm.currentState
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.statusItem?.button?.image = self.currentMenubarImage()
+                self.observeStateChanges()
+            }
+        }
+    }
+
+    private func currentMenubarImage() -> NSImage? {
+        let name = Self.menubarImageName(for: sessionManager?.currentState ?? .sleeping)
+        let image = NSImage(named: name)
+        image?.isTemplate = true
+        image?.accessibilityDescription = "Notchikko"
+        return image
+    }
+
+    private static func menubarImageName(for state: NotchikkoState) -> String {
+        switch state {
+        case .sleeping:
+            return "MenubarSleeping"
+        case .error, .approving:
+            return "MenubarAlert"
+        default:
+            return "MenubarDefault"
+        }
     }
 
     @discardableResult
@@ -89,13 +122,30 @@ final class MenuBarManager {
             }
         }
 
-        // Section 2: 显示器
+        // Section 2: 显示器（常驻）——包含 Notch 检测模式，以及（如有多屏）屏幕切换
         let screens = NSScreen.screens
+        let screenMenu = NSMenu()
+        let currentMode = PreferencesStore.shared.preferences.notchDetectionMode
+
+        let notchItems: [(NotchDetectionMode, String)] = [
+            (.auto, "settings.notch_auto"),
+            (.forceOn, "settings.notch_force_on"),
+            (.forceOff, "settings.notch_force_off"),
+        ]
+        for (mode, key) in notchItems {
+            let item = NSMenuItem(title: NSLocalizedString(key, comment: ""),
+                                  action: #selector(setNotchMode(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.state = (mode == currentMode) ? .on : .off
+            screenMenu.addItem(item)
+        }
+
         if screens.count > 1 {
-            let screenMenu = NSMenu()
+            screenMenu.addItem(.separator())
             for (i, screen) in screens.enumerated() {
                 let name = screen.localizedName
-                let item = NSMenuItem(title: "\(name)", action: #selector(screenSelected(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: name, action: #selector(screenSelected(_:)), keyEquivalent: "")
                 item.target = self
                 item.tag = i
                 if screen == currentScreen {
@@ -103,10 +153,11 @@ final class MenuBarManager {
                 }
                 screenMenu.addItem(item)
             }
-            let screenItem = NSMenuItem(title: NSLocalizedString("menu.display", comment: ""), action: nil, keyEquivalent: "")
-            screenItem.submenu = screenMenu
-            menu.addItem(screenItem)
         }
+
+        let screenItem = NSMenuItem(title: NSLocalizedString("menu.display", comment: ""), action: nil, keyEquivalent: "")
+        screenItem.submenu = screenMenu
+        menu.addItem(screenItem)
 
         // 设置
         let settingsItem = NSMenuItem(title: NSLocalizedString("menu.settings", comment: ""), action: #selector(openSettings(_:)), keyEquivalent: ",")
@@ -165,6 +216,14 @@ final class MenuBarManager {
         let screens = NSScreen.screens
         guard sender.tag < screens.count else { return }
         onSwitchScreen?(screens[sender.tag])
+    }
+
+    @objc private func setNotchMode(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let mode = NotchDetectionMode(rawValue: raw) else { return }
+        PreferencesStore.shared.preferences.notchDetectionMode = mode
+        // 状态栏菜单不会自动刷新，重建以更新勾选状态
+        statusItem?.menu = buildMenu()
     }
 
     @objc private func openSettings(_ sender: NSMenuItem) {
