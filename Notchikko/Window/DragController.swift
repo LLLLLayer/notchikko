@@ -85,6 +85,14 @@ final class DragController {
     private func handleEvent(_ event: NSEvent) {
         guard let panel else { return }
 
+        // 隐身态（panel.ignoresMouseEvents=true）下全部交互短路。
+        // Why: NSEvent 全局 monitor 不受 ignoresMouseEvents 影响，仍会把鼠标位置 / 点击事件喂进来，
+        // 如果不显式短路，撸猫检测 / 右键 / 点击跳转仍会生效——和"屏蔽交互"的承诺不符。
+        if panel.ignoresMouseEvents {
+            endPettingIfActive()
+            return
+        }
+
         // .mouseMoved 不参与拖拽判定，单独走撸猫检测
         if event.type == .mouseMoved {
             handlePettingSample(panel: panel)

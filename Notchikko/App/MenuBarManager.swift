@@ -10,9 +10,13 @@ final class MenuBarManager {
     var onSwitchScreen: ((NSScreen) -> Void)?
     var onQuit: (() -> Void)?
     var onOpenSettings: (() -> Void)?
-    var onCheckForUpdates: (() -> Void)?
     var onRemoveSession: ((String) -> Void)?
     var onJumpToSession: ((String) -> Void)?
+    /// 隐身态切换：true = 进入隐身，false = 退出。AppDelegate 负责把它映射到 panel 透明度 + ignoresMouseEvents。
+    var onToggleStealth: ((Bool) -> Void)?
+
+    /// 运行期状态，不持久化（退出/重启后自动回到普通态）。
+    private var isStealthActive: Bool = false
 
     func setup(sessionManager: SessionManager) {
         self.sessionManager = sessionManager
@@ -122,10 +126,30 @@ final class MenuBarManager {
             }
         }
 
-        // Section 2: 显示器（常驻）——包含 Notch 检测模式，以及（如有多屏）屏幕切换
+        // Section 2: 显示器（常驻）——先列连接的屏幕，再列 Notch 检测模式
         let screens = NSScreen.screens
         let screenMenu = NSMenu()
         let currentMode = PreferencesStore.shared.preferences.notchDetectionMode
+
+        if screens.count > 1 {
+            for (i, screen) in screens.enumerated() {
+                let name = screen.localizedName
+                let item = NSMenuItem(title: name, action: #selector(screenSelected(_:)), keyEquivalent: "")
+                item.target = self
+                item.tag = i
+                if screen == currentScreen {
+                    item.state = .on
+                }
+                screenMenu.addItem(item)
+            }
+            screenMenu.addItem(.separator())
+        }
+
+        // Notch detection section — header + 3 modes
+        let notchHeader = NSMenuItem(title: NSLocalizedString("menu.notch_detection", comment: ""),
+                                     action: nil, keyEquivalent: "")
+        notchHeader.isEnabled = false
+        screenMenu.addItem(notchHeader)
 
         let notchItems: [(NotchDetectionMode, String)] = [
             (.auto, "settings.notch_auto"),
@@ -141,35 +165,22 @@ final class MenuBarManager {
             screenMenu.addItem(item)
         }
 
-        if screens.count > 1 {
-            screenMenu.addItem(.separator())
-            for (i, screen) in screens.enumerated() {
-                let name = screen.localizedName
-                let item = NSMenuItem(title: name, action: #selector(screenSelected(_:)), keyEquivalent: "")
-                item.target = self
-                item.tag = i
-                if screen == currentScreen {
-                    item.state = .on
-                }
-                screenMenu.addItem(item)
-            }
-        }
-
         let screenItem = NSMenuItem(title: NSLocalizedString("menu.display", comment: ""), action: nil, keyEquivalent: "")
         screenItem.submenu = screenMenu
         menu.addItem(screenItem)
 
-        // 设置
+        // 设置（检查更新已移入"更多设置 → 关于"）
         let settingsItem = NSMenuItem(title: NSLocalizedString("menu.settings", comment: ""), action: #selector(openSettings(_:)), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        // 检查更新
-        let updateItem = NSMenuItem(title: NSLocalizedString("menu.check_for_updates", comment: ""), action: #selector(checkForUpdates(_:)), keyEquivalent: "")
-        updateItem.target = self
-        menu.addItem(updateItem)
-
         menu.addItem(.separator())
+
+        // 隐身开关：透明度 + 屏蔽交互。双行 attributedTitle：主标题 + 副标题描述
+        let stealthItem = NSMenuItem(title: "", action: #selector(toggleStealth(_:)), keyEquivalent: "")
+        stealthItem.target = self
+        stealthItem.attributedTitle = Self.stealthMenuTitle(isActive: isStealthActive)
+        menu.addItem(stealthItem)
 
         // 退出
         let quitItem = NSMenuItem(title: NSLocalizedString("menu.quit", comment: ""), action: #selector(quitApp(_:)), keyEquivalent: "q")
@@ -230,12 +241,33 @@ final class MenuBarManager {
         onOpenSettings?()
     }
 
-    @objc private func checkForUpdates(_ sender: NSMenuItem) {
-        onCheckForUpdates?()
-    }
-
     @objc private func quitApp(_ sender: NSMenuItem) {
         onQuit?()
+    }
+
+    @objc private func toggleStealth(_ sender: NSMenuItem) {
+        isStealthActive.toggle()
+        onToggleStealth?(isStealthActive)
+        // 重建菜单，让主/副标题切到对应形态
+        statusItem?.menu = buildMenu()
+    }
+
+    /// 双行菜单项标题：主标题随状态切换；副标题描述功能，较小较淡
+    private static func stealthMenuTitle(isActive: Bool) -> NSAttributedString {
+        let mainKey = isActive ? "menu.stealth.off" : "menu.stealth.on"
+        let main = NSLocalizedString(mainKey, comment: "")
+        let subtitle = NSLocalizedString("menu.stealth.subtitle", comment: "")
+
+        let result = NSMutableAttributedString()
+        result.append(NSAttributedString(string: main, attributes: [
+            .font: NSFont.menuFont(ofSize: 0),
+            .foregroundColor: NSColor.labelColor,
+        ]))
+        result.append(NSAttributedString(string: "\n\(subtitle)", attributes: [
+            .font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        return result
     }
 
     private static func usageItem(_ title: String) -> NSMenuItem {

@@ -13,7 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var approvalPanelCoordinator: ApprovalPanelCoordinator?
     private var settingsWindow: NSWindow?
     private let terminalJumper = TerminalJumper()
-    private let updateManager = UpdateManager()
+    private let updateManager = UpdateManager.shared
     private var hotkeyBridge: ApprovalHotkeyBridge?
     private let transcriptPoller = TranscriptPoller()
     private let processDiscovery = ProcessDiscovery()
@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var screenObserver: NSObjectProtocol?
     private var prefsObserver: NSObjectProtocol?
+
+    /// 隐身态镜像（权威在 MenuBarManager；这里复制一份是为了 panel 重建后能恢复）
+    private var isStealthActive: Bool = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 忽略 SIGPIPE：写入已断开的 socket 时不要杀进程
@@ -73,12 +76,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.sessionManager.removeSession(sessionId)
         }
 
-        menuBarManager.onCheckForUpdates = { [weak self] in
-            self?.updateManager.checkForUpdates()
-        }
-
         menuBarManager.onQuit = {
             NSApp.terminate(nil)
+        }
+
+        menuBarManager.onToggleStealth = { [weak self] active in
+            self?.isStealthActive = active
+            self?.applyStealth(active, animated: true)
+        }
+    }
+
+    /// 隐身态切换：透明度淡入淡出 + 鼠标事件穿透。
+    /// panel 重建（切屏幕 / 换主题 / 缩放）会丢失 alpha/ignoresMouseEvents，
+    /// 所以 setupNotchWindow 末尾也调一次这个来同步状态。
+    private func applyStealth(_ active: Bool, animated: Bool) {
+        guard let panel = notchPanel else { return }
+        panel.ignoresMouseEvents = active
+        let target: CGFloat = active ? 0.15 : 1.0
+        if animated {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.25
+                panel.animator().alphaValue = target
+            }
+        } else {
+            panel.alphaValue = target
         }
     }
 
@@ -104,15 +125,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchPanel = nil
 
         let mode = PreferencesStore.shared.preferences.notchDetectionMode
-        let geo = NotchGeometry(screen: screen, notchDetectionMode: mode)
+        let petSize = 80 * PreferencesStore.shared.preferences.petScale
+        let geo = NotchGeometry(screen: screen, notchDetectionMode: mode, petSize: petSize)
         self.geometry = geo
 
         let panel = NotchPanel(frame: geo.panelFrame)
         panel.treatAsNotched = geo.hasPhysicalNotch
         // 强制设置 frame，防止系统自动调整位置
         panel.setFrame(geo.panelFrame, display: false)
-
-        let petSize = 80 * PreferencesStore.shared.preferences.petScale
         let contentView = NotchContentView(
             notchHeight: geo.hiddenNotchHeight,
             sessionManager: sessionManager,
@@ -148,6 +168,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.orderFrontRegardless()
         self.notchPanel = panel
+
+        // panel 是全新实例（alpha=1, ignoresMouseEvents=false），若隐身态已开启需立刻同步（无动画）
+        if isStealthActive {
+            applyStealth(true, animated: false)
+        }
 
         // 拖拽
         dragController.setup(panel: panel, homeFrame: geo.panelFrame,
@@ -432,18 +457,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 决定是否为 .notification 事件弹出非阻塞通知卡片。
     /// 规则：
-    /// 1. 纯 Notification（空 msg）和未知事件 → 不弹
-    /// 2. 过时（session 已结束、或到达前是 happy/sleeping）→ 不弹
-    /// 3. Elicitation / AskUserQuestion → 弹（不受 approvalCardEnabled 影响）
+    /// 1. session 已结束 → 不弹
+    /// 2. Elicitation / AskUserQuestion：prevState 为 happy/sleeping 时抑制（任务刚完 / 宠物在睡，
+    ///    很可能是尾声噪音）；否则弹。不受 approvalCardEnabled 影响。
+    /// 3. Notification（CLI 顶层 message 字段非空）：不作 prevState 抑制——Gemini 唯一 attention
+    ///    channel、Claude Code 终端审批 fallback 都走这条；空 message 的 Notification 在 Adapter
+    ///    已经把 detail 留空，这里直接过滤掉（纯心跳类，不弹）。
     private func showNotificationCardIfNeeded(sessionId sid: String, message msg: String, detail: String) {
         let session = sessionManager.sessions[sid]
         let prevState = sessionManager.previousState
 
         let needsCard: Bool = {
-            guard msg == "Elicitation" || msg == "AskUserQuestion" else { return false }
             if session == nil || session?.phase == .ended { return false }
-            if prevState == .happy || prevState == .sleeping { return false }
-            return true
+            switch msg {
+            case "Elicitation", "AskUserQuestion":
+                if prevState == .happy || prevState == .sleeping { return false }
+                return true
+            case "Notification":
+                return !detail.isEmpty
+            default:
+                return false
+            }
         }()
         guard needsCard else { return }
 

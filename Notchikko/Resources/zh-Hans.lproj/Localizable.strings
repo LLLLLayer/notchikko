@@ -1,6 +1,6 @@
 /* MenuBarManager */
 "menu.sessions" = "Sessions";
-"menu.auto" = "🔄 Auto（自动跟踪）";
+"menu.auto" = "🔄 自动跟随活跃会话";
 "menu.display" = "显示器";
 "menu.pin" = "固定";
 "menu.unpin" = "取消固定";
@@ -15,6 +15,9 @@
 "menu.settings" = "更多设置...";
 "menu.check_for_updates" = "检查更新…";
 "menu.quit" = "退出 Notchikko";
+"menu.stealth.on" = "隐身 NoNotchikko";
+"menu.stealth.off" = "取消隐身 NoNotchikko";
+"menu.stealth.subtitle" = "提高透明度并屏蔽交互，需从菜单栏图标恢复";
 
 /* SettingsWindow - Tabs */
 "settings.display" = "显示";
@@ -22,6 +25,7 @@
 "settings.approval" = "审批";
 "settings.integration" = "集成";
 "settings.shortcuts" = "快捷键";
+"settings.about" = "关于";
 
 /* SettingsWindow - Shortcuts */
 "settings.shortcuts.group_approval" = "审批";
@@ -44,7 +48,8 @@
 "settings.size_large" = "大";
 "settings.theme" = "Notchikko 主题";
 "settings.notch_detection" = "Notch 检测";
-"settings.notch_auto" = "自动";
+"menu.notch_detection" = "Notch 检测";
+"settings.notch_auto" = "自动（根据屏幕识别）";
 "settings.notch_force_on" = "强制有 Notch";
 "settings.notch_force_off" = "强制无 Notch";
 "settings.danmaku" = "工具弹幕";

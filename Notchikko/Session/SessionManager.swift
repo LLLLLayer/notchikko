@@ -24,6 +24,10 @@ final class SessionManager {
     private var returnTimer: Task<Void, Never>?
     private var sessionCleanupTasks: [String: Task<Void, Never>] = [:]
 
+    /// 有未解决错误的 session。`.error` 入 set，任何前进事件（prompt/tool/compact/stop）清除；
+    /// 只有在 set 中 + `.sessionEnd` 到来时才播 error 声——代表报错真的终断了会话。
+    private var sessionsWithUnresolvedError: Set<String> = []
+
     /// Session 被移除时触发（菜单关闭 / LRU 淘汰）。
     /// 订阅者应清理自己持有的 session 级状态（e.g. ApprovalManager.autoApprovedSessions）
     var onSessionRemoved: ((String) -> Void)?
@@ -127,30 +131,26 @@ final class SessionManager {
         sessionCleanupTasks[sessionId]?.cancel()
         sessionCleanupTasks.removeValue(forKey: sessionId)
         guard sessions.removeValue(forKey: sessionId) != nil else { return }
+        // 手动关闭 ≠ 错误导致的中断 → 丢弃错误标记（用户主动关，不播声）
+        sessionsWithUnresolvedError.remove(sessionId)
         onSessionRemoved?(sessionId)
         if pinnedSessionId == sessionId {
             pinnedSessionId = nil
         }
-        // 更新状态
-        if let nextId = activeSessionId, let next = sessions[nextId] {
-            currentState = stateForPhase(next.phase)
-        } else {
-            transition(to: .sleeping)
-        }
+        // 恢复到下一个 active session；审批进行中则 restoreActiveState 守住 .approving
+        restoreActiveState(fallback: .sleeping)
     }
 
     // MARK: - 绑定切换
 
     func pinSession(_ sessionId: String?) {
         pinnedSessionId = sessionId
-        // 切换绑定后，立即根据目标 session 的 phase 更新状态
+        // 发弹幕（如果切到了具体 session）
         if let sid = activeSessionId, let session = sessions[sid] {
-            currentState = stateForPhase(session.phase)
             emitSessionDanmaku(session)
-        } else {
-            currentState = .sleeping
         }
-        resetTimers()
+        // 切换绑定后，恢复到目标 session 的 phase；审批进行中则保持 .approving
+        restoreActiveState(fallback: .sleeping)
     }
 
     // MARK: - 事件处理
@@ -178,7 +178,7 @@ final class SessionManager {
                 lastEvent: Date(), phase: .waitingForInput,
                 terminalPid: terminalPid, pidChain: pidChain
             )
-            SoundManager.shared.play(for: "session-start", cooldownKey: "session-start:\(sid)")
+            SoundManager.shared.play(for: "session-start")
             emitSessionDanmaku(sessions[sid]!)
             // 只在没有其他工作中 session 时切到 idle，避免打断正在工作的 session
             if !hadWorkingSession {
@@ -192,6 +192,8 @@ final class SessionManager {
             if let text, !text.isEmpty {
                 sessions[sid]?.lastPrompt = text
             }
+            // 前进事件：清掉未解决错误标记（用户继续推进，错误不是终断性的）
+            sessionsWithUnresolvedError.remove(sid)
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .thinking)
@@ -203,6 +205,8 @@ final class SessionManager {
                 sessions[sid]?.phase = .runningTool(tool)
                 sessions[sid]?.lastEvent = Date()
                 sessions[sid]?.lastToolSummary = tool
+                // 前进事件：清掉错误标记
+                sessionsWithUnresolvedError.remove(sid)
                 if sid == activeSessionId {
                     resetTimers()
                     transition(to: stateForTool(tool))
@@ -212,6 +216,12 @@ final class SessionManager {
                 }
             case .post(let success):
                 sessions[sid]?.lastEvent = Date()
+                if !success {
+                    // 工具失败：phase 回到 waiting（不再跑工具），resetTimers 才能切到 waiting 档 timer；
+                    // 并标记为未解决错误，后续若 sessionEnd 到来则播声
+                    sessions[sid]?.phase = .waitingForInput
+                    sessionsWithUnresolvedError.insert(sid)
+                }
                 if sid == activeSessionId && !success {
                     resetTimers()
                     transition(to: .error)
@@ -223,6 +233,8 @@ final class SessionManager {
             sessions[sid]?.phase = .waitingForInput
             sessions[sid]?.lastEvent = Date()
             if let usage { sessions[sid]?.tokenUsage = usage }
+            // 正常停止 = 任务完成，清掉错误标记
+            sessionsWithUnresolvedError.remove(sid)
             Log("Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
             if sid == activeSessionId {
                 resetTimers()
@@ -233,6 +245,10 @@ final class SessionManager {
 
         case .error(let sid, _):
             sessions[sid]?.lastEvent = Date()
+            // phase 回到 waiting（工具/任务已中断），resetTimers 才能切到 waiting 档 timer
+            sessions[sid]?.phase = .waitingForInput
+            // 标记为未解决错误——视觉切到 .error 但不响，等 sessionEnd 到来再判断是否是终断
+            sessionsWithUnresolvedError.insert(sid)
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .error)
@@ -242,12 +258,18 @@ final class SessionManager {
         case .compact(let sid):
             sessions[sid]?.phase = .compacting
             sessions[sid]?.lastEvent = Date()
+            // 前进事件：清掉错误标记
+            sessionsWithUnresolvedError.remove(sid)
             if sid == activeSessionId {
                 resetTimers()
                 transition(to: .sweeping)
             }
 
         case .sessionEnd(let sid):
+            // 先判断是否有未解决错误——若有，这是"错误导致会话中断"的情况，播 error 声
+            if sessionsWithUnresolvedError.remove(sid) != nil {
+                SoundManager.shared.play(for: "error")
+            }
             sessions[sid]?.phase = .ended
             // 如果绑定的 session 结束了，自动解绑
             if pinnedSessionId == sid {
@@ -270,10 +292,20 @@ final class SessionManager {
                 transition(to: .sleeping)
             }
 
-        case .notification(_, let msg, _):
-            // 阻塞式 PermissionRequest 走 onApprovalRequest 直通，这里只处理信息性通知
-            // PermissionRequest 升格为 .permissionRequest case，不再用字符串判等识别
-            let needsUserAction = (msg == "Elicitation" || msg == "AskUserQuestion")
+        case .notification(_, let msg, let detail):
+            // 阻塞式 PermissionRequest 走 onApprovalRequest 直通，这里只处理信息性通知。
+            // PermissionRequest 升格为 .permissionRequest case，不再用字符串判等识别。
+            //
+            // Notification 对待：CLI 顶层 message 字段带文本时视为"agent 要 attention"。
+            // Gemini CLI 这是唯一的 attention channel；Claude Code 也会在终端审批 fallback /
+            // 等待用户输入时发。空 message 的 Notification 是心跳类噪音，忽略。
+            let needsUserAction: Bool = {
+                switch msg {
+                case "Elicitation", "AskUserQuestion": return true
+                case "Notification": return !detail.isEmpty
+                default: return false
+                }
+            }()
             guard needsUserAction else { break }
             triggerApprovingState(forSession: event.sessionId)
 
@@ -439,8 +471,16 @@ final class SessionManager {
         restoreActiveState()
     }
 
-    /// 从活跃 session 的当前 phase 恢复正确状态
+    /// 从活跃 session 的当前 phase 恢复正确状态。
+    /// 审批进行中则保持 `.approving`——drag/petting/session 切换结束时审批卡还没关，
+    /// 此处不能让 pet 脱离审批锁视觉。endApproval() 调用本函数时 isApproving 已被手动置 false，
+    /// 所以那条路径不受影响。
     private func restoreActiveState(fallback: NotchikkoState = .idle) {
+        if isApproving {
+            currentState = .approving
+            // 审批期间不重启 idle/sleep timer——approving 是用户输入等待态，由审批链路掌控
+            return
+        }
         if let sid = activeSessionId, let session = sessions[sid] {
             currentState = stateForPhase(session.phase)
         } else {
@@ -543,12 +583,14 @@ final class SessionManager {
         // 1. 优先淘汰已结束的 session
         if let oldest = sessions.values.filter({ $0.phase == .ended }).min(by: { $0.lastEvent < $1.lastEvent }) {
             sessions.removeValue(forKey: oldest.id)
+            sessionsWithUnresolvedError.remove(oldest.id)
             onSessionRemoved?(oldest.id)
             return
         }
         // 2. 再淘汰最旧的 idle session
         if let oldest = sessions.values.filter({ $0.phase == .waitingForInput }).min(by: { $0.lastEvent < $1.lastEvent }) {
             sessions.removeValue(forKey: oldest.id)
+            sessionsWithUnresolvedError.remove(oldest.id)
             onSessionRemoved?(oldest.id)
             return
         }
@@ -556,6 +598,7 @@ final class SessionManager {
         if let oldest = sessions.values.min(by: { $0.lastEvent < $1.lastEvent }) {
             Log("Evicting working session under pressure: \(oldest.id.prefix(8))", tag: "Session")
             sessions.removeValue(forKey: oldest.id)
+            sessionsWithUnresolvedError.remove(oldest.id)
             onSessionRemoved?(oldest.id)
         }
     }
@@ -573,14 +616,43 @@ final class SessionManager {
         let oldState = currentState
         currentState = newState
         if oldState != newState {
-            SoundManager.shared.play(for: newState.soundKey)
+            // .error 状态不在这里响——只在 .sessionEnd 时若 session 带未解决错误才响，
+            // 避免任务中间某次失败（后续还能继续跑）就叮一声。
+            if newState != .error {
+                SoundManager.shared.play(for: newState.soundKey)
+            }
         }
     }
 
+    /// 重置所有 timer。timer 长度按 active session 的 phase 分流：
+    ///
+    /// - **waiting 阶段**（waitingForInput / ended / 无 active session）：60s → idle，120s → sleep。
+    ///   这是"用户离开了桌子"的剧本——pet 逐渐安静。
+    /// - **working 阶段**（processing / runningTool / compacting）：不挂 idle timer，600s → sleep。
+    ///   Codex 的 hook 只对 Bash 触发（upstream 限制），一个纯 Edit/Write 阶段可能几分钟不发事件；
+    ///   Claude Code 的长 Bash / 长 LLM 推理同理。短 idle timer 会把还活着的 session 误判为空闲。
+    ///   600s sleep 仍保留作为"进程卡死 / 被 kill"的兜底。
     private func resetTimers() {
         idleTimer?.cancel()
         sleepTimer?.cancel()
         returnTimer?.cancel()
+
+        let activePhase: SessionPhase? = activeSessionId.flatMap { sessions[$0]?.phase }
+        let isWorking: Bool = {
+            switch activePhase {
+            case .processing, .runningTool, .compacting: return true
+            case .waitingForInput, .ended, .none: return false
+            }
+        }()
+
+        if isWorking {
+            sleepTimer = Task {
+                try? await Task.sleep(for: .seconds(600))
+                guard !Task.isCancelled else { return }
+                transition(to: .sleeping)
+            }
+            return
+        }
 
         idleTimer = Task {
             try? await Task.sleep(for: .seconds(60))
@@ -616,12 +688,15 @@ final class SessionManager {
                 pinnedSessionId = nil
             }
 
-            // 切换到下一个活跃 session 的状态
+            // 切换到下一个活跃 session 的状态；重置 timer 以新 session 的 phase 为准，
+            // 避免上一个 .stop 留下来的 60s/120s waiting timer 把新 session 的工作态踢回 idle。
             if let nextId = activeSessionId, let next = sessions[nextId] {
                 transition(to: stateForPhase(next.phase))
+                resetTimers()
                 emitSessionDanmaku(next)
             } else {
                 transition(to: .idle)
+                resetTimers()
             }
         }
     }

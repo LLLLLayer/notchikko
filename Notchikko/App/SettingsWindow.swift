@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 // MARK: - 设置面板主窗口（侧边栏导航）
 
 enum SettingsTab: String, CaseIterable {
-    case display, sound, approval, integration, shortcuts
+    case display, sound, approval, integration, shortcuts, about
 
     var displayName: String {
         switch self {
@@ -13,6 +13,7 @@ enum SettingsTab: String, CaseIterable {
         case .approval: return String(localized: "settings.approval")
         case .integration: return String(localized: "settings.integration")
         case .shortcuts: return String(localized: "settings.shortcuts")
+        case .about: return String(localized: "settings.about")
         }
     }
 
@@ -23,6 +24,7 @@ enum SettingsTab: String, CaseIterable {
         case .approval: return "checkmark.shield"
         case .integration: return "terminal"
         case .shortcuts: return "keyboard"
+        case .about: return "info.circle"
         }
     }
 }
@@ -50,6 +52,8 @@ struct SettingsWindowView: View {
                     IntegrationSettingsView()
                 case .shortcuts:
                     ShortcutsSettingsView()
+                case .about:
+                    AboutSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -517,6 +521,61 @@ private struct KeyCap: View {
                     .stroke(.secondary.opacity(0.3), lineWidth: 0.5)
             )
             .cornerRadius(4)
+    }
+}
+
+// MARK: - 关于
+
+struct AboutSettingsView: View {
+    private static let githubURL = URL(string: "https://github.com/yangjie-layer/Notchikko")!
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+    }
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 18) {
+            // 使用 NSApplication.shared.applicationIconImage 以直接拿到 Assets 里的 AppIcon（不依赖图标名称常量）
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+                .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+
+            VStack(spacing: 4) {
+                Text("Notchikko")
+                    .font(.title.bold())
+                Text("v\(appVersion)\(buildNumber.isEmpty ? "" : " (\(buildNumber))")")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            VStack(spacing: 10) {
+                Link(destination: Self.githubURL) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                        Text(verbatim: "github.com/yangjie-layer/Notchikko")
+                    }
+                    .font(.callout)
+                }
+                .buttonStyle(.link)
+
+                Button(String(localized: "menu.check_for_updates")) {
+                    UpdateManager.shared.checkForUpdates()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(!UpdateManager.shared.canCheckForUpdates)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 8)
     }
 }
 

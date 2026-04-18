@@ -2,6 +2,10 @@ import Sparkle
 
 /// Sparkle 自动更新管理器
 final class UpdateManager {
+    /// 共享实例。AppDelegate + 设置-关于页都通过它调 `checkForUpdates`，无需通过回调层层传递。
+    /// Sparkle 的 updater 在 `start()` 调用前是空转的，预先持有实例是安全的。
+    static let shared = UpdateManager()
+
     private let updaterController: SPUStandardUpdaterController
 
     init() {

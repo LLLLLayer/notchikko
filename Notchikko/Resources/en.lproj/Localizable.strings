@@ -1,6 +1,6 @@
 /* MenuBarManager */
 "menu.sessions" = "Sessions";
-"menu.auto" = "🔄 Auto (track latest)";
+"menu.auto" = "🔄 Auto-follow active session";
 "menu.display" = "Display";
 "menu.pin" = "Pin";
 "menu.unpin" = "Unpin";
@@ -15,6 +15,9 @@
 "menu.settings" = "More Settings...";
 "menu.check_for_updates" = "Check for Updates…";
 "menu.quit" = "Quit Notchikko";
+"menu.stealth.on" = "Stealth NoNotchikko";
+"menu.stealth.off" = "Unstealth NoNotchikko";
+"menu.stealth.subtitle" = "Fade out and block interaction — restore from the menu bar icon";
 
 /* SettingsWindow - Tabs */
 "settings.display" = "Display";
@@ -22,6 +25,7 @@
 "settings.approval" = "Approval";
 "settings.integration" = "Integration";
 "settings.shortcuts" = "Shortcuts";
+"settings.about" = "About";
 
 /* SettingsWindow - Shortcuts */
 "settings.shortcuts.group_approval" = "Approval";
@@ -44,7 +48,8 @@
 "settings.size_large" = "Large";
 "settings.theme" = "Notchikko theme";
 "settings.notch_detection" = "Notch detection";
-"settings.notch_auto" = "Auto";
+"menu.notch_detection" = "Notch detection";
+"settings.notch_auto" = "Auto (detect from screen)";
 "settings.notch_force_on" = "Force notch";
 "settings.notch_force_off" = "Force no notch";
 "settings.danmaku" = "Tool danmaku";

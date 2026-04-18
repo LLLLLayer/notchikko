@@ -153,6 +153,9 @@ final class SoundManager {
     private func playURL(_ url: URL, volume: Float) {
         guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
         player.volume = volume
+        // 启动瞬间可能有多个状态事件同时要播：显式 stop 旧 player，避免新老音效叠响
+        // Why: 仅靠 currentPlayer 赋值覆盖依赖 ARC，ARC 回收前老 player 还会继续响
+        currentPlayer?.stop()
         player.play()
         currentPlayer = player  // 防止被 ARC 回收
     }
