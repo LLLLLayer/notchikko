@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" width="500" height="500" preserveAspectRatio="xMidYMin meet">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 8px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .defensive-stance {
+        transform-origin: 8px 15px;
+        animation: defensive-crouch 2s infinite ease-in-out;
+      }
+      .sword-ready {
+        transform-origin: 0px 10.5px;
+        animation: sword-raised 1.5s infinite ease-in-out;
+      }
+      .visor-glow {
+        animation: visor-danger 0.8s infinite ease-in-out;
+      }
+      .error-warning {
+        animation: error-flash 0.8s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.95) translate(0, 0.8px); }
+      }
+      @keyframes defensive-crouch {
+        0%, 100% { transform: scaleY(0.97) translateY(0.5px); }
+        50% { transform: scaleY(0.94) translateY(1px); }
+      }
+      @keyframes sword-raised {
+        0%, 100% { transform: rotate(-15deg); }
+        50% { transform: rotate(-5deg); }
+      }
+      @keyframes visor-danger {
+        0%, 100% { fill: #888878; }
+        50% { fill: #CC4444; }
+      }
+      @keyframes error-flash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+    <!-- Shadow -->
+    <rect x="1" y="15" width="14" height="1" fill="#000" opacity="0.4"/>
+
+    <!-- Flashing Red Warning "!" -->
+    <g class="error-warning">
+      <!-- Exclamation mark -->
+      <rect x="17" y="3" width="2" height="4" fill="#FF3B30"/>
+      <rect x="17" y="8" width="2" height="1" fill="#FF3B30"/>
+    </g>
+
+    <!-- Flashing X mark -->
+    <g class="error-warning" opacity="0.8">
+      <rect x="-5" y="4" width="1" height="4" fill="#FF3B30" transform="rotate(45 -4.5 6)"/>
+      <rect x="-5" y="4" width="1" height="4" fill="#FF3B30" transform="rotate(-45 -4.5 6)"/>
+    </g>
+
+    <!-- Legs -->
+    <g fill="#DE886D">
+      <rect x="3" y="13" width="1" height="2"/>
+      <rect x="5" y="13" width="1" height="2"/>
+      <rect x="11" y="13" width="1" height="2"/>
+      <rect x="13" y="13" width="1" height="2"/>
+    </g>
+
+    <!-- Body (defensive stance) -->
+    <g class="defensive-stance">
+      <g class="breathe">
+        <!-- Ear -->
+        <rect x="13" y="5" width="2" height="1" fill="#DE886D"/>
+        <!-- Main body -->
+        <rect x="2" y="6" width="13" height="7" fill="#DE886D"/>
+        <!-- Snout -->
+        <rect x="0" y="9" width="2" height="3" fill="#DE886D"/>
+
+        <!-- Helmet -->
+        <rect x="3" y="3" width="10" height="1" fill="#383838"/>
+        <rect x="2" y="4" width="12" height="1" fill="#383838"/>
+        <rect x="2" y="5" width="12" height="1" fill="#484848"/>
+        <rect x="2" y="6" width="12" height="3" fill="#505050"/>
+        <!-- Visor (pulses red for danger) -->
+        <g class="visor-glow">
+          <rect x="3" y="7" width="3" height="2"/>
+          <rect x="9" y="7" width="3" height="2"/>
+        </g>
+        <!-- Eye holes -->
+        <rect x="4" y="7" width="2" height="1" fill="#282828"/>
+        <rect x="10" y="7" width="2" height="1" fill="#282828"/>
+        <!-- Chin guard -->
+        <rect x="3" y="9" width="10" height="1" fill="#606050"/>
+
+        <!-- Sword (raised ready position) -->
+        <g class="sword-ready">
+          <!-- Blade -->
+          <rect x="-2" y="10" width="2" height="1" fill="#9E9E9E"/>
+          <!-- Guard -->
+          <rect x="0" y="9" width="1" height="3" fill="#7878B8"/>
+          <!-- Handle -->
+          <rect x="-3" y="10" width="1" height="1" fill="#FBC02D"/>
+          <rect x="-4" y="11" width="2" height="1" fill="#FBC02D"/>
+        </g>
+      </g>
+    </g>
+
+  </g>
+</svg>

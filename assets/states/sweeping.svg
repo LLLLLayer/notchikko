@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      /* === Packing cycle: 3.6s === */
+
+      /* Breathing */
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      /* Body: slight forward lean while packing */
+      .body-pack {
+        transform-origin: 7.5px 12px;
+        animation: body-lean 3.6s infinite ease-in-out;
+      }
+
+      /* Left arm pushes inward */
+      .arm-l {
+        transform-origin: 2px 9px;
+        animation: arm-l-pack 3.6s infinite ease-in-out;
+      }
+
+      /* Right arm pushes inward */
+      .arm-r {
+        transform-origin: 13px 9px;
+        animation: arm-r-pack 3.6s infinite ease-in-out;
+      }
+
+      /* Eye blink */
+      .eye {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 5s infinite ease-in-out;
+      }
+
+      /* Box compression */
+      .box-body {
+        transform-origin: 7.5px 15px;
+        animation: box-squish 3.6s infinite ease-in-out;
+      }
+
+      /* Box top flap closing */
+      .box-flap {
+        transform-box: fill-box;
+        transform-origin: center bottom;
+        animation: flap-close 3.6s infinite ease-in-out;
+      }
+
+      /* Tape extending */
+      .tape {
+        transform-box: fill-box;
+        transform-origin: center bottom;
+        animation: tape-extend 3.6s infinite ease-in-out;
+      }
+
+      /* Checkmark flash */
+      .checkmark {
+        opacity: 0;
+        animation: check-flash 3.6s infinite ease-in-out;
+      }
+
+      /* Shadow */
+      .shadow-pack {
+        animation: shadow-pack 3.6s infinite ease-in-out;
+      }
+
+      /* Flying items */
+      .item {
+        opacity: 0;
+      }
+      .item-1 { animation: item-fly-1 3.6s infinite ease-in; }
+      .item-2 { animation: item-fly-2 3.6s 0.3s infinite ease-in; }
+      .item-3 { animation: item-fly-3 3.6s 0.6s infinite ease-in; }
+      .item-4 { animation: item-fly-4 3.6s 0.9s infinite ease-in; }
+
+      /* ==================== Keyframes ==================== */
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50%      { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+
+      /* Body leans forward during push phase */
+      @keyframes body-lean {
+        0%, 15%, 75%, 100% { transform: rotate(0deg); }
+        35%, 55%           { transform: rotate(-2deg); }
+      }
+
+      /* Left arm: -20deg rest, pushes to -35deg */
+      @keyframes arm-l-pack {
+        0%, 15%, 75%, 100% { transform: rotate(-20deg); }
+        35%, 55%           { transform: rotate(-40deg); }
+      }
+
+      /* Right arm: 20deg rest, pushes to 35deg */
+      @keyframes arm-r-pack {
+        0%, 15%, 75%, 100% { transform: rotate(20deg); }
+        35%, 55%           { transform: rotate(40deg); }
+      }
+
+      @keyframes eye-blink {
+        0%, 4%, 100% { transform: scaleY(1); }
+        2%           { transform: scaleY(0.1); }
+      }
+
+      /* Box squishes on push */
+      @keyframes box-squish {
+        0%, 15%, 75%, 100% { transform: scaleY(1); }
+        35%, 55%           { transform: scaleY(0.95); }
+      }
+
+      /* Flap closes during push */
+      @keyframes flap-close {
+        0%, 15%     { transform: scaleY(0.5); }
+        35%, 100%   { transform: scaleY(1); }
+      }
+
+      /* Tape extends with push */
+      @keyframes tape-extend {
+        0%, 15%     { transform: scaleY(0); }
+        35%, 100%   { transform: scaleY(1); }
+      }
+
+      /* Checkmark flashes at end of cycle */
+      @keyframes check-flash {
+        0%, 70%  { opacity: 0; }
+        78%, 88% { opacity: 1; }
+        95%      { opacity: 0; }
+      }
+
+      @keyframes shadow-pack {
+        0%, 15%, 75%, 100% { transform: scaleX(1); }
+        35%, 55%           { transform: scaleX(1.02); }
+      }
+
+      /* Item 1: flies from upper-left into box */
+      @keyframes item-fly-1 {
+        0%   { opacity: 1; transform: translate(-3px, -6px); }
+        40%  { opacity: 1; transform: translate(0px, -1px); }
+        50%  { opacity: 0; transform: translate(0px, 0px); }
+        100% { opacity: 0; }
+      }
+
+      /* Item 2: flies from above-center into box */
+      @keyframes item-fly-2 {
+        0%   { opacity: 1; transform: translate(0px, -7px); }
+        40%  { opacity: 1; transform: translate(0px, -1px); }
+        50%  { opacity: 0; transform: translate(0px, 0px); }
+        100% { opacity: 0; }
+      }
+
+      /* Item 3: flies from upper-right into box */
+      @keyframes item-fly-3 {
+        0%   { opacity: 1; transform: translate(3px, -5px); }
+        40%  { opacity: 1; transform: translate(0px, -1px); }
+        50%  { opacity: 0; transform: translate(0px, 0px); }
+        100% { opacity: 0; }
+      }
+
+      /* Item 4: flies from far left into box */
+      @keyframes item-fly-4 {
+        0%   { opacity: 1; transform: translate(-4px, -4px); }
+        40%  { opacity: 1; transform: translate(0.5px, -1px); }
+        50%  { opacity: 0; transform: translate(0.5px, 0px); }
+        100% { opacity: 0; }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Flying items (data being compacted) -->
+  <rect class="item item-1" x="5" y="10" width="1" height="1" fill="#4CAF50"/>
+  <rect class="item item-2" x="7" y="10" width="1" height="1" fill="#2196F3"/>
+  <rect class="item item-3" x="9" y="10" width="1" height="1" fill="#FF9800"/>
+  <rect class="item item-4" x="6" y="10" width="1" height="1" fill="#9C27B0"/>
+
+  <!-- Shadow -->
+  <rect class="shadow-pack" x="3" y="15" width="9" height="1" fill="#000000" opacity="0.4"/>
+
+  <!-- Character body (drawn first = behind box) -->
+  <g class="body-pack">
+    <g class="breathe">
+      <!-- Head stripe -->
+      <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+      <!-- Body -->
+      <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+      <!-- Legs -->
+      <g fill="#DE886D">
+        <rect x="3" y="12" width="1" height="3"/>
+        <rect x="5" y="12" width="1" height="3"/>
+        <rect x="9" y="12" width="1" height="3"/>
+        <rect x="11" y="12" width="1" height="3"/>
+      </g>
+      <!-- Eyes -->
+      <g fill="#000000">
+        <rect class="eye" x="5" y="8" width="1" height="1"/>
+        <rect class="eye" x="10" y="8" width="1" height="1"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Cardboard box (drawn on top of body) -->
+  <g class="box-body">
+    <!-- Box body -->
+    <rect x="4" y="10" width="7" height="5" fill="#A1887F"/>
+    <!-- Box darker bottom edge -->
+    <rect x="4" y="14.5" width="7" height="0.5" fill="#8D6E63"/>
+    <!-- Box side crease -->
+    <rect x="7.3" y="10" width="0.4" height="5" fill="#8D6E63" opacity="0.3"/>
+    <!-- Box flap (top) -->
+    <rect class="box-flap" x="4" y="10" width="7" height="1" fill="#8D6E63"/>
+    <!-- Flap fold line -->
+    <rect class="box-flap" x="4" y="10.8" width="7" height="0.2" fill="#795548" opacity="0.4"/>
+    <!-- Packing tape (centered) -->
+    <rect class="tape" x="6.8" y="10" width="1.4" height="5" fill="#FFC107" opacity="0.7"/>
+    <!-- Shipping label -->
+    <rect x="5" y="12" width="3" height="1.5" fill="#FFFFFF"/>
+    <rect x="5.3" y="12.3" width="2.4" height="0.3" fill="#90A4AE" opacity="0.4"/>
+    <rect x="5.3" y="12.8" width="1.6" height="0.3" fill="#90A4AE" opacity="0.3"/>
+    <!-- Checkmark on label -->
+    <g class="checkmark">
+      <rect x="5.5" y="12.2" width="0.4" height="0.6" fill="#4CAF50" transform="rotate(-45 5.7 12.5)"/>
+      <rect x="5.8" y="12.1" width="0.4" height="0.8" fill="#4CAF50" transform="rotate(30 6 12.5)"/>
+    </g>
+  </g>
+
+  <!-- Arms on top (wrapping around box) -->
+  <g class="body-pack">
+    <g class="breathe">
+      <g class="arm-l">
+        <rect x="2" y="10" width="2" height="2" fill="#DE886D"/>
+      </g>
+      <g class="arm-r">
+        <rect x="11" y="10" width="2" height="2" fill="#DE886D"/>
+      </g>
+    </g>
+  </g>
+
+  </g>
+</svg>

@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" width="500" height="500" preserveAspectRatio="xMidYMin meet">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 8px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .pig-bounce {
+        transform-origin: 8px 15px;
+        animation: pig-bounce 1.5s infinite ease-in-out;
+      }
+      .bubble-pulse {
+        transform-origin: 11px 2.5px;
+        animation: bubble-pulse 1s infinite ease-in-out;
+      }
+      .dot1 { animation: dot-blink 1.2s infinite 0s; }
+      .dot2 { animation: dot-blink 1.2s infinite 0.25s; }
+      .dot3 { animation: dot-blink 1.2s infinite 0.5s; }
+      /* Notification badge */
+      .noti-badge {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: noti-pulse 0.8s infinite ease-in-out;
+      }
+      .noti-ring {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: noti-ring 1.5s infinite ease-out;
+      }
+      .noti-blink {
+        animation: noti-blink 0.6s infinite;
+      }
+      /* Alert shake */
+      .alert-shake {
+        transform-origin: 7.5px 10px;
+        animation: alert-shake 0.3s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+      @keyframes pig-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-1px); }
+      }
+      @keyframes bubble-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+      @keyframes dot-blink {
+        0%, 30%, 100% { opacity: 0.3; }
+        15% { opacity: 1; }
+      }
+      @keyframes noti-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+      }
+      @keyframes noti-ring {
+        0% { transform: scale(1); opacity: 0.8; }
+        100% { transform: scale(2.5); opacity: 0; }
+      }
+      @keyframes noti-blink {
+        0%, 60%, 100% { opacity: 1; }
+        30% { opacity: 0.2; }
+      }
+      @keyframes alert-shake {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(2deg); }
+        75% { transform: rotate(-2deg); }
+      }
+    </style>
+  </defs>
+  <g transform="scale(1,-1)">
+
+    <!-- Shadow -->
+    <rect x="1" y="15" width="14" height="1" fill="#000" opacity="0.4"/>
+
+    <!-- Pig body with bounce + alert shake -->
+    <g class="pig-bounce alert-shake">
+
+      <!-- Legs -->
+      <g fill="#DE886D">
+        <rect x="3" y="13" width="1" height="2"/>
+        <rect x="5" y="13" width="1" height="2"/>
+        <rect x="11" y="13" width="1" height="2"/>
+        <rect x="13" y="13" width="1" height="2"/>
+      </g>
+
+      <!-- Body -->
+      <g class="breathe">
+        <!-- Ear -->
+        <rect x="13" y="5" width="2" height="1" fill="#DE886D"/>
+        <!-- White ear detail -->
+        <rect x="13.5" y="5.2" width="1" height="0.6" fill="#FFF" opacity="0.4"/>
+        <!-- Main body -->
+        <rect x="2" y="6" width="13" height="7" fill="#DE886D"/>
+        <!-- Snout -->
+        <rect x="0" y="9" width="2" height="3" fill="#DE886D"/>
+        <!-- Eyes (alert, wide) -->
+        <rect x="4" y="9" width="2" height="1" fill="#000"/>
+        <rect x="9" y="9" width="2" height="1" fill="#000"/>
+      </g>
+
+    </g>
+
+    <!-- Speech Bubble (pulsing for attention) -->
+    <g class="bubble-pulse">
+      <g fill="#6898D8">
+        <rect x="8" y="0" width="6" height="1"/>
+        <rect x="7" y="1" width="8" height="3"/>
+        <rect x="8" y="4" width="6" height="1"/>
+        <!-- Tail -->
+        <rect x="9" y="5" width="1" height="1"/>
+        <rect x="8" y="6" width="1" height="1"/>
+      </g>
+      <!-- Typing dots (faster) -->
+      <rect class="dot1" x="9" y="2" width="1" height="1" fill="#1E3A8A"/>
+      <rect class="dot2" x="11" y="2" width="1" height="1" fill="#1E3A8A"/>
+      <rect class="dot3" x="13" y="2" width="1" height="1" fill="#1E3A8A"/>
+    </g>
+
+    <!-- Notification badge (on bubble corner) -->
+    <g>
+      <rect class="noti-ring" x="13" y="-1" width="3" height="3" rx="1" fill="none" stroke="#FF5252" stroke-width="0.3"/>
+      <rect class="noti-badge" x="13.5" y="-0.5" width="2" height="2" rx="1" fill="#FF5252"/>
+      <rect class="noti-blink" x="14.2" y="-0.2" width="0.6" height="0.8" fill="#FFF"/>
+      <rect class="noti-blink" x="14.2" y="0.9" width="0.6" height="0.4" fill="#FFF"/>
+    </g>
+
+  </g>
+</svg>

@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" width="500" height="500" preserveAspectRatio="xMidYMin meet">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 8px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-origin: 7px 9px;
+        animation: blink 4s infinite;
+      }
+      .body-bounce {
+        transform-origin: 8px 15px;
+        animation: body-bounce 1.5s infinite;
+      }
+      .body-squash {
+        transform-origin: 8px 15px;
+        animation: body-squash 1.5s infinite;
+      }
+      .hammer-swing {
+        transform-origin: 0.5px 11px;
+        animation: hammer-swing 1.5s infinite;
+      }
+      .shadow-anim {
+        transform-origin: 8px 15.5px;
+        animation: shadow-bounce 1.5s infinite;
+      }
+      .spark { opacity: 0; }
+      .s1 { animation: spark-1 1.5s infinite; }
+      .s2 { animation: spark-2 1.5s infinite; }
+      .s3 { animation: spark-3 1.5s infinite; }
+      .sweat {
+        opacity: 0;
+        animation: sweat-fly 5s infinite;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.02, 0.98) translate(0, 0.5px); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes body-bounce {
+        0%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-2px); }
+        45% { transform: translateY(0); }
+        50% { transform: translateY(2px); }
+        70% { transform: translateY(0); }
+      }
+      @keyframes body-squash {
+        0%, 100% { transform: scale(1, 1); }
+        30% { transform: scale(0.95, 1.05); }
+        50% { transform: scale(1.15, 0.85); }
+        70% { transform: scale(1, 1); }
+      }
+      @keyframes shadow-bounce {
+        0%, 45%, 70%, 100% { transform: scaleX(1); opacity: 0.4; }
+        30% { transform: scaleX(0.92); opacity: 0.35; }
+        50% { transform: scaleX(1.08); opacity: 0.5; }
+      }
+      @keyframes hammer-swing {
+        0%, 100% { transform: rotate(15deg); }
+        30% { transform: rotate(-40deg); }
+        45% { transform: rotate(30deg); }
+        50% { transform: rotate(80deg); }
+        65% { transform: rotate(40deg); }
+        80% { transform: rotate(15deg); }
+      }
+      @keyframes spark-1 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(4px,-6px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes spark-2 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(7px,-2px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes spark-3 {
+        0%, 49% { opacity: 0; transform: translate(0,0) scale(0); }
+        50% { opacity: 1; transform: translate(0,0) scale(1); }
+        70% { opacity: 0; transform: translate(3px,3px) scale(0); }
+        71%, 100% { opacity: 0; }
+      }
+      @keyframes sweat-fly {
+        0%, 55% { opacity: 0; transform: translate(0,0) scale(0); }
+        60% { opacity: 1; transform: translate(0,0) scale(1); }
+        80% { opacity: 0; transform: translate(-5px,-5px) scale(0.5); }
+        100% { opacity: 0; }
+      }
+    </style>
+    <g id="pixel-spark">
+      <rect x="0" y="0" width="1" height="1"/>
+    </g>
+  </defs>
+  <g transform="scale(1,-1)">
+
+    <!-- Shadow -->
+    <rect class="shadow-anim" x="1" y="15" width="14" height="1" fill="#000"/>
+
+    <!-- Impact Sparks -->
+    <g fill="#FFC107" transform="translate(-1, 9)">
+      <use href="#pixel-spark" class="spark s1"/>
+      <use href="#pixel-spark" class="spark s2"/>
+      <use href="#pixel-spark" class="spark s3"/>
+    </g>
+
+    <!-- Legs -->
+    <g class="body-bounce" fill="#DE886D">
+      <rect x="3" y="13" width="1" height="2"/>
+      <rect x="5" y="13" width="1" height="2"/>
+      <rect x="11" y="13" width="1" height="2"/>
+      <rect x="13" y="13" width="1" height="2"/>
+    </g>
+    <!-- Feet accents -->
+    <g class="body-bounce" fill="#C06848">
+      <rect x="3" y="14" width="1" height="1"/>
+      <rect x="5" y="14" width="1" height="1"/>
+      <rect x="11" y="14" width="1" height="1"/>
+      <rect x="13" y="14" width="1" height="1"/>
+    </g>
+
+    <!-- Body group [bounce > breathe] -->
+    <g class="body-bounce">
+      <g class="breathe">
+
+        <!-- Sweat -->
+        <g transform="translate(14, 6)">
+          <g class="sweat" fill="#40C4FF">
+            <rect x="0" y="1" width="1.5" height="1.5"/>
+            <rect x="0.25" y="0" width="1" height="1"/>
+          </g>
+        </g>
+
+        <!-- Body core [squash] -->
+        <g class="body-squash">
+          <!-- Ear -->
+          <rect x="13" y="5" width="2" height="1" fill="#DE886D"/>
+          <!-- Main body -->
+          <rect x="2" y="6" width="13" height="7" fill="#DE886D"/>
+          <!-- Snout -->
+          <rect x="0" y="9" width="2" height="3" fill="#DE886D"/>
+
+          <!-- Hard Hat -->
+          <rect x="5" y="3" width="8" height="1" fill="#FBC02D"/>
+          <rect x="4" y="4" width="10" height="1" fill="#FBC02D"/>
+          <rect x="3" y="5" width="12" height="1" fill="#F9A825"/>
+          <!-- Hat cross -->
+          <rect x="8" y="3" width="1" height="2" fill="#F9A825"/>
+          <rect x="7" y="4" width="3" height="1" fill="#F9A825"/>
+
+          <!-- Eyes -->
+          <g class="blink" fill="#000">
+            <rect x="4" y="9" width="1" height="1"/>
+            <rect x="9" y="9" width="1" height="1"/>
+          </g>
+        </g>
+
+        <!-- Hammer -->
+        <g class="hammer-swing">
+          <!-- Handle -->
+          <rect x="0" y="10" width="1" height="3" fill="#795548"/>
+          <!-- Head -->
+          <rect x="-1" y="9" width="3" height="2" fill="#9E9E9E"/>
+        </g>
+
+      </g>
+    </g>
+
+  </g>
+</svg>

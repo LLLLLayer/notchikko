@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>Notchikko Menubar — Alert</title>
+  <!-- Standard notch body. A small "halo" cut-out around the badge separates
+       it visually from the body without deforming the notch shape. -->
+  <path fill="black" fill-rule="evenodd" d="
+    M4,4 H28 V22 Q28,28 22,28 H10 Q4,28 4,22 Z
+    M12,15 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z
+    M20,15 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z
+    M27,5 m-4.5,0 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z
+  "/>
+  <!-- Notification badge (sits in the halo cut-out so it floats off the body) -->
+  <circle cx="27" cy="5" r="3.5" fill="black"/>
+</svg>

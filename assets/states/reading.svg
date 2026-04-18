@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe-anim {
+        transform-origin: 7.5px -7px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+
+      .eyes-blink {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: eye-blink 5s infinite ease-in-out;
+      }
+
+      .eyes-scan {
+        animation: eye-scan 8s infinite linear;
+      }
+
+      .body-lean {
+        transform-origin: 7.5px -6px;
+        animation: lean 3.2s infinite ease-in-out;
+      }
+
+      .page-turn {
+        transform-box: fill-box;
+        transform-origin: left center;
+        animation: page-flip 8s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.01, 0.99) translate(0, -0.3px); }
+      }
+
+      @keyframes eye-blink {
+        0%, 8%, 100% { transform: scaleY(1); }
+        4% { transform: scaleY(0.1); }
+      }
+
+      @keyframes eye-scan {
+        0% { transform: translate(-0.6px, 0); }
+        22% { transform: translate(0.6px, 0); }
+        25% { transform: translate(-0.6px, -0.1px); }
+        47% { transform: translate(0.6px, -0.1px); }
+        50% { transform: translate(-0.6px, -0.2px); }
+        72% { transform: translate(0.6px, -0.2px); }
+        75% { transform: translate(-0.6px, -0.3px); }
+        97% { transform: translate(0.6px, -0.3px); }
+        100% { transform: translate(-0.6px, 0); }
+      }
+
+      @keyframes lean {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(0.8deg); }
+      }
+
+      @keyframes page-flip {
+        0%, 90%, 100% { transform: skewY(0deg); }
+        93% { transform: skewY(-8deg); }
+        96% { transform: skewY(-3deg); }
+      }
+
+      @keyframes shadow-breathe {
+        0%, 100% { transform: scaleX(1); }
+        50% { transform: scaleX(1.02); }
+      }
+
+      .shadow-anim {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: shadow-breathe 3.2s infinite ease-in-out;
+      }
+    </style>
+  </defs>
+
+  <g transform="scale(1,-1)">
+    <!-- Shadow -->
+    <rect class="shadow-anim" x="3" y="15" width="9" height="1" fill="#000" opacity="0.4"/>
+
+    <!-- Legs -->
+    <g fill="#DE886D">
+      <rect x="3" y="12" width="1" height="3"/>
+      <rect x="5" y="12" width="1" height="3"/>
+      <rect x="9" y="12" width="1" height="3"/>
+      <rect x="11" y="12" width="1" height="3"/>
+    </g>
+
+    <!-- Upper body group with lean -->
+    <g class="body-lean">
+      <g class="breathe-anim">
+        <!-- Head stripe -->
+        <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+
+        <!-- Body -->
+        <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+        <!-- Left arm (rotated inward toward book) -->
+        <g transform="rotate(-10, 1, 10)">
+          <rect x="0" y="9" width="2" height="2" fill="#DE886D"/>
+        </g>
+
+        <!-- Right arm (rotated inward toward book) -->
+        <g transform="rotate(10, 14, 10)">
+          <rect x="13" y="9" width="2" height="2" fill="#DE886D"/>
+        </g>
+
+        <!-- Book -->
+        <g>
+          <!-- Book cover edges -->
+          <rect x="0" y="9" width="1" height="5" fill="#5D4037"/>
+          <rect x="14" y="9" width="1" height="5" fill="#5D4037"/>
+          <!-- Left page -->
+          <rect x="1" y="9" width="6" height="5" fill="#FFF8E1"/>
+          <!-- Right page (with page turn animation) -->
+          <rect class="page-turn" x="8" y="9" width="6" height="5" fill="#FFFDE7"/>
+          <!-- Book spine -->
+          <rect x="7" y="9" width="1" height="5" fill="#795548"/>
+          <!-- Book bottom -->
+          <rect x="1" y="14" width="13" height="1" fill="#795548"/>
+
+          <!-- Text lines on left page -->
+          <rect x="2" y="10" width="4" height="0.4" fill="#9E9E9E"/>
+          <rect x="2" y="11" width="3" height="0.4" fill="#9E9E9E"/>
+          <rect x="2" y="12" width="5" height="0.4" fill="#9E9E9E"/>
+          <rect x="2" y="13" width="3.5" height="0.4" fill="#9E9E9E"/>
+
+          <!-- Text lines on right page -->
+          <rect x="9" y="10" width="4" height="0.4" fill="#9E9E9E"/>
+          <rect x="9" y="11" width="5" height="0.4" fill="#9E9E9E"/>
+          <rect x="9" y="12" width="3" height="0.4" fill="#9E9E9E"/>
+          <rect x="9" y="13" width="4.5" height="0.4" fill="#9E9E9E"/>
+        </g>
+
+        <!-- Eyes (scanning left-right) -->
+        <g class="eyes-scan">
+          <g class="eyes-blink" fill="#000">
+            <rect x="5" y="8" width="1" height="1"/>
+            <rect x="10" y="8" width="1" height="1"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

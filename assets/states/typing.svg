@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -16 32 18" preserveAspectRatio="xMidYMin meet" width="500" height="500">
+  <defs>
+    <style>
+      .breathe {
+        transform-origin: 7.5px 10px;
+        animation: breathe 3.2s infinite ease-in-out;
+      }
+      .blink {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: blink 4s infinite;
+      }
+      .glow { animation: glow 2.5s infinite ease-in-out; }
+      /* Legs kick up alternating */
+      .kick-a { animation: kick-a 0.4s infinite ease-in-out; }
+      .kick-b { animation: kick-b 0.4s infinite ease-in-out; }
+      /* Keyboard bounce */
+      .kb { animation: kb 0.35s infinite ease-in-out; }
+      /* Arms type */
+      .arm-l { transform-origin: 1px 10px; animation: al 0.15s infinite alternate ease-in-out; }
+      .arm-r { transform-origin: 14px 10px; animation: ar 0.12s infinite alternate ease-in-out; }
+      /* Key flash */
+      @keyframes kf { 0%, 70%, 100% { opacity: 0; } 35% { opacity: 0.9; } }
+      /* Sparkle */
+      .sp-c { opacity: 0; animation: spc 1.5s infinite step-end; animation-delay: var(--d,0s); }
+      .sp-o { opacity: 0; animation: spo 1.5s infinite step-end; animation-delay: var(--d,0s); }
+      /* Floating code symbols */
+      .cf {
+        animation: cf 6s infinite ease-in-out;
+        animation-delay: var(--d, 0s);
+      }
+      /* Shadow */
+      .shadow-anim {
+        transform-origin: 7.5px 15.5px;
+        animation: shadow-bob 0.35s infinite ease-in-out;
+      }
+
+      @keyframes breathe {
+        0%, 100% { transform: scale(1, 1) translate(0, 0); }
+        50% { transform: scale(1.008, 0.992) translate(0, 0.5px); }
+      }
+      @keyframes blink {
+        0%, 10%, 100% { transform: scaleY(1); }
+        5% { transform: scaleY(0.1); }
+      }
+      @keyframes glow {
+        0%, 100% { opacity: 0.04; }
+        50% { opacity: 0.12; }
+      }
+      @keyframes kick-a {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-0.5px); }
+      }
+      @keyframes kick-b {
+        0%, 100% { transform: translateY(-0.5px); }
+        50% { transform: translateY(0); }
+      }
+      @keyframes kb {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(0.1px); }
+      }
+      @keyframes al { 0% { transform: rotate(-6deg); } 100% { transform: rotate(6deg); } }
+      @keyframes ar { 0% { transform: rotate(6deg); } 100% { transform: rotate(-6deg); } }
+      @keyframes spc { 0%{opacity:0} 10%{opacity:1} 30%,100%{opacity:0} }
+      @keyframes spo { 0%{opacity:0} 20%{opacity:1} 40%,100%{opacity:0} }
+      @keyframes cf {
+        0% { opacity:0; transform:translate(0,0); }
+        12% { opacity:0.45; }
+        50% { opacity:0.25; transform:translate(var(--dx,1px),-4px); }
+        85%,100% { opacity:0; transform:translate(var(--mx,0.5px),-8px); }
+      }
+      @keyframes shadow-bob {
+        0%, 100% { transform: scaleX(1.02); opacity: 0.4; }
+        50% { transform: scaleX(1.05); opacity: 0.45; }
+      }
+    </style>
+    <g id="sp">
+      <rect class="sp-c" x="-0.5" y="-0.5" width="1" height="1"/>
+      <rect class="sp-o" x="-0.5" y="-1.5" width="1" height="1"/>
+      <rect class="sp-o" x="-0.5" y="0.5" width="1" height="1"/>
+      <rect class="sp-o" x="-1.5" y="-0.5" width="1" height="1"/>
+      <rect class="sp-o" x="0.5" y="-0.5" width="1" height="1"/>
+    </g>
+  </defs>
+  <g transform="scale(1,-1)">
+
+  <!-- Shadow -->
+  <rect class="shadow-anim" x="1" y="15" width="14" height="1" fill="#000" opacity="0.4"/>
+
+  <!-- Glow under feet -->
+  <rect class="glow" x="3" y="12" width="9" height="2" rx="1" fill="#DE886D"/>
+
+  <!-- Legs (alternating kicks, at top) -->
+  <g fill="#DE886D">
+    <rect class="kick-a" x="3" y="12" width="1" height="3"/>
+    <rect class="kick-b" x="5" y="12" width="1" height="3"/>
+    <rect class="kick-a" x="9" y="12" width="1" height="3"/>
+    <rect class="kick-b" x="11" y="12" width="1" height="3"/>
+  </g>
+
+  <!-- Body -->
+  <g class="breathe">
+
+    <!-- Head stripe -->
+    <rect x="2" y="5" width="11" height="1" fill="#C07050"/>
+    <!-- Body -->
+    <rect x="2" y="6" width="11" height="6" fill="#DE886D"/>
+
+    <!-- Arms (at keyboard level, on edges) -->
+    <g class="arm-l">
+      <rect x="0" y="10" width="2" height="2" fill="#DE886D"/>
+    </g>
+    <g class="arm-r">
+      <rect x="13" y="10" width="2" height="2" fill="#DE886D"/>
+    </g>
+
+    <!-- Keyboard (upper body, same width as body) -->
+    <g class="kb">
+      <rect x="2" y="10" width="11" height="2.5" fill="#37474F" rx="0.2"/>
+      <!-- Row 1 -->
+      <g fill="#607D8B">
+        <rect x="2.3" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="3.2" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="4.1" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="5.0" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="5.9" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="6.8" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="7.7" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="8.6" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="9.5" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="10.4" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="11.3" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="12.2" y="10.2" width="0.5" height="0.5" rx="0.1"/>
+      </g>
+      <!-- Row 2 -->
+      <g fill="#607D8B">
+        <rect x="2.5" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="3.4" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="4.3" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="5.2" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="6.1" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="7.0" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="7.9" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="8.8" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="9.7" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="10.6" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="11.5" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+      </g>
+      <!-- Row 3 + space bar -->
+      <g fill="#607D8B">
+        <rect x="2.5" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="3.4" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="4.5" y="11.6" width="4.5" height="0.5" rx="0.1"/>
+        <rect x="9.3" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="10.2" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="11.1" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect x="12.0" y="11.6" width="0.5" height="0.5" rx="0.1"/>
+      </g>
+      <!-- Key flashes -->
+      <g fill="#90A4AE">
+        <rect style="animation:kf .6s infinite;opacity:0" x="5.0" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect style="animation:kf .8s -.25s infinite;opacity:0" x="8.8" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect style="animation:kf .5s -.1s infinite;opacity:0" x="3.4" y="11.6" width="0.7" height="0.5" rx="0.1"/>
+        <rect style="animation:kf .7s -.4s infinite;opacity:0" x="9.5" y="10.2" width="0.7" height="0.5" rx="0.1"/>
+        <rect style="animation:kf .55s -.3s infinite;opacity:0" x="6.1" y="10.9" width="0.7" height="0.5" rx="0.1"/>
+        <rect style="animation:kf .9s -.5s infinite;opacity:0" x="4.5" y="11.6" width="4.5" height="0.5" rx="0.1"/>
+      </g>
+    </g>
+
+    <!-- Eyes (peeking below keyboard) -->
+    <g class="blink">
+      <rect x="5" y="8" width="1" height="1" fill="#000"/>
+      <rect x="10" y="8" width="1" height="1" fill="#000"/>
+    </g>
+
+  </g>
+
+  <!-- Sparkles -->
+  <use href="#sp" x="-4" y="8" fill="#FBC02D" style="--d:0s"/>
+  <use href="#sp" x="19" y="7" fill="#FFF59D" style="--d:.4s"/>
+  <use href="#sp" x="-5" y="12" fill="#40C4FF" style="--d:.8s"/>
+  <use href="#sp" x="20" y="11" fill="#FF5252" style="--d:1.2s"/>
+
+  <!-- Floating code symbols -->
+  <text class="cf" x="-5" y="10" font-family="monospace" font-size="2" fill="#4CAF50" opacity="0" style="--d:0s;--dx:1px;--mx:0.5px">{</text>
+  <text class="cf" x="19" y="9" font-family="monospace" font-size="1.8" fill="#4CAF50" opacity="0" style="--d:2s;--dx:-0.8px;--mx:-0.4px">}</text>
+  <text class="cf" x="-4" y="13" font-family="monospace" font-size="1.6" fill="#42A5F5" opacity="0" style="--d:1s;--dx:0.8px;--mx:0.4px">[ ]</text>
+  <text class="cf" x="19" y="12" font-family="monospace" font-size="1.8" fill="#FFC107" opacity="0" style="--d:3.5s;--dx:-1px;--mx:-0.5px">=&gt;</text>
+
+  </g>
+</svg>

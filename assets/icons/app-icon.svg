@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Notchikko App Icon</title>
+  <defs>
+    <!-- Neutral charcoal-gray gradient. No purple/blue cast — purest grayscale
+         we can use while still giving the icon vertical depth. -->
+    <linearGradient id="bgB" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#4D4D4D"/>
+      <stop offset="0.55" stop-color="#2C2C2C"/>
+      <stop offset="1"   stop-color="#1A1A1A"/>
+    </linearGradient>
+    <radialGradient id="eyeGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFD56B" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#FFD56B" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Subtle warm bleed from the notch — keeps a hint of warmth without
+         creating a strong overall glare. -->
+    <radialGradient id="warmHalo" cx="0.5" cy="0.18" r="0.55">
+      <stop offset="0" stop-color="#FFB870" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#FFB870" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="notchClip">
+      <path d="M 262,0 V 280 Q 262,340 322,340 H 702 Q 762,340 762,280 V 0 Z"/>
+    </clipPath>
+    <!-- Clip ghost-text to the squircle so it can't bleed past rounded corners -->
+    <clipPath id="iconClip">
+      <rect width="1024" height="1024" rx="225" ry="225"/>
+    </clipPath>
+  </defs>
+
+  <!-- Squircle background -->
+  <rect width="1024" height="1024" rx="225" ry="225" fill="url(#bgB)"/>
+
+  <!-- Warm halo bleed from the notch — clipped to the squircle -->
+  <rect width="1024" height="1024" rx="225" ry="225" fill="url(#warmHalo)"/>
+
+  <!-- Ghost terminal: code-line silhouettes printed onto the background.
+       Re-tuned palette — prompts (green) and tags (coral) act as anchors,
+       arguments use amber that echoes the eye color (visual harmony),
+       output text is soft lavender. Opacities are bumped a touch so the
+       terminal reads as a backdrop with personality, not a watermark. -->
+  <g clip-path="url(#iconClip)">
+    <!-- Line 1 (y=304, top ~45% under notch): single gray block, shorter -->
+    <rect x="180" y="304" width="400" height="80" fill="#C5CAE8" opacity="0.26"/>
+
+    <!-- Line 2 (y=432): small blue tag + long gray output, extended -->
+    <rect x="180" y="432" width="120" height="80" fill="#5FA8FF" opacity="0.45"/>
+    <rect x="316" y="432" width="528" height="80" fill="#C5CAE8" opacity="0.22"/>
+
+    <!-- Line 3 (y=560): single red block, ~45% width — punchy short status -->
+    <rect x="180" y="560" width="300" height="80" fill="#FF8F7E" opacity="0.42"/>
+
+    <!-- Line 4 (y=688): medium gray output -->
+    <rect x="180" y="688" width="540" height="80" fill="#C5CAE8" opacity="0.28"/>
+
+    <!-- Line 5 (y=816): $ prompt + gray caret -->
+    <rect x="180" y="816" width="80" height="80" fill="#5BD68C" opacity="0.42"/>
+    <rect x="280" y="816" width="40" height="80" fill="#C5CAE8" opacity="0.32"/>
+  </g>
+
+  <!-- Larger notch (hosts the eyes) — drawn on top of the terminal -->
+  <path d="M 262,0 V 280 Q 262,340 322,340 H 702 Q 762,340 762,280 V 0 Z" fill="#000"/>
+
+  <!-- Glow halos clipped to inside notch (kept tight so eyes aren't blown out) -->
+  <g clip-path="url(#notchClip)">
+    <circle cx="416" cy="208" r="130" fill="url(#eyeGlow)"/>
+    <circle cx="608" cy="208" r="130" fill="url(#eyeGlow)"/>
+  </g>
+
+  <!-- Pixel-style eyes: bigger amber blocks with white catch-light -->
+  <g>
+    <!-- Left eye (centered at 416, 208) -->
+    <rect x="360" y="152" width="112" height="112" fill="#FFC857"/>
+    <rect x="360" y="152" width="36"  height="36"  fill="#FFFFFF"/>
+    <!-- Right eye (centered at 608, 208) -->
+    <rect x="552" y="152" width="112" height="112" fill="#FFC857"/>
+    <rect x="552" y="152" width="36"  height="36"  fill="#FFFFFF"/>
+  </g>
+
+  <!-- Subtle "blush" pixels under the eyes for warmth -->
+  <g fill="#FF8F8F" opacity="0.55">
+    <rect x="344" y="282" width="36" height="22"/>
+    <rect x="644" y="282" width="36" height="22"/>
+  </g>
+</svg>
