@@ -134,7 +134,10 @@ final class ClaudeCodeAdapter: AgentBridge {
             return .error(sessionId: hook.sessionId, message: "Task failed")
         // SubagentStart/SubagentStop 已在 onEvent 闭包中处理（深度追踪），不会到达这里
         case "Notification":
-            return .notification(sessionId: hook.sessionId, message: "")
+            // Gemini CLI 唯一的 attention 通道；Claude Code 也会在 terminal fallback / 等待用户输入时发。
+            // 空 message 的 Notification 是噪音（通常是心跳类），不弹卡——下游以 detail 非空判定。
+            let detail = hook.message ?? ""
+            return .notification(sessionId: hook.sessionId, message: "Notification", detail: detail)
         case "Elicitation":
             let detail = Self.extractElicitationDetail(from: hook.toolInput)
             return .notification(sessionId: hook.sessionId, message: hook.event, detail: detail)

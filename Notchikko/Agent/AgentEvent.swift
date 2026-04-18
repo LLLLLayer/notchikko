@@ -16,6 +16,7 @@ struct HookEvent: Decodable {
     let permissionMode: String?  // "default" / "bypassPermissions" 等
     let pidChain: [Int]?         // v0.4: hook→终端的 PID 链（VS Code 终端定位）
     let usage: TokenUsage?       // Stop 事件携带的 token 用量
+    let message: String?         // Notification 事件带的 message（e.g. "Claude is waiting for your input"）
 
     struct TokenUsage: Decodable {
         let inputTokens: Int
@@ -43,7 +44,7 @@ struct HookEvent: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
-        case cwd, event, status, tool, source, prompt, usage
+        case cwd, event, status, tool, source, prompt, usage, message
         case toolInput = "tool_input"
         case requestId = "request_id"
         case terminalPid = "terminal_pid"

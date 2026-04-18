@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# notchikko-hook-version: 1
+# notchikko-hook-version: 2
 """
 Notchikko Hook — forwards CLI agent events via Unix socket.
 
@@ -289,6 +289,14 @@ def handle_standard(input_data, source, terminal_pid, pid_chain):
     prompt_text = input_data.get("prompt", "")
     if prompt_text:
         output["prompt"] = prompt_text[:200]
+
+    # Notification 事件：Claude Code / Gemini CLI 在顶层带 `message` 字段
+    # （e.g. "Claude is waiting for your input"）。Gemini 的 Notification 是
+    # 它唯一的"attention"信号；Claude Code 也会用它做终端审批 fallback 提示。
+    # 转发给 app 在 Adapter 里走 .notification 卡片。
+    notification_message = input_data.get("message", "")
+    if notification_message:
+        output["message"] = notification_message[:200]
     if terminal_pid:
         output["terminal_pid"] = terminal_pid
     if pid_chain:
