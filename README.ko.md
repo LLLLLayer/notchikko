@@ -118,14 +118,14 @@ Notchikko는 macOS 14.0 이상이 필요합니다.
 
 ### 설치 패키지 다운로드
 
-[Releases](https://github.com/yangjie-layer/Notchikko/releases)에서 서명 및 공증된 최신 `.dmg`를 다운로드하여 `/Applications`에 드래그한 후 실행하세요. 첫 실행 시 Notchikko는 설치된 AI CLI를 자동으로 감지하고 필요에 따라 hook 설치를 안내합니다.
+[Releases](https://github.com/LLLLLayer/notchikko/releases)에서 서명 및 공증된 최신 `.dmg`를 다운로드하여 `/Applications`에 드래그한 후 실행하세요. 첫 실행 시 Notchikko는 설치된 AI CLI를 자동으로 감지하고 필요에 따라 hook 설치를 안내합니다.
 
 ### 소스에서 빌드
 
 요구 사항: Xcode 15 이상, Swift 5; 외부 종속성 [Sparkle](https://github.com/sparkle-project/Sparkle)은 SPM으로 통합되어 있습니다.
 
 ```bash
-git clone https://github.com/yangjie-layer/Notchikko.git
+git clone https://github.com/LLLLLayer/notchikko.git
 cd Notchikko
 xcodebuild -scheme Notchikko -configuration Debug build
 ```
