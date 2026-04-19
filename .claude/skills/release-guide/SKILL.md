@@ -150,7 +150,7 @@ xcrun stapler validate ./build/export/Notchikko.app
 
 > **Security**: Always use `--keychain-profile`, never `--password`. The latter exposes credentials in shell history and process list. Never paste the App-Specific Password into chat / logs / commit messages either — treat it as a leaked credential if you do and regenerate immediately at appleid.apple.com.
 
-### Step 4: Package for Distribution
+### Step 4a: Package ZIP (for Sparkle auto-update)
 
 ```bash
 # Re-zip AFTER stapling (the stapled ticket must be in the distributed archive)
@@ -158,6 +158,40 @@ rm ./build/Notchikko-notarize.zip
 ditto -c -k --sequesterRsrc --keepParent \
   ./build/export/Notchikko.app ./build/Notchikko-1.1.zip
 ```
+
+### Step 4b: Package DMG (for first-time download)
+
+Two-product model: ZIP is Sparkle's auto-update payload, DMG is the human-facing download on the GitHub Releases page (drag-to-Applications is the macOS muscle-memory install).
+
+```bash
+# Staging folder = .app + /Applications symlink. hdiutil snapshots this as the DMG root,
+# so when the user mounts the DMG they see both icons side by side.
+mkdir -p ./build/dmg-staging
+cp -R ./build/export/Notchikko.app ./build/dmg-staging/
+ln -sf /Applications ./build/dmg-staging/Applications
+
+# Compressed DMG (UDZO). -ov overwrites prior runs.
+hdiutil create -volname "Notchikko 1.1" \
+  -srcfolder ./build/dmg-staging \
+  -ov -format UDZO \
+  ./build/Notchikko-1.1.dmg
+
+# Sign the DMG ITSELF — the stapled ticket on the .app inside is not enough;
+# Gatekeeper inspects the DMG wrapper at mount time.
+codesign --force --sign "Developer ID Application: Jie Yang (Q2T8TN4ZW6)" \
+  ./build/Notchikko-1.1.dmg
+
+# Notarize + staple the DMG (separate submission from the .app's earlier one).
+xcrun notarytool submit ./build/Notchikko-1.1.dmg \
+  --keychain-profile "notchikko-notarize" --wait
+
+xcrun stapler staple ./build/Notchikko-1.1.dmg
+xcrun stapler validate ./build/Notchikko-1.1.dmg
+
+rm -rf ./build/dmg-staging
+```
+
+> **Critical — DON'T chain `stapler staple` behind a pipe.** `xcrun stapler staple ... | tail -3` masks staple failures (tail's exit code wins), so a failed staple silently proceeds to `gh release upload`, shipping an un-stapled DMG. Either run `stapler staple` standalone, set `-o pipefail`, or check `PIPESTATUS[0]` explicitly.
 
 ### Step 5: Generate Appcast
 
@@ -179,13 +213,27 @@ Options:
 
 ### Step 6: Publish
 
+Upload all four assets together:
+- `Notchikko-1.1.dmg` — first-time download (drag-to-Applications)
+- `Notchikko-1.1.zip` — Sparkle full update payload
+- `Notchikko{build}-{prevBuild}.delta` — Sparkle incremental update (e.g. `Notchikko2-1.delta`)
+- `appcast.xml` — update metadata
+
 ```bash
 # Write release notes to a file to avoid shell-escaping Chinese/Markdown headaches
 gh release create v1.1 \
+  ./build/Notchikko-1.1.dmg \
   ./build/Notchikko-1.1.zip \
+  ./build/Notchikko2-1.delta \
   ./build/appcast.xml \
   --title "Notchikko v1.1" \
   --notes-file /tmp/notchikko-v1.1-notes.md
+```
+
+If you need to replace a single asset after the release is published (e.g. the DMG shipped un-stapled because `stapler staple` failed silently behind a pipe):
+
+```bash
+gh release upload v1.1 ./build/Notchikko-1.1.dmg --clobber
 ```
 
 The appcast URL in Info.plist points to:
@@ -230,8 +278,10 @@ These are in `Notchikko/Info.plist` and merged with auto-generated keys at build
 - [ ] Private key only in macOS Keychain (never in git, env vars, or plain files)
 - [ ] Archive is signed with Developer ID (not Development)
 - [ ] Staple BEFORE final zip (so ticket is embedded in distributed archive)
+- [ ] DMG independently signed + notarized + stapled (Gatekeeper inspects the DMG wrapper on mount)
 - [ ] Appcast served over HTTPS (GitHub Releases = automatic)
 - [ ] `CURRENT_PROJECT_VERSION` incremented (Sparkle ignores marketing version)
+- [ ] `stapler staple` not behind a pipe (exit code gets masked; see Troubleshooting)
 
 ---
 
@@ -250,6 +300,20 @@ These are in `Notchikko/Info.plist` and merged with auto-generated keys at build
 ### Delta updates not generated
 - Keep previous version zips in the same directory as new zip when running `generate_appcast`
 - Delta generation requires both old and new .app bundles extractable from their zips
+
+### `stapler staple` Error 68 ("CloudKit's response is inconsistent")
+- Apple's notarization ticket service occasionally returns a transient CloudKit failure — the notarization was Accepted, only the staple fetch hiccuped.
+- Wait ~10 seconds and retry `xcrun stapler staple <path>`. Usually passes on the second try.
+- Do NOT re-submit to `notarytool` — the ticket already exists, only the local fetch needs another attempt.
+
+### DMG shipped un-stapled / missing notarization ticket
+- Check the publish chain: any `xcrun stapler staple … | tail -N && gh release upload …` pattern masks the staple exit code (tail's 0 wins), so a failed staple silently proceeds to upload.
+- Run `stapler staple` on its own line, or prefix with `set -o pipefail`, or check `PIPESTATUS[0]` after the pipe.
+- Fix an already-published un-stapled asset: staple locally, then `gh release upload vX.Y ./build/Notchikko-X.Y.dmg --clobber`.
+
+### Gatekeeper complains on DMG mount even though the .app inside is notarized
+- The stapled ticket on the `.app` isn't visible until *after* mount. Gatekeeper inspects the DMG wrapper *at* mount time.
+- Staple the DMG itself (step 4b). Without it, first-time downloaders see a "this file is from the internet" warning even though the enclosed app is clean.
 
 ### Build warning: "Copy Bundle Resources contains Info.plist"
 - Already handled: `PBXFileSystemSynchronizedBuildFileExceptionSet` excludes `Info.plist` from resources
