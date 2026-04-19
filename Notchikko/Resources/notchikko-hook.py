@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# notchikko-hook-version: 2
+# notchikko-hook-version: 3
 """
 Notchikko Hook — forwards CLI agent events via Unix socket.
 
@@ -84,20 +84,41 @@ def main():
 
 # ============================================================
 # Trae CLI (Coco) 适配
-# Trae CLI 的 JSON 格式与 Claude Code 不同：
-#   {"event_type": "pre_tool_use", "pre_tool_use": {"cwd": ..., "tool_name": ..., ...}}
-# 需要转换为 Notchikko 统一格式，且不支持审批阻塞。
+# Trae CLI 发送两种格式：
+#   新格式（同 Claude Code）: {"hook_event_name": "PreToolUse", "session_id": "...", "tool_name": "...", ...}
+#   旧格式（嵌套）: {"event_type": "pre_tool_use", "pre_tool_use": {"cwd": ..., "tool_name": ..., ...}}
+# 新格式优先走 handle_standard；旧格式走 handle_trae_cli_legacy 转换后发送。
+# 所有事件均为非阻塞（Trae CLI 不读 hook stdout）。
 # ============================================================
 TRAE_EVENT_MAP = {
-    "user_prompt_submit": ("UserPromptSubmit", "processing"),
-    "pre_tool_use":       ("PreToolUse",        "running_tool"),
-    "post_tool_use":      ("PostToolUse",       "processing"),
-    "stop":               ("Stop",              "waiting_for_input"),
-    "subagent_stop":      ("SubagentStop",      "subagent_stop"),
+    "user_prompt_submit":    ("UserPromptSubmit",   "processing"),
+    "pre_tool_use":          ("PreToolUse",         "running_tool"),
+    "post_tool_use":         ("PostToolUse",        "processing"),
+    "post_tool_use_failure": ("PostToolUseFailure", "error"),
+    "stop":                  ("Stop",               "waiting_for_input"),
+    "subagent_start":        ("SubagentStart",      "subagent_start"),
+    "subagent_stop":         ("SubagentStop",       "subagent_stop"),
+    "session_start":         ("SessionStart",       "waiting_for_input"),
+    "session_end":           ("SessionEnd",         "ended"),
+    "pre_compact":           ("PreCompact",         "compacting"),
+    "post_compact":          ("PostCompact",        "processing"),
+    "notification":          ("Notification",       "notification"),
+    "permission_request":    ("PermissionRequest",  "permission_request"),
 }
 
 
 def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
+    # Trae CLI 新版同时提供 hook_event_name（PascalCase，同 Claude Code 格式）
+    # 如果有 hook_event_name，走标准路径（但强制非阻塞）
+    hook_event_name = input_data.get("hook_event_name", "")
+    if hook_event_name and hook_event_name in STATUS_MAP:
+        # 确保 session_id 有值（Trae CLI 现在提供了，但 fallback 以防万一）
+        if not input_data.get("session_id"):
+            input_data["session_id"] = f"trae-{os.getppid()}"
+        handle_trae_standard(input_data, source, terminal_pid, pid_chain)
+        return
+
+    # 旧格式 fallback：嵌套的 event_type + body
     event_type = input_data.get("event_type", "")
     event_body = input_data.get(event_type, {})
 
@@ -106,10 +127,9 @@ def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
 
     mapped_event, mapped_status = TRAE_EVENT_MAP[event_type]
 
-    # Trae CLI 没有 session_id，用 PPID 作为稳定标识
-    session_id = f"trae-{os.getppid()}"
-    # cwd 仅 tool 事件有，其余用 os.getcwd() fallback
-    cwd = event_body.get("cwd", "") or os.getcwd()
+    # Use real session_id if provided; PPID fallback for older builds
+    session_id = event_body.get("session_id", "") or input_data.get("session_id", "") or f"trae-{os.getppid()}"
+    cwd = event_body.get("cwd", "") or input_data.get("cwd", "") or os.getcwd()
 
     output = {
         "session_id": session_id,
@@ -124,6 +144,17 @@ def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
     prompt = event_body.get("prompt", "")
     if prompt:
         output["prompt"] = prompt[:200]
+
+    # notification / permission_request may carry a message
+    notification_message = event_body.get("message", "") or input_data.get("message", "")
+    if notification_message:
+        output["message"] = notification_message[:200]
+
+    # permission_mode if provided
+    permission_mode = event_body.get("permission_mode", "") or input_data.get("permission_mode", "")
+    if permission_mode:
+        output["permission_mode"] = permission_mode
+
     if terminal_pid:
         output["terminal_pid"] = terminal_pid
     if pid_chain:
@@ -135,7 +166,53 @@ def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
     except Exception:
         pass
 
-    # Trae CLI 不支持审批阻塞，直接发送
+    # Trae CLI 不读 hook stdout，所有事件均为 fire-and-forget
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        sock.connect(SOCKET_PATH)
+        sock.sendall(json.dumps(output).encode())
+        sock.close()
+    except Exception:
+        pass
+
+
+def handle_trae_standard(input_data, source, terminal_pid, pid_chain):
+    """Trae CLI 新格式走标准流程，但强制非阻塞（不生成 request_id，不读 stdout）"""
+    hook_event = input_data.get("hook_event_name", "")
+    session_id = input_data.get("session_id", "") or f"trae-{os.getppid()}"
+
+    output = {
+        "session_id": session_id,
+        "cwd": input_data.get("cwd", ""),
+        "event": hook_event,
+        "status": STATUS_MAP.get(hook_event, "unknown"),
+        "tool": input_data.get("tool_name", ""),
+        "tool_input": input_data.get("tool_input", {}),
+        "source": source,
+        "permission_mode": input_data.get("permission_mode", ""),
+    }
+
+    prompt_text = input_data.get("prompt", "")
+    if prompt_text:
+        output["prompt"] = prompt_text[:200]
+
+    notification_message = input_data.get("message", "")
+    if notification_message:
+        output["message"] = notification_message[:200]
+
+    if terminal_pid:
+        output["terminal_pid"] = terminal_pid
+    if pid_chain:
+        output["pid_chain"] = pid_chain
+    try:
+        tty = os.ttyname(0)
+        if tty:
+            output["terminal_tty"] = tty
+    except Exception:
+        pass
+
+    # 非阻塞：fire-and-forget
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(2)

@@ -87,13 +87,13 @@ ThemeProvider → NotchikkoView     ← SVG rendered in WKWebView
 ### Trae CLI 🦎
 - **Config**: `~/.trae/traecli.yaml`
 - **Format**: YAML (separate parsing in HookInstaller)
-- **Events**: user_prompt_submit, pre_tool_use, post_tool_use, stop, subagent_stop
+- **Events**: session_start, session_end, user_prompt_submit, pre_tool_use, post_tool_use, post_tool_use_failure, pre_compact, post_compact, stop, subagent_start, subagent_stop, notification, permission_request
 - **Stdin format**: Different from Claude Code! Uses `event_type` + nested body:
   ```json
   { "event_type": "pre_tool_use", "pre_tool_use": { "cwd": "...", "tool_name": "...", "tool_input": {...} } }
   ```
-- **Session ID**: No `session_id` — hook uses `'trae-' + str(os.getppid())` as stable identifier
-- **Approval**: Not supported (fire-and-forget only)
+- **Session ID**: Uses real `session_id` from event body when available; falls back to `'trae-' + str(os.getppid())` for older builds
+- **Approval**: Not supported (Trae CLI does not read hook stdout; `permission_request` fires as non-blocking notification only)
 
 ---
 

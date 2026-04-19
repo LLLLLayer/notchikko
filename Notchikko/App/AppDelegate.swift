@@ -476,6 +476,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if prevState == .happy || prevState == .sleeping { return false }
                 return true
             case "Notification":
+                // Trae CLI 在 Stop 后会多发一个 "Agent finished..." 的 notification，
+                // 内容与 .happy 庆祝完全重复，正在庆祝时抑制掉。
+                if prevState == .happy { return false }
                 return !detail.isEmpty
             default:
                 return false

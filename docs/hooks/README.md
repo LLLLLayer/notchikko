@@ -15,7 +15,7 @@ This folder documents, for each supported CLI agent:
 | Claude Code | [`claude-code.md`](./claude-code.md) | `~/.claude/settings.json` | All tools | Full (blocking `PermissionRequest`) |
 | OpenAI Codex | [`codex.md`](./codex.md) | `~/.codex/hooks.json` | **Bash only** (upstream) | None used (Notchikko chooses not to block; `PreToolUse` is blockable upstream) |
 | Gemini CLI | [`gemini-cli.md`](./gemini-cli.md) | `~/.gemini/settings.json` | All tools | None (no approval event upstream) |
-| Trae CLI | [`trae-cli.md`](./trae-cli.md) | `~/.trae/traecli.yaml` | All tools | None (non-blocking contract) |
+| Trae CLI | [`trae-cli.md`](./trae-cli.md) | `~/.trae/traecli.yaml` | All tools | Notification only (`permission_request` fires but stdout not read) |
 
 ## Shared pipeline
 

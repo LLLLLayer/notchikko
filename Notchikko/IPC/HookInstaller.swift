@@ -80,9 +80,13 @@ final class HookInstaller {
             icon: "🦎",
             settingsPath: "~/.trae/traecli.yaml",
             hookEvents: [
+                "session_start", "session_end",
                 "user_prompt_submit",
-                "pre_tool_use", "post_tool_use",
-                "stop", "subagent_stop",
+                "pre_tool_use", "post_tool_use", "post_tool_use_failure",
+                "pre_compact", "post_compact",
+                "stop",
+                "subagent_start", "subagent_stop",
+                "notification", "permission_request",
             ],
             configFormat: .yaml
         ),
@@ -268,36 +272,61 @@ final class HookInstaller {
         // 已安装则跳过
         if content.contains("notchikko") { return }
 
-        // 生成 Trae CLI YAML hook 配置块
-        // Trae CLI 格式: 一个 hook 条目，用 matchers 数组匹配多个事件
         let matchers = cli.hookEvents.map { "      - event: \($0)" }.joined(separator: "\n")
-        let hookBlock = """
 
-        # Notchikko hook — visual pet indicator
-        hooks:
-          - type: command
-            command: '\(hookScriptPath) \(cli.name)'
-            matchers:
-        \(matchers)
-        """
-
-        // 如果文件已有 hooks: 字段，需要在其下追加而非新建
-        // 简化实现：如果已有 hooks: 开头的行，在其后追加条目
         if content.contains("\nhooks:") || content.hasPrefix("hooks:") {
-            // 在已有 hooks 块下追加一个条目
-            let appendBlock = """
+            // ---- 文件已有 hooks: 字段 → 找到该列表末尾，把新条目插进去 ----
+            let entry = [
+                "    # Notchikko hook — visual pet indicator",
+                "    - type: command",
+                "      command: '\(hookScriptPath) \(cli.name)'",
+                "      matchers:",
+            ].joined(separator: "\n") + "\n" + matchers
 
-              # Notchikko hook — visual pet indicator
-              - type: command
-                command: '\(hookScriptPath) \(cli.name)'
-                matchers:
-            \(cli.hookEvents.map { "      - event: \($0)" }.joined(separator: "\n"))
-            """
-            content.append(appendBlock)
+            var lines = content.components(separatedBy: "\n")
+
+            // 找到 "hooks:" 行
+            guard let hooksIdx = lines.firstIndex(where: {
+                let trimmed = $0.trimmingCharacters(in: .whitespaces)
+                return trimmed == "hooks:" || trimmed.hasPrefix("hooks:")
+            }) else {
+                // 不应该走到这里，但保底追加完整块
+                content.append("\nhooks:\n" + entry + "\n")
+                try content.write(to: settingsURL, atomically: true, encoding: .utf8)
+                return
+            }
+
+            // 从 hooks: 的下一行开始，找到第一个非空 & 缩进 <= hooks: 本身的行 —— 即下一个顶级 key
+            let hooksIndent = lines[hooksIdx].prefix(while: { $0 == " " || $0 == "\t" }).count
+            var insertAt = lines.count // 默认：列表延伸到文件末尾
+            for i in (hooksIdx + 1)..<lines.count {
+                let line = lines[i]
+                if line.trimmingCharacters(in: .whitespaces).isEmpty { continue }
+                let indent = line.prefix(while: { $0 == " " || $0 == "\t" }).count
+                if indent <= hooksIndent {
+                    insertAt = i
+                    break
+                }
+            }
+
+            // 在 insertAt 处插入新条目
+            lines.insert(entry, at: insertAt)
+            content = lines.joined(separator: "\n")
         } else {
+            // ---- 文件没有 hooks: 字段 → 追加完整块 ----
+            let hookBlock = [
+                "",
+                "hooks:",
+                "    # Notchikko hook — visual pet indicator",
+                "    - type: command",
+                "      command: '\(hookScriptPath) \(cli.name)'",
+                "      matchers:",
+            ].joined(separator: "\n") + "\n" + matchers
             content.append(hookBlock)
         }
 
+        // 确保文件以换行符结尾
+        if !content.hasSuffix("\n") { content.append("\n") }
         try content.write(to: settingsURL, atomically: true, encoding: .utf8)
     }
 
@@ -353,17 +382,53 @@ final class HookInstaller {
         guard var content = try? String(contentsOf: settingsURL, encoding: .utf8) else { return }
         guard content.contains("notchikko") else { return }
 
-        // 移除包含 notchikko 的行以及紧邻的注释行
+        // 找到包含 "notchikko" 的 hook 条目块并完整移除。
+        // 每个条目以 "- type: command" 开头（缩进 4 格），
+        // 其上可能有一行 # 注释，其下的续行缩进更深。
         var lines = content.components(separatedBy: "\n")
         var indicesToRemove = IndexSet()
+
         for (i, line) in lines.enumerated() {
-            if line.contains("notchikko") {
-                indicesToRemove.insert(i)
-                // 也移除上方的注释行
-                if i > 0 && lines[i - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#") &&
-                   lines[i - 1].contains("Notchikko") {
-                    indicesToRemove.insert(i - 1)
+            guard line.contains("notchikko") else { continue }
+
+            // 向上找到这个条目的起始行 ("- type:")
+            var blockStart = i
+            for j in stride(from: i - 1, through: 0, by: -1) {
+                let trimmed = lines[j].trimmingCharacters(in: .whitespaces)
+                if trimmed.isEmpty { continue }
+                if trimmed.hasPrefix("- type:") {
+                    blockStart = j
+                    break
                 }
+                if trimmed.hasPrefix("#") {
+                    // 可能是此条目的注释，继续向上看
+                    blockStart = j
+                    continue
+                }
+                break
+            }
+            // 也移除 blockStart 上方紧邻的 Notchikko 注释行
+            if blockStart > 0 {
+                let above = lines[blockStart - 1].trimmingCharacters(in: .whitespaces)
+                if above.hasPrefix("#") && above.contains("Notchikko") {
+                    blockStart -= 1
+                }
+            }
+
+            // 向下找到条目结束：从 "- type:" 行的缩进开始，后续缩进更深的行都属于此条目
+            let anchorLine = lines[min(blockStart, lines.count - 1)]
+            let anchorIndent = anchorLine.prefix(while: { $0 == " " || $0 == "\t" }).count
+            var blockEnd = blockStart
+            for j in (blockStart + 1)..<lines.count {
+                let l = lines[j]
+                if l.trimmingCharacters(in: .whitespaces).isEmpty { continue }
+                let indent = l.prefix(while: { $0 == " " || $0 == "\t" }).count
+                if indent <= anchorIndent { break }
+                blockEnd = j
+            }
+
+            for idx in blockStart...blockEnd {
+                indicesToRemove.insert(idx)
             }
         }
 
@@ -373,6 +438,7 @@ final class HookInstaller {
         }
 
         content = lines.joined(separator: "\n")
+        if !content.hasSuffix("\n") && !content.isEmpty { content.append("\n") }
         try content.write(to: settingsURL, atomically: true, encoding: .utf8)
     }
 

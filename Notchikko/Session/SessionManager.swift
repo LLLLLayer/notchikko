@@ -319,6 +319,9 @@ final class SessionManager {
                 sessions.removeValue(forKey: sid)
                 sessionCleanupTasks.removeValue(forKey: sid)
             }
+            // 庆祝中不打断——Stop 事件已经 scheduleAutoSwitch(3s) 接管收尾。
+            // Trae CLI 每轮 stop 紧跟 session_end，不加这道闸 .happy 会被立刻覆盖。
+            guard currentState != .happy else { break }
             // 如果还有活跃 session，切换到它的状态并重置 timer
             if let nextActive = activeSessionId, let session = sessions[nextActive] {
                 resetTimers()

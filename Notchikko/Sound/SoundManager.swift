@@ -36,6 +36,12 @@ final class SoundManager {
     private var lastPlayTimes: [String: Date] = [:]
     private static let cooldownInterval: TimeInterval = 2.0
 
+    /// 启动静音窗口：首次启动时 TranscriptPoller + ProcessDiscovery 会一次性补发
+    /// 若干历史 session 的 .sessionStart / .stop 等事件，若都放声会乱成一片。
+    /// 窗口内全部吞掉，窗口外走正常 cooldown 逻辑。
+    private let launchDate = Date()
+    private static let startupGracePeriod: TimeInterval = 2.0
+
     private init() {}
 
     // MARK: - Prewarm
@@ -126,9 +132,12 @@ final class SoundManager {
         let prefs = PreferencesStore.shared.preferences
         guard prefs.soundVolume > 0 else { return }
 
+        // 启动静音窗口：首 N 秒吞掉 poller 补发的历史事件声，避免"首次启动声海"
+        let now = Date()
+        if now.timeIntervalSince(launchDate) < Self.startupGracePeriod { return }
+
         // 冷却检查：默认按状态名去重 2s；多 agent 并发可传 sessionId 拓宽
         let key = cooldownKey ?? stateName
-        let now = Date()
         if let lastTime = lastPlayTimes[key],
            now.timeIntervalSince(lastTime) < Self.cooldownInterval {
             return

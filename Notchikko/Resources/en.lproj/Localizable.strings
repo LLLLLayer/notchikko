@@ -95,6 +95,7 @@
 "settings.install_hook" = "Install Hook";
 "settings.reinstall_hook" = "Reinstall";
 "settings.uninstall_hook" = "Uninstall";
+"settings.open_config_folder" = "Reveal config file in Finder";
 "settings.bypass_active" = "Auto Approve is ON — all tools auto-approved globally. This was set from the approval card.";
 "settings.disable_bypass" = "Disable";
 "settings.coming_soon" = "Coming Soon";

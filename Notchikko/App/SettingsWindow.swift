@@ -659,6 +659,14 @@ private struct CLIRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button {
+                revealConfigInFinder()
+            } label: {
+                Image(systemName: "folder")
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderless)
+            .help(String(localized: "settings.open_config_folder"))
             if isInstalled {
                 Button(String(localized: "settings.uninstall_hook")) { onUninstall() }
                     .controlSize(.small)
@@ -674,6 +682,18 @@ private struct CLIRow: View {
         .padding(8)
         .background(.quaternary.opacity(0.3))
         .cornerRadius(8)
+    }
+
+    private func revealConfigInFinder() {
+        let expanded = NSString(string: cli.settingsPath).expandingTildeInPath
+        // 文件存在：在 Finder 中高亮它；不存在：打开父目录（让用户能看到"就差这个文件"的上下文）
+        if FileManager.default.fileExists(atPath: expanded) {
+            NSWorkspace.shared.selectFile(expanded, inFileViewerRootedAtPath: "")
+        } else {
+            let folder = (expanded as NSString).deletingLastPathComponent
+            try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(URL(fileURLWithPath: folder))
+        }
     }
 }
 
