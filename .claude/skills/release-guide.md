@@ -30,6 +30,26 @@ Menu entry: status bar → "Check for Updates…" (between Settings and Quit).
 
 ---
 
+## One-Time Setup: Developer ID Application Certificate
+
+Required before any signed + notarized release. A plain Xcode "Apple Development" cert **will not work** — export needs a distribution cert.
+
+1. **Generate CSR** — Keychain Access.app → menu bar → `Certificate Assistant → Request a Certificate From a Certificate Authority…`
+   - User Email: Apple ID email
+   - Common Name: any label (e.g. `LLLLLayer Developer ID`)
+   - CA Email: leave blank
+   - Select **Saved to disk**
+2. **Create cert** — https://developer.apple.com/account/resources/certificates → "+" → **Developer ID Application** → Profile Type **G2 Sub-CA (Xcode 11.4.1 or later)** → upload the CSR
+3. **Install** — download the `.cer`, double-click to import into login Keychain. Verify:
+   ```bash
+   security find-identity -v -p codesigning | grep "Developer ID Application"
+   ```
+   Should print one line with your team ID `(Q2T8TN4ZW6)`.
+
+CSR file is safe to delete after the cert is installed — the private key stays in Keychain.
+
+---
+
 ## One-Time Setup: EdDSA Key Pair
 
 ```bash
@@ -46,6 +66,8 @@ Copy the printed public key into `Notchikko/Info.plist`:
 <key>SUPublicEDKey</key>
 <string>PASTE_BASE64_PUBLIC_KEY_HERE</string>
 ```
+
+**Commit this change** before shipping any release — installed clients verify the appcast `sparkle:edSignature` against the public key baked into their own Info.plist at build time, so dev builds running on the old placeholder key will reject every update.
 
 ### Key Management
 
@@ -70,8 +92,8 @@ Both values in `project.pbxproj` target build settings (Debug + Release):
 ### Step 2: Archive & Export
 
 ```bash
-# Archive
-xcodebuild archive -scheme Notchikko \
+# Archive (Release config required — Debug won't be accepted by notarization)
+xcodebuild archive -scheme Notchikko -configuration Release \
   -archivePath ./build/Notchikko.xcarchive
 
 # Export with Developer ID signing
@@ -79,9 +101,13 @@ xcodebuild -exportArchive \
   -archivePath ./build/Notchikko.xcarchive \
   -exportOptionsPlist ExportOptions.plist \
   -exportPath ./build/export
+
+# Verify the exported .app is signed by Developer ID (not Apple Development)
+codesign -dv --verbose=2 ./build/export/Notchikko.app 2>&1 | grep Authority
+# Expect: "Authority=Developer ID Application: <Name> (Q2T8TN4ZW6)"
 ```
 
-`ExportOptions.plist`:
+`ExportOptions.plist` (gitignored — contains teamID):
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -92,6 +118,8 @@ xcodebuild -exportArchive \
     <string>developer-id</string>
     <key>teamID</key>
     <string>Q2T8TN4ZW6</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
 </dict>
 </plist>
 ```
@@ -100,27 +128,33 @@ xcodebuild -exportArchive \
 
 ```bash
 # First time only: store credentials in Keychain (interactive prompt, password never on disk)
+# Requires an App-Specific Password from appleid.apple.com → Sign-In and Security →
+# App-Specific Passwords. Apple Developer accounts have 2FA enforced, so the regular
+# Apple ID password cannot be used here.
 xcrun notarytool store-credentials "notchikko-notarize" \
   --apple-id YOUR_APPLE_ID --team-id Q2T8TN4ZW6
 
 # Create zip for notarization (ditto preserves symlinks)
 ditto -c -k --sequesterRsrc --keepParent \
-  ./build/export/Notchikko.app ./build/Notchikko.zip
+  ./build/export/Notchikko.app ./build/Notchikko-notarize.zip
 
 # Submit (uses Keychain profile — no password on command line)
-xcrun notarytool submit ./build/Notchikko.zip \
+# Typical duration: 1–3 minutes. --wait blocks until Accepted/Rejected.
+xcrun notarytool submit ./build/Notchikko-notarize.zip \
   --keychain-profile "notchikko-notarize" --wait
 
-# Staple the ticket to the .app (not the zip)
+# Staple the ticket to the .app (NOT the zip). Then verify.
 xcrun stapler staple ./build/export/Notchikko.app
+xcrun stapler validate ./build/export/Notchikko.app
 ```
 
-> **Security**: Always use `--keychain-profile`, never `--password`. The latter exposes credentials in shell history and process list.
+> **Security**: Always use `--keychain-profile`, never `--password`. The latter exposes credentials in shell history and process list. Never paste the App-Specific Password into chat / logs / commit messages either — treat it as a leaked credential if you do and regenerate immediately at appleid.apple.com.
 
 ### Step 4: Package for Distribution
 
 ```bash
 # Re-zip AFTER stapling (the stapled ticket must be in the distributed archive)
+rm ./build/Notchikko-notarize.zip
 ditto -c -k --sequesterRsrc --keepParent \
   ./build/export/Notchikko.app ./build/Notchikko-1.1.zip
 ```
@@ -128,25 +162,30 @@ ditto -c -k --sequesterRsrc --keepParent \
 ### Step 5: Generate Appcast
 
 ```bash
-# Keep previous version zips in the same directory for delta generation
-# generate_appcast reads the EdDSA private key from Keychain automatically
-"$SPARKLE_BIN/generate_appcast" ./build/
+# Keep previous version zips in the same directory for delta generation.
+# generate_appcast reads the EdDSA private key from Keychain automatically.
+# --download-url-prefix rewrites enclosure URLs to point at the GitHub Releases
+# asset paths — required, otherwise clients try to download by bare filename.
+"$SPARKLE_BIN/generate_appcast" \
+  --download-url-prefix "https://github.com/LLLLLayer/notchikko/releases/download/v1.1/" \
+  ./build/
 
 # Output: ./build/appcast.xml (+ delta files like Notchikko1.0-1.1.delta)
 ```
 
 Options:
-- `--download-url-prefix URL` — prepend URL to enclosure filenames (for GitHub Releases hosting)
 - `--maximum-deltas N` — limit delta files per version (default: all previous)
+- First release only: no prior zip → no delta files generated, only a single `<item>` for the new version. Expected.
 
 ### Step 6: Publish
 
 ```bash
+# Write release notes to a file to avoid shell-escaping Chinese/Markdown headaches
 gh release create v1.1 \
   ./build/Notchikko-1.1.zip \
   ./build/appcast.xml \
-  --title "v1.1" \
-  --notes "Release notes"
+  --title "Notchikko v1.1" \
+  --notes-file /tmp/notchikko-v1.1-notes.md
 ```
 
 The appcast URL in Info.plist points to:
