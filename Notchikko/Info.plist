@@ -5,7 +5,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/LLLLLayer/notchikko/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_YOUR_ED25519_PUBLIC_KEY</string>
+	<string>1KQyep01BcF/cug6qlRDSCa4gmtz+hFRc8idMXxsbd8=</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>

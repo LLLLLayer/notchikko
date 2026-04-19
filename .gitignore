@@ -5,3 +5,7 @@ xcuserdata/
 DerivedData/
 .build/
 .claude/settings.local.json
+
+# Release artifacts
+build/
+ExportOptions.plist
