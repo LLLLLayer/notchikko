@@ -117,7 +117,7 @@ final class HookOnboardingCoordinator {
     }
 
     private func buildItems() -> [HookOnboardingView.CLIItem] {
-        HookInstaller.supportedCLIs.map { cli in
+        HookInstaller.supportedCLIs.filter { !$0.hidden }.map { cli in
             let settingsURL = URL(fileURLWithPath: NSString(string: cli.settingsPath).expandingTildeInPath)
             let cliExists = FileManager.default.fileExists(atPath: settingsURL.deletingLastPathComponent().path)
             let status: HookOnboardingView.CLIItem.Status

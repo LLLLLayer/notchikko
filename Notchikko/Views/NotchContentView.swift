@@ -15,7 +15,9 @@ struct NotchContentView: View {
             }
 
             // 上层：Notchikko 居中贴在 panel 顶部，上半身自然藏在 notch 里
-            NotchikkoRepresentable(state: sessionManager.currentState)
+            // dragEndPreviewState 非空时用它挑 SVG：拖拽松手瞬间就换成目标形象，
+            // 让 350ms 飞回动画期间不再看到 dragging SVG 再突然切换的闪动感。
+            NotchikkoRepresentable(state: sessionManager.dragEndPreviewState ?? sessionManager.currentState)
                 .frame(width: petSize, height: petSize)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

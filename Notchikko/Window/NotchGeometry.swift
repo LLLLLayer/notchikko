@@ -53,23 +53,21 @@ struct NotchGeometry {
         // 刘海下方需要容纳的 pet 可视高度（petSize + padding 正好覆盖 drag/hover 热区下边缘）
         let petAreaHeight = petSize + Self.petAreaPadding
 
-        if hasPhysicalNotch && !screenHasNotch {
-            // 强制有刘海 + 无物理刘海：模拟刘海底边位置
-            // 真实刘海屏上 pet 从刘海底边往下挂，这里同理：
-            // panel 顶部 = screenTop - notchHeight，pet 从这里开始往下
-            let panelHeight = petAreaHeight
+        if hasPhysicalNotch {
+            // 刘海屏（含强制模拟）：panel 顶部 = 刘海底边，crab 整只挂在刘海正下方、完全可见。
+            // 过去设计让上半身藏进挖孔里，但飞回动画会穿过挖孔区看起来"闪一下"，
+            // 改成全露出后，归位干净，也不需要任何 hiddenNotchHeight 偏置。
             hiddenNotchHeight = 0
             panelFrame = NSRect(
                 x: screenFrame.midX - panelWidth / 2,
-                y: screenFrame.maxY - notchSize.height - panelHeight,
+                y: screenFrame.maxY - notchSize.height - petAreaHeight,
                 width: panelWidth,
-                height: panelHeight
+                height: petAreaHeight
             )
         } else {
+            // 无刘海：panel 顶部贴到屏幕顶部，上半身超出屏幕顶部被裁剪
             let panelHeight = notchSize.height + petAreaHeight
             hiddenNotchHeight = notchSize.height
-            // 有真实 Notch → 上半身藏在 Notch 硬件挖孔里
-            // 无 Notch → 上半身超出屏幕顶部被裁剪
             panelFrame = NSRect(
                 x: screenFrame.midX - panelWidth / 2,
                 y: screenFrame.maxY - panelHeight,
@@ -77,6 +75,5 @@ struct NotchGeometry {
                 height: panelHeight
             )
         }
-
     }
 }

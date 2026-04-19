@@ -13,7 +13,7 @@ PreToolUse, PostToolUse,
 Stop
 ```
 
-**There is no `SessionEnd` upstream.** Notchikko's installer currently registers `SessionEnd` anyway (see `CLIHookConfig` for `"codex"`); Codex silently ignores unknown events, so this is harmless but wasted config.
+**There is no `SessionEnd` upstream.** Notchikko's Codex config (`CLIHookConfig` for `"codex"`) intentionally omits it — Codex would silently ignore it anyway, but writing wasted config into user settings is avoidable noise.
 
 No `PermissionRequest`. No `Elicitation` / `AskUserQuestion`. No `PreCompact` / `PostCompact`. No subagent lifecycle. No `StopFailure` / `PostToolUseFailure` granularity — errors surface as whatever the CLI prints.
 
@@ -102,4 +102,4 @@ These are silent stand-ins; if the user hasn't installed the Codex hook, Notchik
 - **Large-file hook silent failure.** On Linux / Windows, Codex editing a file over ~100 KB (or ~1500–2000 lines) can exceed OS argv limits and the hook never runs at all ([codex#18067](https://github.com/openai/codex/issues/18067)). macOS has a higher limit but isn't immune.
 - **Schema drift is the biggest other risk.** Codex's hook system has iterated faster than Claude Code's. If upstream renames `hook_event_name` or stops sending `session_id`, the `handle_standard` early-exits silently (fail-open). Symptom: Notchikko looks dead while Codex is obviously running.
 - **Blocking is available upstream but Notchikko doesn't use it.** Codex's `PreToolUse` can deny Bash commands via `permissionDecision: "deny"` on stdout. Notchikko chooses not to — blocking approval UX is reserved for Claude Code's `PermissionRequest`. A future release could add it.
-- **`matcher` field uses regex.** Per upstream, Codex matchers are regex strings (e.g. `"Bash"`, `"Edit|Write"`, `"startup|resume"`). Notchikko's installer writes `"*"`, which is not a valid regex quantifier; in practice Codex treats it as a fail-closed / match-all depending on version. If a future release tightens regex validation, the installer will need to switch to `".*"` or `""`.
+- **`matcher` field uses regex.** Per upstream, Codex matchers are regex strings (e.g. `"Bash"`, `"Edit|Write"`, `"startup|resume"`). Notchikko's installer now writes `".*"` for Codex specifically (via `CLIHookConfig.matcher`) — Claude Code keeps the glob `"*"` it expects. A bare `"*"` is not a valid regex quantifier and would break if upstream tightened regex validation.

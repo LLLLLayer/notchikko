@@ -284,18 +284,20 @@ final class DragController {
         )
     }
 
-    /// 飞回目标位置，动画完成后执行回调
+    /// 飞回目标位置，动画完成后执行回调。
+    /// 归位点就是 `geo.panelFrame`——刘海屏上这个位置已经是刘海正下方，整只 crab 可见，
+    /// 所以单段 0.35s easeInOut 就够了，不用再分两段"入洞"。
     func animateToFrame(_ frame: NSRect, completion: (() -> Void)? = nil) {
         guard let panel else { completion?(); return }
-        // 动画期间禁用 frame 约束，避免刘海屏上被系统推到刘海下方
+        // 动画期间禁用 frame 约束，防止中途被系统推偏
         panel.disableFrameConstraint = true
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.35
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().setFrame(frame, display: true)
         }, completionHandler: { [weak panel] in
-            // 动画已将 frame 设到正确位置，不再重复 setFrame
-            // 否则 constrainFrameRect 会把超出刘海安全区的 panel 推下来
+            // 收尾再显式 setFrame 一次，像素级锁死最终帧
+            panel?.setFrame(frame, display: false)
             panel?.disableFrameConstraint = false
             completion?()
         })

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# notchikko-hook-version: 3
+# notchikko-hook-version: 4
 """
 Notchikko Hook — forwards CLI agent events via Unix socket.
 
@@ -13,16 +13,25 @@ For PermissionRequest on approval tools (Bash/Edit/Write/NotebookEdit) or
 AskUserQuestion, blocks waiting for the app's decision response.
 
 Fail-open by design: any exception → exit 0 so the hook never blocks the CLI.
+
+Logs each invocation to ~/Library/Logs/Notchikko/hook-YYYY-MM-DD.log
+(shared dir with the app; the app's FileLogger purges files >3 days old).
+Line format mirrors the app:
+    YYYY-MM-DD HH:mm:ss.SSS LEVEL [Hook] sid=xxxxxxxx req=xxxxxxxx k=v ... message
+so you can `grep 'sid=abc12345' ~/Library/Logs/Notchikko/*.log` across both ends.
 """
 import json
 import os
 import socket
 import subprocess
 import sys
+import time
 import uuid
+from datetime import datetime
 
 
 SOCKET_PATH = "/tmp/notchikko.sock"
+LOG_DIR = os.path.expanduser("~/Library/Logs/Notchikko")
 
 # 已知终端进程名 → 可匹配的关键词
 KNOWN_TERMINALS = {
@@ -31,6 +40,42 @@ KNOWN_TERMINALS = {
     "Warp", "Hyper",
     "Code Helper", "Cursor Helper",  # VSCode/Cursor 的终端进程
 }
+
+
+def hook_log(level, message, **fields):
+    """追加一行日志到 ~/Library/Logs/Notchikko/hook-YYYY-MM-DD.log。
+    Fail-silent：任何异常都吞掉，绝不阻塞 hook。
+
+    格式与 Swift FileLogger 对齐：
+      YYYY-MM-DD HH:mm:ss.SSS LEVEL [Hook] sid=xxxxxxxx req=xxxxxxxx k=v ... message
+    sid/req 取前 8 位，保证和 app 侧日志可以用同一 grep 查到。
+    """
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        now = datetime.now()
+        ts = now.strftime("%Y-%m-%d %H:%M:%S.") + f"{now.microsecond // 1000:03d}"
+        today = now.strftime("%Y-%m-%d")
+        path = os.path.join(LOG_DIR, f"hook-{today}.log")
+
+        parts = [ts, level, "[Hook]"]
+        sid = fields.pop("sid", None)
+        req = fields.pop("req", None)
+        if sid:
+            parts.append(f"sid={str(sid).split('-', 1)[0][:8]}")
+        if req:
+            parts.append(f"req={str(req).split('-', 1)[0][:8]}")
+        for k, v in fields.items():
+            if v is None or v == "":
+                continue
+            sv = str(v).replace("\n", " ").replace("\r", " ")
+            if len(sv) > 200:
+                sv = sv[:200] + "..."
+            parts.append(f"{k}={sv}")
+        parts.append(str(message))
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(" ".join(parts) + "\n")
+    except Exception:
+        pass
 
 
 def detect_terminal_info():
@@ -64,12 +109,13 @@ def detect_terminal_info():
 
 
 def main():
+    source = sys.argv[1] if len(sys.argv) > 1 else "unknown"
     try:
         input_data = json.load(sys.stdin)
-    except Exception:
+    except Exception as e:
+        hook_log("ERROR", f"stdin parse failed: {e.__class__.__name__}: {e}", source=source)
         sys.exit(0)
 
-    source = sys.argv[1] if len(sys.argv) > 1 else "unknown"
     terminal_pid, pid_chain = detect_terminal_info()
 
     if source == "trae-cli":
@@ -123,6 +169,8 @@ def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
     event_body = input_data.get(event_type, {})
 
     if event_type not in TRAE_EVENT_MAP:
+        hook_log("DEBUG", "trae legacy skip: unknown event_type",
+                 source=source, event=event_type)
         sys.exit(0)
 
     mapped_event, mapped_status = TRAE_EVENT_MAP[event_type]
@@ -167,14 +215,18 @@ def handle_trae_cli(input_data, source, terminal_pid, pid_chain):
         pass
 
     # Trae CLI 不读 hook stdout，所有事件均为 fire-and-forget
+    t0 = time.time()
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(2)
         sock.connect(SOCKET_PATH)
         sock.sendall(json.dumps(output).encode())
         sock.close()
-    except Exception:
-        pass
+        hook_log("INFO", "sent", source=source, event=mapped_event, sid=session_id,
+                 tool=output["tool"], legacy=1, dur_ms=int((time.time() - t0) * 1000))
+    except Exception as e:
+        hook_log("ERROR", f"socket error: {e.__class__.__name__}: {e}",
+                 source=source, event=mapped_event, sid=session_id, legacy=1)
 
 
 def handle_trae_standard(input_data, source, terminal_pid, pid_chain):
@@ -213,14 +265,18 @@ def handle_trae_standard(input_data, source, terminal_pid, pid_chain):
         pass
 
     # 非阻塞：fire-and-forget
+    t0 = time.time()
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(2)
         sock.connect(SOCKET_PATH)
         sock.sendall(json.dumps(output).encode())
         sock.close()
-    except Exception:
-        pass
+        hook_log("INFO", "sent", source=source, event=hook_event, sid=session_id,
+                 tool=output["tool"], dur_ms=int((time.time() - t0) * 1000))
+    except Exception as e:
+        hook_log("ERROR", f"socket error: {e.__class__.__name__}: {e}",
+                 source=source, event=hook_event, sid=session_id)
 
 
 # ============================================================
@@ -259,6 +315,7 @@ def normalize_gemini_cli(input_data):
     raw_event = input_data.get("hook_event_name", "")
     mapped = GEMINI_EVENT_MAP.get(raw_event)
     if not mapped:
+        hook_log("DEBUG", "gemini skip: unknown event", source="gemini-cli", event=raw_event)
         sys.exit(0)
     input_data["hook_event_name"] = mapped
     raw_tool = input_data.get("tool_name", "")
@@ -334,21 +391,27 @@ def extract_token_usage(transcript_path):
 
 
 def handle_standard(input_data, source, terminal_pid, pid_chain):
+    t0 = time.time()
     hook_event = input_data.get("hook_event_name", "")
-    if not input_data.get("session_id", ""):
+    session_id = input_data.get("session_id", "")
+    tool_name = input_data.get("tool_name", "")
+
+    if not session_id:
+        hook_log("DEBUG", "skip: no session_id", source=source, event=hook_event)
         sys.exit(0)  # 无 session_id 无法处理
     if hook_event not in STATUS_MAP:
+        hook_log("DEBUG", "skip: unknown event", source=source, event=hook_event, sid=session_id)
         sys.exit(0)
 
     # permission_mode：bypassPermissions = --dangerously-skip-permissions
     permission_mode = input_data.get("permission_mode", "default")
 
     output = {
-        "session_id": input_data.get("session_id", ""),
+        "session_id": session_id,
         "cwd": input_data.get("cwd", ""),
         "event": hook_event,
         "status": STATUS_MAP.get(hook_event, "unknown"),
-        "tool": input_data.get("tool_name", ""),
+        "tool": tool_name,
         "tool_input": input_data.get("tool_input", {}),
         "source": source,
         "permission_mode": permission_mode,
@@ -386,7 +449,6 @@ def handle_standard(input_data, source, terminal_pid, pid_chain):
         pass
 
     # 审批判定：仅 PermissionRequest 阻塞（PreToolUse 对所有工具都触发，不应阻塞）
-    tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
     bypass = (permission_mode == "bypassPermissions")
     approval_enabled = read_prefs_approval_enabled()
@@ -400,8 +462,10 @@ def handle_standard(input_data, source, terminal_pid, pid_chain):
                    and not bypass)
     needs_blocking = needs_approval or is_ask_user
 
+    request_id = None
     if needs_blocking:
-        output["request_id"] = str(uuid.uuid4())
+        request_id = str(uuid.uuid4())
+        output["request_id"] = request_id
 
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -410,14 +474,29 @@ def handle_standard(input_data, source, terminal_pid, pid_chain):
         sock.sendall(json.dumps(output).encode())
 
         if needs_blocking:
-            handle_blocking_response(sock, tool_input, is_ask_user)
+            hook_log("INFO", "blocking — waiting for decision",
+                     source=source, event=hook_event, sid=session_id, req=request_id,
+                     tool=tool_name, ask=(1 if is_ask_user else 0))
+            handle_blocking_response(sock, tool_input, is_ask_user, source, session_id, request_id)
+            hook_log("INFO", "decision complete",
+                     source=source, event=hook_event, sid=session_id, req=request_id,
+                     dur_ms=int((time.time() - t0) * 1000))
+        else:
+            hook_log("INFO", "sent",
+                     source=source, event=hook_event, sid=session_id, tool=tool_name,
+                     dur_ms=int((time.time() - t0) * 1000))
         sock.close()
-    except Exception:
+    except Exception as e:
+        hook_log("ERROR", f"socket error: {e.__class__.__name__}: {e}",
+                 source=source, event=hook_event, sid=session_id, req=request_id,
+                 dur_ms=int((time.time() - t0) * 1000))
         if needs_blocking:
             emit_fallback_allow()
+            hook_log("WARN", "emitted fallback allow (socket failed)",
+                     source=source, sid=session_id, req=request_id)
 
 
-def handle_blocking_response(sock, tool_input, is_ask_user):
+def handle_blocking_response(sock, tool_input, is_ask_user, source=None, session_id=None, request_id=None):
     """阻塞等待 app 回写审批决定，打印到 stdout 供 CLI 解析"""
     sock.settimeout(3600)
     response_data = b""
@@ -425,7 +504,10 @@ def handle_blocking_response(sock, tool_input, is_ask_user):
         try:
             chunk = sock.recv(4096)
             if not chunk:
-                break
+                hook_log("WARN", "app closed fd before responding — fallback allow",
+                         source=source, sid=session_id, req=request_id)
+                emit_fallback_allow()
+                return
             response_data += chunk
             try:
                 result = json.loads(response_data.decode())
@@ -443,6 +525,9 @@ def handle_blocking_response(sock, tool_input, is_ask_user):
                         "updatedInput": updated_input,
                     },
                 }}))
+                hook_log("INFO", "ask-user answered",
+                         source=source, sid=session_id, req=request_id,
+                         answers=json.dumps(answers)[:100])
             else:
                 decision = result.get("decision", "allow")
                 decision_obj = {"behavior": decision}
@@ -466,10 +551,16 @@ def handle_blocking_response(sock, tool_input, is_ask_user):
                     "hookEventName": "PermissionRequest",
                     "decision": decision_obj,
                 }}))
-            break
+                hook_log("INFO", f"decision={decision}",
+                         source=source, sid=session_id, req=request_id,
+                         allow_tool=allow_tool or "",
+                         bypass=(1 if result.get("bypass") else 0))
+            return
         except socket.timeout:
+            hook_log("ERROR", "recv timeout — fallback allow",
+                     source=source, sid=session_id, req=request_id)
             emit_fallback_allow()
-            break
+            return
 
 
 def emit_fallback_allow():

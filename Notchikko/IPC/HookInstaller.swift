@@ -7,7 +7,9 @@ struct CLIHookConfig {
     let icon: String            // emoji
     let settingsPath: String    // 配置文件路径 (~ 会被展开)
     let hookEvents: [String]    // 需要注册的事件
+    let matcher: String         // JSON 写入时的 matcher 值：Claude Code 用 glob "*"；Codex 用正则 ".*"
     let configFormat: ConfigFormat // 配置文件格式
+    let hidden: Bool            // true = 不在 Settings / Onboarding / 批量更新里曝光（保留元数据用）
 
     enum ConfigFormat {
         case json   // Claude Code, Codex
@@ -15,13 +17,16 @@ struct CLIHookConfig {
     }
 
     init(name: String, displayName: String, icon: String, settingsPath: String,
-         hookEvents: [String], configFormat: ConfigFormat = .json) {
+         hookEvents: [String], matcher: String = "*", configFormat: ConfigFormat = .json,
+         hidden: Bool = false) {
         self.name = name
         self.displayName = displayName
         self.icon = icon
         self.settingsPath = settingsPath
         self.hookEvents = hookEvents
+        self.matcher = matcher
         self.configFormat = configFormat
+        self.hidden = hidden
     }
 
     /// 通过 source 名查找 Agent 元数据（icon + displayName）
@@ -58,10 +63,12 @@ final class HookInstaller {
             icon: "📦",
             settingsPath: "~/.codex/hooks.json",
             hookEvents: [
-                "UserPromptSubmit", "SessionStart", "SessionEnd",
+                "UserPromptSubmit", "SessionStart",
                 "PreToolUse", "PostToolUse",
                 "Stop",
-            ]
+            ],
+            // Codex matcher 是正则，glob "*" 不是合法量词；用 ".*" 做"匹配任意工具"
+            matcher: ".*"
         ),
         CLIHookConfig(
             name: "gemini-cli",
@@ -72,7 +79,9 @@ final class HookInstaller {
                 "SessionStart", "SessionEnd",
                 "BeforeAgent", "BeforeTool", "AfterTool", "AfterAgent",
                 "Notification", "PreCompress",
-            ]
+            ],
+            // 暂未完成端到端验证——先从 UI / Onboarding / 批量更新里隐藏，代码保留以便后续放出
+            hidden: true
         ),
         CLIHookConfig(
             name: "trae-cli",
@@ -159,8 +168,14 @@ final class HookInstaller {
 
     /// 批量重装所有当前已安装的 CLI hooks（Settings 的 "Update All" 按钮用）
     func reinstallAllOutdatedHooks() {
-        for cli in Self.supportedCLIs where isInstalled(for: cli) {
-            try? install(for: cli)
+        for cli in Self.supportedCLIs where !cli.hidden && isInstalled(for: cli) {
+            do {
+                try install(for: cli)
+                Log("Reinstalled hook for \(cli.displayName)", tag: "HookInstaller")
+            } catch {
+                Log("Failed to reinstall hook for \(cli.displayName): \(error)",
+                    tag: "HookInstaller", level: .error)
+            }
         }
     }
 
@@ -224,8 +239,9 @@ final class HookInstaller {
         var hooks = json["hooks"] as? [String: Any] ?? [:]
 
         // Claude Code 嵌套格式: { "matcher": "*", "hooks": [{ "type": "command", "command": "...", "timeout": N }] }
+        // Claude Code 的 matcher 是 glob（"*"），Codex 是正则（".*"）——由 cli.matcher 决定
         let defaultHookEntry: [String: Any] = [
-            "matcher": "*",
+            "matcher": cli.matcher,
             "hooks": [
                 [
                     "type": "command",
@@ -236,7 +252,7 @@ final class HookInstaller {
 
         // PermissionRequest 需要长超时（阻塞等用户操作）
         let permissionHookEntry: [String: Any] = [
-            "matcher": "*",
+            "matcher": cli.matcher,
             "hooks": [
                 [
                     "type": "command",

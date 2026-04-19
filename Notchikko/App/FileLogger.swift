@@ -1,6 +1,18 @@
 import Foundation
 
+/// 日志等级（grep 友好的大写枚举值）
+enum LogLevel: String {
+    case error = "ERROR"
+    case warn  = "WARN"
+    case info  = "INFO"
+    case debug = "DEBUG"
+}
+
 /// 文件日志系统：写入 ~/Library/Logs/Notchikko/notchikko-YYYY-MM-DD.log，保留 3 天
+///
+/// 行格式：`YYYY-MM-DD HH:mm:ss.SSS LEVEL [Tag] sid=xxxxxxxx req=xxxxxxxx message`
+/// - 等级 LEVEL 便于 `grep ERROR` 一键筛查
+/// - sid / req 为 session_id / request_id 的前 8 位；hook 侧日志也用同样格式，方便跨端 grep
 final class FileLogger {
     static let shared = FileLogger()
 
@@ -21,7 +33,7 @@ final class FileLogger {
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
         timestampFormatter = DateFormatter()
-        timestampFormatter.dateFormat = "HH:mm:ss.SSS"
+        timestampFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
 
         purgeOldLogs()
     }
@@ -32,20 +44,35 @@ final class FileLogger {
 
     // MARK: - Public
 
-    func log(_ message: String, tag: String = "", file: String = #file, line: Int = #line) {
+    func log(_ message: String,
+             tag: String = "",
+             level: LogLevel = .info,
+             sid: String? = nil,
+             req: String? = nil,
+             file: String = #file,
+             line: Int = #line) {
         let timestamp = timestampFormatter.string(from: Date())
         let fileName = (file as NSString).lastPathComponent.replacingOccurrences(of: ".swift", with: "")
-        let prefix = tag.isEmpty ? "[\(fileName):\(line)]" : "[\(tag)]"
-        let entry = "\(timestamp) \(prefix) \(message)\n"
+        let tagStr = tag.isEmpty ? "\(fileName):\(line)" : tag
+
+        var entry = "\(timestamp) \(level.rawValue) [\(tagStr)]"
+        if let sid, !sid.isEmpty { entry += " sid=\(Self.shortId(sid))" }
+        if let req, !req.isEmpty { entry += " req=\(Self.shortId(req))" }
+        entry += " \(message)\n"
 
         queue.async { [weak self] in
             self?.write(entry)
         }
 
         #if DEBUG
-        // Debug 模式同时输出到 stdout
         print(entry, terminator: "")
         #endif
+    }
+
+    /// 从 UUID/session_id 里取前 8 位用于日志显示（与 hook 侧一致）
+    static func shortId(_ id: String) -> String {
+        let head = id.split(separator: "-").first.map(String.init) ?? id
+        return String(head.prefix(8))
     }
 
     /// 返回日志目录路径（Settings 里展示用）
@@ -109,7 +136,14 @@ final class FileLogger {
 
 // MARK: - 便捷全局函数
 
-/// 全局日志函数：`Log("message", tag: "Module")`
-func Log(_ message: String, tag: String = "", file: String = #file, line: Int = #line) {
-    FileLogger.shared.log(message, tag: tag, file: file, line: line)
+/// 全局日志函数：`Log("message", tag: "Module", level: .error, sid: sid, req: req)`
+/// 旧的 `Log("msg", tag: "X")` 调用自动走 `.info`，向后兼容。
+func Log(_ message: String,
+         tag: String = "",
+         level: LogLevel = .info,
+         sid: String? = nil,
+         req: String? = nil,
+         file: String = #file,
+         line: Int = #line) {
+    FileLogger.shared.log(message, tag: tag, level: level, sid: sid, req: req, file: file, line: line)
 }

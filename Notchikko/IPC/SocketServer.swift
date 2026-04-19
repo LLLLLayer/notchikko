@@ -79,6 +79,7 @@ final class SocketServer {
         pendingLock.lock()
         guard let fd = pendingResponses.removeValue(forKey: requestId) else {
             pendingLock.unlock()
+            Log("respond: no pending fd (already closed?)", tag: "Socket", level: .warn, req: requestId)
             return
         }
         pendingMonitors.removeValue(forKey: requestId)?.cancel()
@@ -93,7 +94,8 @@ final class SocketServer {
                 guard let base = ptr.baseAddress else { ok = false; return }
                 let written = write(fd, base, dataCopy.count)
                 if written != dataCopy.count {
-                    Log("Socket write failed: \(written)/\(dataCopy.count), errno=\(errno)", tag: "Socket")
+                    Log("write failed: \(written)/\(dataCopy.count) errno=\(errno)",
+                        tag: "Socket", level: .error, req: requestId)
                     ok = false
                 }
             }
@@ -155,10 +157,13 @@ final class SocketServer {
         chmod(Self.socketPath, 0o600)
 
         guard listen(serverSocket, 10) == 0 else {
+            Log("listen() failed: errno=\(errno)", tag: "Socket", level: .error)
             close(serverSocket)
             serverSocket = -1
             return
         }
+
+        Log("Listening on \(Self.socketPath)", tag: "Socket")
 
         acceptSource = DispatchSource.makeReadSource(fileDescriptor: serverSocket, queue: serverQueue)
         acceptSource?.setEventHandler { [weak self] in
@@ -171,7 +176,9 @@ final class SocketServer {
         while true {
             let clientSocket = accept(serverSocket, nil, nil)
             guard clientSocket >= 0 else {
-                if errno == EAGAIN || errno == EWOULDBLOCK { return }
+                let err = errno
+                if err == EAGAIN || err == EWOULDBLOCK { return }
+                Log("accept() failed: errno=\(err)", tag: "Socket", level: .error)
                 return
             }
 
@@ -199,11 +206,14 @@ final class SocketServer {
         }
 
         guard !data.isEmpty else {
+            Log("Empty hook payload — closing fd", tag: "Socket", level: .warn)
             close(clientSocket)
             return
         }
 
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: data) else {
+            let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
+            Log("JSON decode failed (\(data.count)B): \(preview)", tag: "Socket", level: .error)
             close(clientSocket)
             return
         }

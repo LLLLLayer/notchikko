@@ -272,12 +272,11 @@ final class SessionManager {
             // 正常停止 = 任务完成，清掉错误标记
             sessionsWithUnresolvedError.remove(sid)
             Log("Stop: sid=\(sid.prefix(8)), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
-            if sid == activeSessionId {
-                resetTimers()
-                transition(to: .happy)
-                // 庆祝完后，如果绑定了这个 session 且有其他活跃 session，自动切换
-                scheduleAutoSwitch(from: sid, delay: 3.0)
-            }
+            // 任何 session 的 Stop 都强制庆祝 3s——即使它当前不是 activeSessionId（后台 session 完成时也要被看到）。
+            // scheduleAutoSwitch 在 3s 后会自动切回当前真正在忙的 session，所以前台工作不会被永久打断。
+            resetTimers()
+            transition(to: .happy)
+            scheduleAutoSwitch(from: sid, delay: 3.0)
 
         case .error(let sid, _):
             sessions[sid]?.lastEvent = Date()
@@ -331,22 +330,11 @@ final class SessionManager {
                 transition(to: .sleeping)
             }
 
-        case .notification(_, let msg, let detail):
-            // 阻塞式 PermissionRequest 走 onApprovalRequest 直通，这里只处理信息性通知。
-            // PermissionRequest 升格为 .permissionRequest case，不再用字符串判等识别。
-            //
-            // Notification 对待：CLI 顶层 message 字段带文本时视为"agent 要 attention"。
-            // Gemini CLI 这是唯一的 attention channel；Claude Code 也会在终端审批 fallback /
-            // 等待用户输入时发。空 message 的 Notification 是心跳类噪音，忽略。
-            let needsUserAction: Bool = {
-                switch msg {
-                case "Elicitation", "AskUserQuestion": return true
-                case "Notification": return !detail.isEmpty
-                default: return false
-                }
-            }()
-            guard needsUserAction else { break }
-            triggerApprovingState(forSession: event.sessionId)
+        case .notification:
+            // 信息性通知（Notification / Elicitation / 非阻塞 AskUserQuestion）不触发任何视觉/音效——
+            // "只在需要用户授权时才提示"。真正的授权仍走 onApprovalRequest 直通路径（blocking
+            // PermissionRequest），由 AppDelegate 调用 overrideState(.approving) 切换 Clawd 状态。
+            break
 
         case .permissionRequest(let sid, _, _):
             // 非阻塞 PermissionRequest（hook 没生成 request_id）：approvalCard 关或 bypass 已让 hook 直通放行
@@ -409,19 +397,37 @@ final class SessionManager {
     /// 撸 Notchikko 期间锁定 petting 状态，阻止其他事件切走动画。优先级低于 dragging/approving
     private(set) var isPetting = false
 
+    /// 松手飞回动画期间的"视觉层目标状态"：只给 NotchContentView 用于挑 SVG。
+    /// - 松手瞬间由 `previewEndDrag()` 赋值为即将恢复到的状态（idle/thinking/…）
+    /// - 动画完成的 `endDrag()` 里清空
+    /// 这样飞回的 350ms 里 SVG 就已经是新的形象，而 currentState / isDragging 不变，
+    /// 状态机和 notch 屏帧约束都不会被提前触发。
+    private(set) var dragEndPreviewState: NotchikkoState?
+
     /// 进入拖拽状态：冻结定时器和状态变更（优先级最高，petting 被打断）
     func beginDrag() {
         if isPetting { isPetting = false }
         isDragging = true
+        dragEndPreviewState = nil
         idleTimer?.cancel()
         sleepTimer?.cancel()
         returnTimer?.cancel()
         currentState = .dragging
     }
 
+    /// 松手瞬间调用：把"拖拽结束后应该恢复到的状态"算出来写进 `dragEndPreviewState`，
+    /// 让 NotchContentView 立刻换 SVG。currentState / isDragging 不动，避免 endDrag 过早
+    /// 跑导致状态机变更 + notch 屏帧约束造成 panel 跳动（CLAUDE.md 明确警示）。
+    /// 飞回动画完成后仍由 `endDrag()` 做真正的状态机恢复。
+    func previewEndDrag() {
+        guard isDragging else { return }
+        dragEndPreviewState = computeRestoreState()
+    }
+
     /// 结束拖拽状态：解冻并恢复到当前 session 的实际状态
     func endDrag() {
         isDragging = false
+        dragEndPreviewState = nil
         restoreActiveState()
     }
 
@@ -520,12 +526,18 @@ final class SessionManager {
             // 审批期间不重启 idle/sleep timer——approving 是用户输入等待态，由审批链路掌控
             return
         }
-        if let sid = activeSessionId, let session = sessions[sid] {
-            currentState = stateForPhase(session.phase)
-        } else {
-            currentState = fallback
-        }
+        currentState = computeRestoreState(fallback: fallback)
         resetTimers()
+    }
+
+    /// 不改任何状态，只算出"此刻如果 restoreActiveState 跑会切到哪个状态"。
+    /// 供 previewEndDrag 提前挑 SVG 用（避免重复逻辑）。
+    private func computeRestoreState(fallback: NotchikkoState = .idle) -> NotchikkoState {
+        if isApproving { return .approving }
+        if let sid = activeSessionId, let session = sessions[sid] {
+            return stateForPhase(session.phase)
+        }
+        return fallback
     }
 
     /// 缓存 session 匹配到的终端信息

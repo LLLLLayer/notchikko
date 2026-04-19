@@ -9,3 +9,7 @@ DerivedData/
 # Release artifacts
 build/
 ExportOptions.plist
+
+# Python
+__pycache__/
+*.pyc

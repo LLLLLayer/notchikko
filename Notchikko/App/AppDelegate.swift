@@ -224,14 +224,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let isSameScreen = (landingScreen == self.currentScreen)
 
             if isSameScreen {
-                // 同屏：先飞回原位，动画完成后再解冻状态
-                // 避免 endDrag 触发的状态变化在动画期间干扰 panel frame
+                // 同屏：
+                //   1) 松手瞬间就把 SVG 切到目标状态（只改 dragEndPreviewState，不动状态机）
+                //   2) 飞回动画 350ms
+                //   3) 动画完成回调里才跑 endDrag（状态机 + 定时器恢复）
+                // 两步分开，避免状态机变更在动画期间触发 notch 屏帧约束导致 panel 跳动。
+                self.sessionManager.previewEndDrag()
                 guard let geo = self.geometry else { return }
                 self.dragController.animateToFrame(geo.panelFrame) {
                     self.sessionManager.endDrag()
                 }
             } else {
-                // 跨屏：解冻状态，重建到目标屏幕
+                // 跨屏：无飞回动画，直接解冻状态并重建到目标屏幕
                 self.sessionManager.endDrag()
                 self.setupNotchWindow(on: landingScreen)
             }
@@ -450,67 +454,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             approvalManager?.cleanupSession(endSid)
         }
 
-        // Elicitation / AskUserQuestion → 弹信息性通知卡片
-        // PermissionRequest 升格为独立 case：阻塞式走 onApprovalRequest 直通，非阻塞已被 hook 放行无需弹卡
-        if case .notification(let sid, let msg, let detail) = event {
-            showNotificationCardIfNeeded(sessionId: sid, message: msg, detail: detail)
-        }
-    }
-
-    /// 决定是否为 .notification 事件弹出非阻塞通知卡片。
-    /// 规则：
-    /// 1. session 已结束 → 不弹
-    /// 2. Elicitation / AskUserQuestion：prevState 为 happy/sleeping 时抑制（任务刚完 / Notchikko 在睡，
-    ///    很可能是尾声噪音）；否则弹。不受 approvalCardEnabled 影响。
-    /// 3. Notification（CLI 顶层 message 字段非空）：不作 prevState 抑制——Gemini 唯一 attention
-    ///    channel、Claude Code 终端审批 fallback 都走这条；空 message 的 Notification 在 Adapter
-    ///    已经把 detail 留空，这里直接过滤掉（纯心跳类，不弹）。
-    private func showNotificationCardIfNeeded(sessionId sid: String, message msg: String, detail: String) {
-        let session = sessionManager.sessions[sid]
-        let prevState = sessionManager.previousState
-
-        let needsCard: Bool = {
-            if session == nil || session?.phase == .ended { return false }
-            switch msg {
-            case "Elicitation", "AskUserQuestion":
-                if prevState == .happy || prevState == .sleeping { return false }
-                return true
-            case "Notification":
-                // Trae CLI 在 Stop 后会多发一个 "Agent finished..." 的 notification，
-                // 内容与 .happy 庆祝完全重复，正在庆祝时抑制掉。
-                if prevState == .happy { return false }
-                return !detail.isEmpty
-            default:
-                return false
-            }
-        }()
-        guard needsCard else { return }
-
-        let notifId = UUID().uuidString
-        let request = ApprovalManager.ApprovalRequest(
-            id: notifId,
-            requestId: "",
-            source: session?.source ?? "unknown",
-            tool: msg,
-            input: detail,
-            sessionId: sid,
-            cwdName: session?.cwdName ?? "",
-            terminalName: session?.matchedTerminal?.appName ?? "",
-            timestamp: Date()
-        )
-        approvalManager?.addNotification(request)
-
-        // AskUserQuestion 消抖：PreToolUse 先到，PermissionRequest ~0.5s 后到
-        // 延迟 1s 出卡片，如果期间 PermissionRequest 到达并替换了通知卡，panel 就不弹了
-        if msg == "AskUserQuestion" {
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1))
-                guard self.approvalManager?.pendingApprovals[notifId] != nil else { return }
-                self.approvalPanelCoordinator?.show(request: request)
-            }
-        } else {
-            approvalPanelCoordinator?.show(request: request)
-        }
+        // 信息性通知（Notification / Elicitation / 非阻塞 AskUserQuestion）不再弹卡——
+        // 只有走 onApprovalRequest 直通路径的 blocking PermissionRequest 才出卡片。
     }
 
     private func observeScreenChanges() {

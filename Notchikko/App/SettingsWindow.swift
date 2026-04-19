@@ -331,7 +331,7 @@ struct IntegrationSettingsView: View {
                 // CLI Hooks
                 GroupBox("CLI Hooks") {
                     VStack(spacing: 12) {
-                        ForEach(HookInstaller.supportedCLIs, id: \.name) { cli in
+                        ForEach(HookInstaller.supportedCLIs.filter { !$0.hidden }, id: \.name) { cli in
                             CLIRow(
                                 cli: cli,
                                 isInstalled: hookStatuses[cli.name] ?? false,
@@ -420,98 +420,88 @@ struct IntegrationSettingsView: View {
 // MARK: - 快捷键
 
 struct ShortcutsSettingsView: View {
+    private let controlWidth: CGFloat = 220
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text(String(localized: "settings.shortcuts"))
                     .font(.title2.bold())
 
-                GroupBox(String(localized: "settings.shortcuts.group_approval")) {
-                    VStack(spacing: 0) {
-                        ShortcutRow(
-                            keys: ["⌘", "Y"],
-                            label: String(localized: "approval.allow_once")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: ["⌘", "⇧", "Y"],
-                            label: String(localized: "approval.always_allow")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: ["⌘", "N"],
-                            label: String(localized: "approval.deny")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: ["⌘", "⇧", "N"],
-                            label: String(localized: "approval.auto_approve")
-                        )
-                    }
-                    .padding(.vertical, 4)
+                // ——— 审批快捷键 ———
+                sectionHeader(String(localized: "settings.shortcuts.group_approval"))
+                VStack(spacing: 12) {
+                    shortcutRow(String(localized: "approval.allow_once"),
+                                keys: ["⌘", "Y"])
+                    Divider()
+                    shortcutRow(String(localized: "approval.always_allow"),
+                                keys: ["⌘", "⇧", "Y"])
+                    Divider()
+                    shortcutRow(String(localized: "approval.deny"),
+                                keys: ["⌘", "N"])
+                    Divider()
+                    shortcutRow(String(localized: "approval.auto_approve"),
+                                keys: ["⌘", "⇧", "N"])
                 }
+                .padding(4)
+
                 Text(String(localized: "settings.shortcuts.approval_hint"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                GroupBox(String(localized: "settings.shortcuts.group_app")) {
-                    VStack(spacing: 0) {
-                        ShortcutRow(
-                            keys: ["⌘", ","],
-                            label: String(localized: "settings.shortcuts.app_open_settings")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: ["⌘", "Q"],
-                            label: String(localized: "settings.shortcuts.app_quit")
-                        )
-                    }
-                    .padding(.vertical, 4)
+                // ——— 应用 ———
+                sectionHeader(String(localized: "settings.shortcuts.group_app"))
+                VStack(spacing: 12) {
+                    shortcutRow(String(localized: "settings.shortcuts.app_open_settings"),
+                                keys: ["⌘", ","])
+                    Divider()
+                    shortcutRow(String(localized: "settings.shortcuts.app_quit"),
+                                keys: ["⌘", "Q"])
                 }
+                .padding(4)
 
-                GroupBox(String(localized: "settings.shortcuts.group_pet")) {
-                    VStack(spacing: 0) {
-                        ShortcutRow(
-                            keys: [String(localized: "settings.shortcuts.mouse_click")],
-                            label: String(localized: "settings.shortcuts.pet_click")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: [String(localized: "settings.shortcuts.mouse_right_click")],
-                            label: String(localized: "settings.shortcuts.pet_right_click")
-                        )
-                        Divider()
-                        ShortcutRow(
-                            keys: [String(localized: "settings.shortcuts.mouse_drag")],
-                            label: String(localized: "settings.shortcuts.pet_drag")
-                        )
-                    }
-                    .padding(.vertical, 4)
+                // ——— 桌宠 ———
+                sectionHeader(String(localized: "settings.shortcuts.group_pet"))
+                VStack(spacing: 12) {
+                    shortcutRow(
+                        String(localized: "settings.shortcuts.pet_click"),
+                        keys: [String(localized: "settings.shortcuts.mouse_click")]
+                    )
+                    Divider()
+                    shortcutRow(
+                        String(localized: "settings.shortcuts.pet_right_click"),
+                        keys: [String(localized: "settings.shortcuts.mouse_right_click")]
+                    )
+                    Divider()
+                    shortcutRow(
+                        String(localized: "settings.shortcuts.pet_drag"),
+                        keys: [String(localized: "settings.shortcuts.mouse_drag")]
+                    )
                 }
+                .padding(4)
 
                 Spacer(minLength: 0)
             }
         }
     }
-}
 
-private struct ShortcutRow: View {
-    let keys: [String]
-    let label: String
+    private func sectionHeader(_ label: String) -> some View {
+        Text(label)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
 
-    var body: some View {
+    private func shortcutRow(_ label: String, keys: [String]) -> some View {
         HStack {
             Text(label)
-                .font(.body)
             Spacer()
             HStack(spacing: 4) {
                 ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                     KeyCap(text: key)
                 }
             }
+            .frame(width: controlWidth, alignment: .trailing)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
     }
 }
 

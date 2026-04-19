@@ -18,12 +18,41 @@ No tests or linting configured. SourceKit frequently reports false-positive "Can
 
 ### Debugging
 
-- App logs: `~/Library/Logs/Notchikko/notchikko-YYYY-MM-DD.log` (3-day retention, synchronized to disk on `applicationWillTerminate`)
+- App logs: `~/Library/Logs/Notchikko/notchikko-YYYY-MM-DD.log` (3-day retention, flushed on `applicationWillTerminate`)
+- Hook logs: `~/Library/Logs/Notchikko/hook-YYYY-MM-DD.log` (same dir → purged by the same retention sweep)
 - Unix socket: `/tmp/notchikko.sock`
 - Hook script (installed, two files): `~/.notchikko/hooks/notchikko-hook.sh` (thin wrapper) + `~/.notchikko/hooks/notchikko-hook.py` (Python impl)
 - Hook source (in-repo): `Notchikko/Resources/notchikko-hook.{sh,py}`
 - Test hook manually: `echo '{"session_id":"test","hook_event_name":"SessionStart","cwd":"/tmp"}' | ~/.notchikko/hooks/notchikko-hook.sh claude-code`
 - Test Python directly (bypass the wrapper): `… | /usr/bin/python3 ~/.notchikko/hooks/notchikko-hook.py claude-code`
+
+#### Log format (app + hook share the same schema)
+
+```
+YYYY-MM-DD HH:mm:ss.SSS LEVEL [Tag] sid=xxxxxxxx req=xxxxxxxx k=v ... message
+```
+
+- **LEVEL** — `ERROR` / `WARN` / `INFO` / `DEBUG`. `grep ERROR` surfaces every failure.
+- **[Tag]** — module name (`Socket`, `Session`, `Approval`, `Hook`, …) or `File:line`.
+- **sid / req** — first 8 chars of `session_id` / `request_id`. Hook and app use the **same** truncation, so you can trace one session or one approval across both ends with a single grep.
+
+Recipes:
+
+```bash
+# All errors today
+grep ERROR ~/Library/Logs/Notchikko/*.log
+
+# One session's full lifecycle (app + hook)
+grep 'sid=abc12345' ~/Library/Logs/Notchikko/*.log
+
+# One approval round-trip (hook → app → back)
+grep 'req=def67890' ~/Library/Logs/Notchikko/*.log
+
+# Hook-only view (what the CLI sent us)
+tail -f ~/Library/Logs/Notchikko/hook-*.log
+```
+
+When reporting an issue, ask the user for the sid or paste the last ~50 lines of today's log — it's usually enough to localize the problem without additional context.
 
 ## Architecture
 
@@ -53,7 +82,7 @@ CLI hook → notchikko-hook.sh → Unix socket → ClaudeCodeAdapter → Session
 
 - **Notchikko (core)** — `NotchikkoState` enum defines 12 states with revealAmount and soundKey (including `.petting`, inserted between `.approving` and the working states in priority). `NotchikkoView` wraps WKWebView, loads SVG via `loadSVG(for: NotchikkoState)`. SVG files > 1MB are rejected (custom theme guard). SVG transitions use JS-injected crossfade (0.3s opacity transition) — first load uses full HTML, subsequent loads inject via `evaluateJavaScript` with error logging. Rapid state changes clean up all prior layers before adding new one (prevents DOM accumulation).
 
-- **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `NotchGeometry` accepts `NotchDetectionMode` (auto/forceOn/forceOff) — on non-notch screens with forceOn, simulates notch by placing panel top at `screenFrame.maxY - notchHeight` instead of screen edge. `NotchPanel.treatAsNotched` controls `constrainFrameRect` behavior (must match `NotchGeometry.hasPhysicalNotch`). `DragController` handles drag with 5pt threshold, hit area padded +20px. Cross-screen drag rebuilds the window on the target screen; same-screen drag animates back with `disableFrameConstraint` flag to prevent notch constraint interference during animation.
+- **Window** — `NotchPanel` (borderless NSPanel) positioned via `NotchGeometry` relative to hardware notch. `NotchGeometry` accepts `NotchDetectionMode` (auto/forceOn/forceOff). **On any notch-mode screen (real or forced)** the panel top sits at `screenFrame.maxY - notchHeight` — i.e. flush with the bottom of the notch — so the whole crab hangs *below* the notch and is fully visible (no portion is hidden by the hardware cutout). `hiddenNotchHeight` is therefore 0 in notch mode and only `notchHeight` on non-notch screens (where the upper body gets clipped by the screen edge). `NotchPanel.treatAsNotched` controls `constrainFrameRect` behavior (must match `NotchGeometry.hasPhysicalNotch`). `DragController` handles drag with 5pt threshold, hit area padded +20px. Cross-screen drag rebuilds the window on the target screen; same-screen drag animates back with `disableFrameConstraint` flag to prevent notch constraint interference during animation.
 
 - **Drag State Freeze** — `SessionManager.beginDrag()` sets `isDragging` flag, cancels all timers, freezes all state changes. `endDrag()` computes correct state from active session's current phase (not a stale snapshot). `refreshNotchWindow()` is blocked during drag to prevent panel duplication. Similarly, `isApproving` locks state to `.approving` while blocking approval cards are visible; `endApproval()` restores the correct state when all cards are dismissed. `isPetting` is a third, lower-priority lock (drag > approving > petting): drag can preempt petting, approving preempts petting, but petting itself blocks `transition(to:)` just like the other two.
 
@@ -126,7 +155,7 @@ No priority-based gating — `transition(to:)` always accepts the new state (blo
 - **PreToolUse vs PermissionRequest** — PreToolUse fires for ALL tool calls (even pre-approved ones); PermissionRequest only fires when Claude Code needs user confirmation. Only block on PermissionRequest, never PreToolUse.
 - **Xcode flattens resource subdirectories** — SVGs in `Resources/themes/clawd/{state}/` end up in a flat bundle directory. ThemeProvider finds them by filename prefix (`{state}-`), not by directory.
 - **`didSet` auto-saves preferences** — never call `save()` manually on PreferencesStore bindings; double-saving causes SVG re-randomization and unnecessary window rebuilds.
-- **Drag freezes everything** — while `isDragging` is true, state transitions, timers, and window refreshes are all blocked. `endDrag()` must be called in the animation completion handler (not before), otherwise state changes during fly-back cause the panel to jump on notch screens.
+- **Drag freezes everything** — while `isDragging` is true, state transitions, timers, and window refreshes are all blocked. `endDrag()` must be called in the animation completion handler (not before), otherwise state changes during fly-back cause the panel to jump on notch screens. For the **visual** swap (SVG), call `previewEndDrag()` at mouse-up: it writes `dragEndPreviewState` which `NotchContentView` uses to pick the SVG without touching `currentState` / `isDragging`, so the 350ms fly-back already renders the post-drag SVG. `endDrag()` then clears the preview and does the real state-machine restore.
 - **`resetTimers()` must cancel all three timers** — idleTimer, sleepTimer, AND returnTimer. Missing returnTimer causes error→idle override of working state.
 - **Screen disconnect** — `refreshNotchWindow()` checks `NSScreen.screens.contains(currentScreen)` and falls back to `NSScreen.main`. Stale NSScreen references stay alive but aren't in the screens list.
 - **AppleScript injection** — tty paths and cwd are user-controlled strings embedded in AppleScript. Always use `KnownTerminal.escapeAppleScript()` when interpolating into AppleScript string literals.

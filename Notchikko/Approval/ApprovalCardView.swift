@@ -238,15 +238,10 @@ struct ApprovalCardView: View {
             HStack(spacing: 5) {
                 // Deny: 紧凑图标按钮
                 Button(action: onDeny) {
-                    VStack(spacing: 1) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("⌘N")
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .foregroundColor(.primary.opacity(0.4))
-                    }
-                    .foregroundColor(.primary.opacity(0.55))
-                    .frame(width: 30, height: 28)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.primary.opacity(0.55))
+                        .frame(width: 30, height: 28)
                 }
                 .buttonStyle(.plain)
                 .background(Color.primary.opacity(0.08))
@@ -260,7 +255,6 @@ struct ApprovalCardView: View {
                 CardButton(
                     label: String(localized: "approval.allow_once"),
                     icon: "checkmark",
-                    hotkey: "⌘Y",
                     style: .primary,
                     action: onApprove
                 )
@@ -268,7 +262,6 @@ struct ApprovalCardView: View {
                 CardButton(
                     label: String(localized: "approval.always_allow"),
                     icon: "checkmark.circle",
-                    hotkey: "⇧⌘Y",
                     style: .light,
                     action: onAlwaysAllow
                 )
@@ -276,7 +269,6 @@ struct ApprovalCardView: View {
                 CardButton(
                     label: String(localized: "approval.auto_approve"),
                     icon: "bolt.fill",
-                    hotkey: "⇧⌘N",
                     style: .amber,
                     action: onAutoApprove
                 )
@@ -403,12 +395,11 @@ private struct ToolPill: View {
     }
 }
 
-// MARK: - 按钮（label + icon + 快捷键提示）
+// MARK: - 按钮（label + icon）
 
 private struct CardButton: View {
     let label: String
     let icon: String
-    let hotkey: String?
     let style: ButtonVariant
     let action: () -> Void
 
@@ -434,33 +425,18 @@ private struct CardButton: View {
         }
     }
 
-    private var hotkeyColor: Color {
-        switch style {
-        case .light: .primary.opacity(0.45)
-        case .primary: .white.opacity(0.7)
-        case .amber: .white.opacity(0.75)
-        }
-    }
-
     private var fontWeight: Font.Weight {
         style == .light ? .medium : .semibold
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 1) {
-                HStack(spacing: 3) {
-                    Image(systemName: icon)
-                        .font(.system(size: 9, weight: fontWeight))
-                    Text(label)
-                        .font(.system(size: 10.5, weight: fontWeight))
-                        .fixedSize()
-                }
-                if let hotkey {
-                    Text(hotkey)
-                        .font(.system(size: 8, weight: .medium, design: .monospaced))
-                        .foregroundColor(hotkeyColor)
-                }
+            HStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: fontWeight))
+                Text(label)
+                    .font(.system(size: 10.5, weight: fontWeight))
+                    .fixedSize()
             }
             .foregroundColor(fgColor)
             .padding(.horizontal, 9)
