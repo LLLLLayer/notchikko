@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyBridge: ApprovalHotkeyBridge?
     private let transcriptPoller = TranscriptPoller()
     private let processDiscovery = ProcessDiscovery()
-    private let hookOnboarding = HookOnboardingCoordinator()
+    private let hookOnboarding = HookOnboardingCoordinator.shared
 
     private var screenObserver: NSObjectProtocol?
     private var prefsObserver: NSObjectProtocol?
@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         signal(SIGPIPE, SIG_IGN)
 
         NSApplication.shared.setActivationPolicy(.accessory)
+        // 后台预热音频系统，让首次 session-start 不在主线程被 CoreAudio HAL 冷启拖住
+        SoundManager.shared.prewarm()
         setupMenuBar()
         setupNotchWindow(on: NSScreen.main)
         startAgentListening()
@@ -145,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hitTestView.translatesAutoresizingMaskIntoConstraints = false
         hitTestView.addSubview(hostingView)
 
-        // 宠物悬浮检测区域（view 本地坐标）
+        // Notchikko 悬浮检测区域（view 本地坐标）
         let padding: CGFloat = 20
         hitTestView.petLocalRect = NSRect(
             x: geo.panelFrame.width / 2 - petSize / 2 - padding,
@@ -360,7 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             approval.handleApprovalRequest(from: hookEvent, session: session, isSubagent: isSubagent)
             let requestId = hookEvent.requestId ?? ""
             // 只有真的创建了卡片（非 autoApproved session 的直通）才切换动画
-            // subagent 审批也不切宠物动画（避免跳来跳去）
+            // subagent 审批也不切 Notchikko 动画（避免跳来跳去）
             if let request = approval.pendingApprovals[requestId] {
                 if !isSubagent {
                     self.sessionManager.overrideState(.approving)
@@ -458,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 决定是否为 .notification 事件弹出非阻塞通知卡片。
     /// 规则：
     /// 1. session 已结束 → 不弹
-    /// 2. Elicitation / AskUserQuestion：prevState 为 happy/sleeping 时抑制（任务刚完 / 宠物在睡，
+    /// 2. Elicitation / AskUserQuestion：prevState 为 happy/sleeping 时抑制（任务刚完 / Notchikko 在睡，
     ///    很可能是尾声噪音）；否则弹。不受 approvalCardEnabled 影响。
     /// 3. Notification（CLI 顶层 message 字段非空）：不作 prevState 抑制——Gemini 唯一 attention
     ///    channel、Claude Code 终端审批 fallback 都走这条；空 message 的 Notification 在 Adapter

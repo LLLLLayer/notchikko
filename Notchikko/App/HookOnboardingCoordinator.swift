@@ -1,56 +1,134 @@
 import AppKit
+import SwiftUI
 
-/// 首次启动检测已安装的 CLI agent，弹窗询问是否一键安装 hooks。
-/// 只弹一次（通过 PreferencesStore.hasShownHookPrompt 记录）。
+/// 托管首次启动 / "关于"页手动触发的 CLI Hook 引导面板。
+/// 自动/手动都经过 `present()`；NSPanel 里装一个 SwiftUI 视图。
 @MainActor
 final class HookOnboardingCoordinator {
-    private let installer = HookInstaller()
+    static let shared = HookOnboardingCoordinator()
 
+    private let installer = HookInstaller()
+    private var panel: NSPanel?
+
+    private init() {}
+
+    /// 首次启动调用：仅当之前未展示过 且 检测到未安装的 CLI 时弹面板。
     func promptIfNeeded() {
         guard !PreferencesStore.shared.preferences.hasShownHookPrompt else { return }
-
-        // 检测哪些 CLI 的配置目录存在但未安装 hook
-        let uninstalledCLIs = HookInstaller.supportedCLIs.filter { cli in
-            let settingsURL = URL(fileURLWithPath: NSString(string: cli.settingsPath).expandingTildeInPath)
-            let cliExists = FileManager.default.fileExists(atPath: settingsURL.deletingLastPathComponent().path)
-            return cliExists && !installer.isInstalled(for: cli)
-        }
-
-        guard !uninstalledCLIs.isEmpty else {
+        let items = buildItems()
+        let hasPending = items.contains(where: { $0.status == .notInstalled })
+        guard hasPending else {
             PreferencesStore.shared.preferences.hasShownHookPrompt = true
             return
         }
-
-        // 延迟 1s 弹窗，等窗口就绪
-        Task {
+        Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
-            runPrompt(for: uninstalledCLIs)
+            self?.present()
         }
     }
 
-    private func runPrompt(for clis: [CLIHookConfig]) {
-        let names = clis.map { "\($0.icon) \($0.displayName)" }.joined(separator: ", ")
-        let alert = NSAlert()
-        alert.messageText = String(localized: "hook_prompt.title")
-        alert.informativeText = String(format: String(localized: "hook_prompt.message"), names)
-        alert.addButton(withTitle: String(localized: "hook_prompt.install"))
-        alert.addButton(withTitle: String(localized: "hook_prompt.later"))
-        alert.alertStyle = .informational
+    /// 从"关于"页手动打开，忽略 `hasShownHookPrompt`。
+    func presentManually() {
+        present()
+    }
 
-        NSApp.activate(ignoringOtherApps: true)
-        let response = alert.runModal()
+    // MARK: - Private
 
-        if response == .alertFirstButtonReturn {
-            for cli in clis {
-                do {
-                    try installer.install(for: cli)
-                    Log("Auto-installed hook for \(cli.displayName)", tag: "Onboarding")
-                } catch {
-                    Log("Failed to install hook for \(cli.displayName): \(error)", tag: "Onboarding")
-                }
-            }
+    private func present() {
+        // 已经打开就聚焦
+        if let existing = panel, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
 
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 480),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.titlebarAppearsTransparent = true
+        panel.titleVisibility = .hidden
+        panel.isMovableByWindowBackground = true
+        panel.isFloatingPanel = false
+        panel.level = .normal
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+
+        rebuildContent(in: panel)
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        self.panel = panel
+    }
+
+    private func rebuildContent(in panel: NSPanel) {
+        let items = buildItems()
+        let view = HookOnboardingView(
+            onClose: { [weak self] in
+                self?.dismiss()
+            },
+            onInstall: { [weak self] cli in
+                self?.install(cli: cli)
+            },
+            onInstallAll: { [weak self] in
+                self?.installAll()
+            },
+            items: items
+        )
+        panel.contentView = NSHostingView(rootView: view)
+    }
+
+    private func dismiss() {
         PreferencesStore.shared.preferences.hasShownHookPrompt = true
+        panel?.close()
+        panel = nil
+    }
+
+    private func install(cli: CLIHookConfig) {
+        do {
+            try installer.install(for: cli)
+            Log("Installed hook for \(cli.displayName)", tag: "Onboarding")
+        } catch {
+            Log("Failed to install hook for \(cli.displayName): \(error)", tag: "Onboarding")
+        }
+        refresh()
+    }
+
+    private func installAll() {
+        let items = buildItems()
+        for item in items where item.status == .notInstalled {
+            do {
+                try installer.install(for: item.cli)
+                Log("Auto-installed hook for \(item.cli.displayName)", tag: "Onboarding")
+            } catch {
+                Log("Failed to install hook for \(item.cli.displayName): \(error)", tag: "Onboarding")
+            }
+        }
+        refresh()
+    }
+
+    private func refresh() {
+        guard let panel else { return }
+        rebuildContent(in: panel)
+    }
+
+    private func buildItems() -> [HookOnboardingView.CLIItem] {
+        HookInstaller.supportedCLIs.map { cli in
+            let settingsURL = URL(fileURLWithPath: NSString(string: cli.settingsPath).expandingTildeInPath)
+            let cliExists = FileManager.default.fileExists(atPath: settingsURL.deletingLastPathComponent().path)
+            let status: HookOnboardingView.CLIItem.Status
+            if !cliExists {
+                status = .notDetected
+            } else if installer.isInstalled(for: cli) {
+                status = .installed
+            } else {
+                status = .notInstalled
+            }
+            return HookOnboardingView.CLIItem(cli: cli, status: status)
+        }
     }
 }

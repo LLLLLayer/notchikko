@@ -52,7 +52,7 @@ Both files live at `~/.notchikko/hooks/`. An app update does **not** auto-sync t
 
 ### Fail-open everywhere
 
-The hook is designed to never block the agent on Notchikko's account. Missing socket, missing Python interpreter, malformed JSON, socket timeout — every error path exits 0. For the **blocking branch specifically** (`PermissionRequest` on an approval-eligible tool while `approvalCardEnabled` is on), the hook also emits a synthetic `{"hookSpecificOutput": {"decision": {"behavior": "allow"}}}` on stdout so Claude Code doesn't fall back to its in-terminal prompt. For non-blocking events, errors simply exit 0 with no stdout — there's no decision surface to emit into. Users who quit Notchikko while hooks are still installed lose the pet, not their agent workflow.
+The hook is designed to never block the agent on Notchikko's account. Missing socket, missing Python interpreter, malformed JSON, socket timeout — every error path exits 0. For the **blocking branch specifically** (`PermissionRequest` on an approval-eligible tool while `approvalCardEnabled` is on), the hook also emits a synthetic `{"hookSpecificOutput": {"decision": {"behavior": "allow"}}}` on stdout so Claude Code doesn't fall back to its in-terminal prompt. For non-blocking events, errors simply exit 0 with no stdout — there's no decision surface to emit into. Users who quit Notchikko while hooks are still installed lose Notchikko, not their agent workflow.
 
 ### PreToolUse is NOT an approval gate
 
@@ -74,15 +74,15 @@ AgentEvent:
   .error(sessionId, message)
 ```
 
-Everything downstream (pet state machine, approval card, danmaku, session menu) consumes only this enum. Adding a new CLI is, by design, a question of "can you produce these cases from its hook output?"
+Everything downstream (Notchikko's state machine, approval card, danmaku, session menu) consumes only this enum. Adding a new CLI is, by design, a question of "can you produce these cases from its hook output?"
 
 ### Synthetic session injection
 
-Not every CLI sends a `SessionStart` as its first event for a given session — some only send it on cold boot and Notchikko might have been launched mid-session. `ClaudeCodeAdapter` tracks `knownSessions`, and on the first event for an unknown session ID it synthesizes a `.sessionStart` before forwarding the real event. This is why the pet appears correctly even if Notchikko starts after the agent.
+Not every CLI sends a `SessionStart` as its first event for a given session — some only send it on cold boot and Notchikko might have been launched mid-session. `ClaudeCodeAdapter` tracks `knownSessions`, and on the first event for an unknown session ID it synthesizes a `.sessionStart` before forwarding the real event. This is why Notchikko appears correctly even if it starts after the agent.
 
 ### Detection tiers
 
-Hooks are Tier 1. When hooks aren't installed, `TranscriptPoller` reads the agent's JSONL transcript directory (Tier 2, polling every 5s) and `ProcessDiscovery` scans `ps` for known agent binary names (Tier 3, 60s). Tiers 2 and 3 cannot observe approvals or drive the pet's live state — they exist so the menu and approval card honestly represent "I know this agent is running, I just can't interact with it." When a Tier 1 event arrives for a session previously seen via Tier 2 or 3, the lower-tier entry is dropped in favor of the hook source.
+Hooks are Tier 1. When hooks aren't installed, `TranscriptPoller` reads the agent's JSONL transcript directory (Tier 2, polling every 5s) and `ProcessDiscovery` scans `ps` for known agent binary names (Tier 3, 60s). Tiers 2 and 3 cannot observe approvals or drive Notchikko's live state — they exist so the menu and approval card honestly represent "I know this agent is running, I just can't interact with it." When a Tier 1 event arrives for a session previously seen via Tier 2 or 3, the lower-tier entry is dropped in favor of the hook source.
 
 ## When this document lies
 

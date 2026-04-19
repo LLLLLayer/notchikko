@@ -8,7 +8,7 @@ struct NotchGeometry {
     /// panel 内被刘海遮住的高度（模拟刘海时为 0，因为 panel 没有延伸到屏幕外）
     let hiddenNotchHeight: CGFloat
 
-    /// 宠物热区下方的 padding（与 DragController.petScreenRect 的 padding 保持一致）
+    /// Notchikko 热区下方的 padding（与 DragController.petScreenRect 的 padding 保持一致）
     /// panel 下方空间 = petSize + padding，刚好容纳 drag/hover 热区下边缘
     static let petAreaPadding: CGFloat = 20
 

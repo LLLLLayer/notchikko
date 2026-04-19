@@ -144,7 +144,9 @@ final class SessionManager {
     // MARK: - 绑定切换
 
     func pinSession(_ sessionId: String?) {
+        let prev = pinnedSessionId
         pinnedSessionId = sessionId
+        Log("pinSession: \(prev?.prefix(8) ?? "nil") → \(sessionId?.prefix(8) ?? "nil")", tag: "Session")
         // 发弹幕（如果切到了具体 session）
         if let sid = activeSessionId, let session = sessions[sid] {
             emitSessionDanmaku(session)
@@ -160,6 +162,10 @@ final class SessionManager {
         Log("handleEvent: \(event), active=\(activeSessionId?.prefix(8) ?? "nil"), state=\(currentState)", tag: "Session")
         let eventSessionId = event.sessionId
 
+        // ensureSession 会为未知 sid 补一个占位；sessionStart 的"升级/重入"路径需要知道这次事件之前
+        // 有没有已存在的 session，所以在 ensureSession 之前先快照
+        let wasPreExisting = sessions[eventSessionId] != nil
+
         // 收到未知 session 的事件时自动创建（应对中途安装 hook 的场景）
         ensureSession(event)
 
@@ -171,19 +177,49 @@ final class SessionManager {
 
         switch event {
         case .sessionStart(let sid, let cwd, let source, let terminalPid, let pidChain):
-            // 记住创建前是否有正在工作的 session
-            let hadWorkingSession = sessions.values.contains { $0.phase != .ended && $0.phase != .waitingForInput }
-            sessions[sid] = SessionInfo(
-                id: sid, cwd: cwd, source: source,
-                lastEvent: Date(), phase: .waitingForInput,
-                terminalPid: terminalPid, pidChain: pidChain
-            )
-            SoundManager.shared.play(for: "session-start")
-            emitSessionDanmaku(sessions[sid]!)
-            // 只在没有其他工作中 session 时切到 idle，避免打断正在工作的 session
-            if !hadWorkingSession {
-                resetTimers()
-                transition(to: .idle)
+            if wasPreExisting, let existing = sessions[sid], existing.phase != .ended {
+                // 同 sid 的升级（transcript → hook / CLI 重入）：保留 phase 与运行时积累
+                // （lastPrompt / lastToolSummary / matchedTerminal / tokenUsage / detection 等），
+                // 只刷新元信息。不播 session-start 音效、不发 Danmaku、不动 state——这不是新 session。
+                //
+                // Why: 之前无条件重建 SessionInfo 会把正在 processing / runningTool 的 session 瞬间
+                // 压回 waitingForInput，后续 restoreActiveState() 会把动画拉回 idle，造成
+                // "有思考中的 session，动画却是 idle"。
+                var merged = SessionInfo(
+                    id: sid,
+                    cwd: cwd.isEmpty ? existing.cwd : cwd,
+                    source: source,
+                    lastEvent: Date(),
+                    phase: existing.phase,
+                    terminalPid: terminalPid ?? existing.terminalPid,
+                    pidChain: pidChain ?? existing.pidChain
+                )
+                merged.lastPrompt = existing.lastPrompt
+                merged.lastToolSummary = existing.lastToolSummary
+                merged.matchedTerminal = existing.matchedTerminal
+                merged.terminalTty = existing.terminalTty
+                merged.isBypassMode = existing.isBypassMode
+                merged.tokenUsage = existing.tokenUsage
+                merged.detection = existing.detection
+                sessions[sid] = merged
+                Log("sessionStart merge: sid=\(sid.prefix(8)), kept phase=\(existing.phase)", tag: "Session")
+            } else {
+                // 真正的新 session（或之前 ended 的重启）
+                let hadWorkingSession = sessions.values.contains {
+                    $0.id != sid && $0.phase != .ended && $0.phase != .waitingForInput
+                }
+                sessions[sid] = SessionInfo(
+                    id: sid, cwd: cwd, source: source,
+                    lastEvent: Date(), phase: .waitingForInput,
+                    terminalPid: terminalPid, pidChain: pidChain
+                )
+                SoundManager.shared.play(for: "session-start")
+                emitSessionDanmaku(sessions[sid]!)
+                // 只在没有其他工作中 session 时切到 idle，避免打断正在工作的 session
+                if !hadWorkingSession {
+                    resetTimers()
+                    transition(to: .idle)
+                }
             }
 
         case .prompt(let sid, let text):
@@ -367,10 +403,10 @@ final class SessionManager {
     /// 审批期间锁定 approving 状态，阻止其他事件切走动画
     private(set) var isApproving = false
 
-    /// 撸宠物期间锁定 petting 状态，阻止其他事件切走动画。优先级低于 dragging/approving
+    /// 撸 Notchikko 期间锁定 petting 状态，阻止其他事件切走动画。优先级低于 dragging/approving
     private(set) var isPetting = false
 
-    /// 进入拖拽状态：冻结定时器和状态变更（优先级最高，撸猫被打断）
+    /// 进入拖拽状态：冻结定时器和状态变更（优先级最高，petting 被打断）
     func beginDrag() {
         if isPetting { isPetting = false }
         isDragging = true
@@ -473,7 +509,7 @@ final class SessionManager {
 
     /// 从活跃 session 的当前 phase 恢复正确状态。
     /// 审批进行中则保持 `.approving`——drag/petting/session 切换结束时审批卡还没关，
-    /// 此处不能让 pet 脱离审批锁视觉。endApproval() 调用本函数时 isApproving 已被手动置 false，
+    /// 此处不能让 Notchikko 脱离审批锁视觉。endApproval() 调用本函数时 isApproving 已被手动置 false，
     /// 所以那条路径不受影响。
     private func restoreActiveState(fallback: NotchikkoState = .idle) {
         if isApproving {

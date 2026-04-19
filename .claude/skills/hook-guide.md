@@ -142,7 +142,7 @@ ThemeProvider → NotchikkoView     ← SVG rendered in WKWebView
 - **Notchikko behavior**: Session creation/destruction, terminal PID/tty/pidChain capture
 
 ### SubagentStart / SubagentStop
-- **Notchikko behavior**: Silently dropped (return nil from `convert()`) to avoid affecting main pet state
+- **Notchikko behavior**: Silently dropped (return nil from `convert()`) to avoid affecting main Notchikko state
 
 ### Notification / Elicitation
 - **Notchikko behavior**: Maps to `.notification`. Elicitation shows notification card. Empty Notification events ignored.

@@ -4,7 +4,7 @@ final class MenuBarManager {
     private var statusItem: NSStatusItem?
     private let menu = NSMenu()
     private weak var sessionManager: SessionManager?
-    /// 当前宠物所在屏幕（由 AppDelegate 更新）
+    /// 当前 Notchikko 所在屏幕（由 AppDelegate 更新）
     var currentScreen: NSScreen?
 
     var onSwitchScreen: ((NSScreen) -> Void)?
@@ -75,10 +75,13 @@ final class MenuBarManager {
                 for session in sessions {
                     let isPinned = session.id == sm.pinnedSessionId
 
-                    // 主菜单项（自定义 view）
+                    // 主菜单项（自定义 view）—— 点击主行默认跳转到对应终端
                     let item = NSMenuItem()
                     let view = SessionMenuItemView(session: session, isPinned: isPinned)
                     item.view = view
+                    item.target = self
+                    item.action = #selector(jumpToSession(_:))
+                    item.representedObject = session.id
 
                     // 子菜单：固定 / 跳转 / 关闭
                     let sub = NSMenu()

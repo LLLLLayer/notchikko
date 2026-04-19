@@ -111,25 +111,25 @@ The Python hook (`handle_standard` path) maps `hook_event_name` → `status`:
 
 | `hook_event_name` | Notchikko `status` | Downstream effect |
 |---|---|---|
-| `SessionStart` | `waiting_for_input` | Session added, pet state = `idle` |
+| `SessionStart` | `waiting_for_input` | Session added, Notchikko state = `idle` |
 | `SessionEnd` | `ended` | Session marked ended, eventually removed |
-| `UserPromptSubmit` | `processing` | Pet → `thinking`; prompt text cached for menu |
-| `PreToolUse` | `running_tool` | Pet → `reading` / `typing` / `building` by tool class |
-| `PostToolUse` | `processing` | Pet returns to `thinking` |
-| `PostToolUseFailure` | `error` | Pet → `error`, 5s auto-return timer |
-| `PreCompact` / `PostCompact` | `compacting` / `processing` | Pet → `sweeping` and back |
+| `UserPromptSubmit` | `processing` | Notchikko → `thinking`; prompt text cached for menu |
+| `PreToolUse` | `running_tool` | Notchikko → `reading` / `typing` / `building` by tool class |
+| `PostToolUse` | `processing` | Notchikko returns to `thinking` |
+| `PostToolUseFailure` | `error` | Notchikko → `error`, 5s auto-return timer |
+| `PreCompact` / `PostCompact` | `compacting` / `processing` | Notchikko → `sweeping` and back |
 | `Stop` | `waiting_for_input` | 3s celebration (`happy`) then return |
 | `StopFailure` | `error` | Same as `PostToolUseFailure` |
-| `Notification` / `Elicitation` | `notification` / `elicitation` | Pet → `approving`, non-blocking card |
+| `Notification` / `Elicitation` | `notification` / `elicitation` | Notchikko → `approving`, non-blocking card |
 | `PermissionRequest` | `permission_request` | Blocking approval card |
 | `SubagentStart` / `SubagentStop` | (tracked, events dropped) | See below |
 | `WorktreeCreate` | `worktree_create` | Purely informational |
 
 ### SubagentStart / SubagentStop — why they're dropped
 
-Claude Code's subagents fire their own `PreToolUse` / `PostToolUse` events, which would cause the main pet to thrash while a subagent grinds. `ClaudeCodeAdapter` maintains a per-session `subagentDepth` counter; while depth > 0, tool events are suppressed. The passthrough set (`subagentPassthroughEvents` in `ClaudeCodeAdapter.swift`) is `{"Elicitation", "AskUserQuestion"}`. `Elicitation` is the one that actually fires — `AskUserQuestion` is defensive: Claude Code never delivers it as a top-level `hook_event_name` (questions arrive wrapped inside `PreToolUse` or `PermissionRequest` with `tool_name == "AskUserQuestion"`), so the passthrough entry is effectively dead code we keep in case upstream ever starts emitting it directly.
+Claude Code's subagents fire their own `PreToolUse` / `PostToolUse` events, which would cause the main Notchikko to thrash while a subagent grinds. `ClaudeCodeAdapter` maintains a per-session `subagentDepth` counter; while depth > 0, tool events are suppressed. The passthrough set (`subagentPassthroughEvents` in `ClaudeCodeAdapter.swift`) is `{"Elicitation", "AskUserQuestion"}`. `Elicitation` is the one that actually fires — `AskUserQuestion` is defensive: Claude Code never delivers it as a top-level `hook_event_name` (questions arrive wrapped inside `PreToolUse` or `PermissionRequest` with `tool_name == "AskUserQuestion"`), so the passthrough entry is effectively dead code we keep in case upstream ever starts emitting it directly.
 
-### Tool → pet-state mapping
+### Tool → Notchikko-state mapping
 
 ```
 Read, Grep, Glob         → reading
@@ -173,10 +173,10 @@ Three independent paths can leave a card visible after the approval has effectiv
 
 ## Token usage
 
-On `Stop`, the hook reads the tail ~64KB of `transcript_path` (JSONL), finds the last `type: "assistant"` entry with a `usage` object, and forwards it. Notchikko caches it per session for menu display and token totals in the pet right-click menu.
+On `Stop`, the hook reads the tail ~64KB of `transcript_path` (JSONL), finds the last `type: "assistant"` entry with a `usage` object, and forwards it. Notchikko caches it per session for menu display and token totals in Notchikko's right-click menu.
 
 ## Caveats
 
-- **Transcript-only CLIs lose PermissionRequest.** If hooks aren't installed, `TranscriptPoller` can reconstruct tool calls from JSONL but not approval prompts — because the approval never appears in the transcript. A user with no hooks gets a visible-but-passive pet.
+- **Transcript-only CLIs lose PermissionRequest.** If hooks aren't installed, `TranscriptPoller` can reconstruct tool calls from JSONL but not approval prompts — because the approval never appears in the transcript. A user with no hooks gets a visible-but-passive Notchikko.
 - **`permission_mode` is advisory.** The hook reads `permission_mode` from the incoming event to decide whether to skip blocking (bypass means no card). But Claude Code might change modes mid-session; the next `PermissionRequest` reflects the new mode.
-- **Session ID is Claude Code's notion of session.** If the user runs `/clear`, Claude Code may reuse the session; the pet stays on the same session row.
+- **Session ID is Claude Code's notion of session.** If the user runs `/clear`, Claude Code may reuse the session; Notchikko stays on the same session row.

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// 审批卡片 NSPanel 的全生命周期管理。
-/// 每个 approval request 对应一个 NSPanel，叠加显示在宠物下方，支持:
+/// 每个 approval request 对应一个 NSPanel，叠加显示在 Notchikko 下方，支持:
 /// - 入场滑入 + 淡入
 /// - hideTimer 触发的滑下隐藏 / hover 恢复
 /// - 退场滑出 + 淡出 + 层缩放
@@ -74,7 +74,7 @@ final class ApprovalPanelCoordinator {
         let fittingSize = hostingView.fittingSize
         let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
 
-        // 气泡尾巴从宠物底部探出，微量重叠确保视觉连接
+        // 气泡尾巴从 Notchikko 底部探出，微量重叠确保视觉连接
         let petSize = 80 * PreferencesStore.shared.preferences.petScale
         let stackIndex = min(CGFloat(approvalPanels.count), Self.maxStackIndex)
         let cardX = screen.frame.midX - cardWidth / 2
@@ -83,7 +83,7 @@ final class ApprovalPanelCoordinator {
         let finalY = petBottom - cardHeight + overlap - stackIndex * Self.cardStackOffset
         let finalFrame = NSRect(x: cardX, y: finalY, width: cardWidth, height: cardHeight)
 
-        // 初始位置 = 偏上方（靠近宠物），动画做滑动+淡入
+        // 初始位置 = 偏上方（靠近 Notchikko），动画做滑动+淡入
         let startY = finalY + cardHeight * 0.4
         let panel = NSPanel(
             contentRect: NSRect(x: cardX, y: startY, width: cardWidth, height: cardHeight),
@@ -93,7 +93,7 @@ final class ApprovalPanelCoordinator {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        // 层级低于宠物（mainMenu+3），卡片视觉上在宠物背后
+        // 层级低于 Notchikko（mainMenu+3），卡片视觉上在 Notchikko 背后
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
         panel.hasShadow = false
         panel.alphaValue = 0
@@ -151,7 +151,7 @@ final class ApprovalPanelCoordinator {
         }
     }
 
-    /// 鼠标悬浮在宠物上 → 恢复所有隐藏的审批卡片
+    /// 鼠标悬浮在 Notchikko 上 → 恢复所有隐藏的审批卡片
     func restoreHidden() {
         approvalManager?.restoreAllHiddenCards()
         for (reqId, finalFrame) in cardFinalFrames {

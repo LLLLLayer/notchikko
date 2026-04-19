@@ -328,8 +328,13 @@ final class HookInstaller {
 
         for event in cli.hookEvents {
             if var entries = hooks[event] as? [[String: Any]] {
+                // 安装时写的是 Claude Code 嵌套格式：顶层 entry = { matcher, hooks: [{ command: "...notchikko..." }] }
+                // notchikko 字符串在内层 hooks[].command 里，顶层没有 "command" 字段。
+                // 和 isInstalled 对齐：把整条 entry 序列化后搜子串，匹配任意嵌套深度。
                 entries.removeAll { entry in
-                    (entry["command"] as? String)?.contains("notchikko") == true
+                    let jsonStr = (try? JSONSerialization.data(withJSONObject: entry))
+                        .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    return jsonStr.contains("notchikko")
                 }
                 if entries.isEmpty {
                     hooks.removeValue(forKey: event)

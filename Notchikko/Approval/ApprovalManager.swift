@@ -276,7 +276,7 @@ final class ApprovalManager {
         startHideTimer(for: requestId)
     }
 
-    /// 恢复所有已隐藏的卡片（鼠标悬浮在宠物上时调用）
+    /// 恢复所有已隐藏的卡片（鼠标悬浮在 Notchikko 上时调用）
     func restoreAllHiddenCards() {
         for reqId in pendingApprovals.keys {
             guard pendingApprovals[reqId]?.isVisible == false else { continue }

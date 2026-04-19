@@ -73,7 +73,7 @@ This is the biggest semantic gap. Trae CLI does not tell the hook which session 
 session_id = f"trae-{os.getppid()}"
 ```
 
-The parent PID is the `coco` / `traecli` process, which is stable for the duration of a single CLI invocation. Reusing the same terminal for a second Trae CLI run will produce a different PPID, so sessions stay distinct — but if Trae CLI re-execs internally, the "session" will flip. In practice the approximation is good enough for the pet.
+The parent PID is the `coco` / `traecli` process, which is stable for the duration of a single CLI invocation. Reusing the same terminal for a second Trae CLI run will produce a different PPID, so sessions stay distinct — but if Trae CLI re-execs internally, the "session" will flip. In practice the approximation is good enough for Notchikko.
 
 ### No blocking
 
@@ -102,14 +102,14 @@ The whole install is string-concatenation, which means the resulting YAML is *co
 
 After `handle_trae_cli` reshapes the payload into Notchikko's unified schema, the event looks exactly like a Claude Code event and flows through `SocketServer` → `ClaudeCodeAdapter` unchanged:
 
-- `pre_tool_use` → pet transitions based on tool-class mapping (`bash` → `building`, `read` → `reading`, etc.).
+- `pre_tool_use` → Notchikko transitions based on tool-class mapping (`bash` → `building`, `read` → `reading`, etc.).
 - `post_tool_use` → returns to `thinking`.
 - `stop` → 3s celebration then idle (no token usage because Trae CLI doesn't ship `transcript_path`).
 - `subagent_stop` → decrements `subagentDepth` in `ClaudeCodeAdapter`. Note: the matching `SubagentStart` is *not* registered on Trae CLI's side (it doesn't emit one), so the depth counter is never actually incremented — subagent_stop is effectively a no-op safety net.
 
 ### Terminal detection
 
-Trae CLI events still benefit from `detect_terminal_info()` in the hook — the PPID-walking code runs regardless of `source`. The `terminal_pid` / `pid_chain` / `terminal_tty` are attached to every Trae event, so the pet's click-to-jump and VS Code tab focus work for Trae sessions when the CLI is running under a recognized terminal.
+Trae CLI events still benefit from `detect_terminal_info()` in the hook — the PPID-walking code runs regardless of `source`. The `terminal_pid` / `pid_chain` / `terminal_tty` are attached to every Trae event, so Notchikko's click-to-jump and VS Code tab focus work for Trae sessions when the CLI is running under a recognized terminal.
 
 ## Caveats
 

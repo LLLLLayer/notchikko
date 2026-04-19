@@ -4,11 +4,11 @@ final class NotchHitTestView: NSView {
     /// 可交互区域（屏幕坐标）。设为 .zero 则完全穿透。
     var interactiveRect: NSRect = .zero
 
-    /// 宠物区域（视图本地坐标），用于悬浮检测
+    /// Notchikko 区域（视图本地坐标），用于悬浮检测
     var petLocalRect: NSRect = .zero {
         didSet { updateTrackingAreas() }
     }
-    /// 鼠标进入宠物区域的回调
+    /// 鼠标进入 Notchikko 区域的回调
     var onPetHover: (() -> Void)?
 
     private var petTrackingArea: NSTrackingArea?

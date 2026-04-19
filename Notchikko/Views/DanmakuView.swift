@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 弹幕层：工具名从右向左飘过宠物背后，工具类别彩色标签，渐入渐出
+/// 弹幕层：工具名从右向左飘过 Notchikko 背后，工具类别彩色标签，渐入渐出
 struct DanmakuView: View {
     var sessionManager: SessionManager
 

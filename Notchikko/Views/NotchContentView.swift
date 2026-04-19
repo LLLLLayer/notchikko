@@ -7,14 +7,14 @@ struct NotchContentView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // 底层：弹幕（工具名飘过宠物背后）
+            // 底层：弹幕（工具名飘过 Notchikko 背后）
             if PreferencesStore.shared.preferences.danmakuEnabled {
                 DanmakuView(sessionManager: sessionManager)
                     .frame(height: petSize * 0.5)
                     .offset(y: petSize * 0.28)
             }
 
-            // 上层：宠物居中贴在 panel 顶部，上半身自然藏在 notch 里
+            // 上层：Notchikko 居中贴在 panel 顶部，上半身自然藏在 notch 里
             NotchikkoRepresentable(state: sessionManager.currentState)
                 .frame(width: petSize, height: petSize)
         }

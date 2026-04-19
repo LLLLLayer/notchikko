@@ -22,11 +22,11 @@ final class DragController {
     var onRightClick: ((NSPoint) -> Void)?
     /// 单击回调（非拖拽的点击）
     var onClick: (() -> Void)?
-    /// 撸猫开始：鼠标在宠物热区内频繁移动达阈值
+    /// Petting 开始：鼠标在 Notchikko 热区内频繁移动达阈值
     var onPetStart: (() -> Void)?
-    /// 撸猫结束：鼠标停止移动 / 离开热区 / 被 drag 抢断
+    /// Petting 结束：鼠标停止移动 / 离开热区 / 被 drag 抢断
     var onPetEnd: (() -> Void)?
-    /// 撸猫中每次 x 方向反转（一次来回 = 2 次反转）；用于 combo 递增
+    /// Petting 中每次 x 方向反转（一次来回 = 2 次反转）；用于 combo 递增
     var onPetCombo: (() -> Void)?
 
     // 撸猫检测：滑动窗内的路径长度采样
@@ -272,8 +272,8 @@ final class DragController {
 
     private func petScreenRect(panel: NotchPanel) -> NSRect {
         let panelFrame = panel.frame
-        // 宠物贴在 panel 顶部，上半身藏在 notch 里
-        // 热区比实际宠物大一圈（上下左右各扩 20px），更容易点到
+        // Notchikko 贴在 panel 顶部，上半身藏在 notch 里
+        // 热区比实际 Notchikko 大一圈（上下左右各扩 20px），更容易点到
         let padding: CGFloat = 20
         let visibleTop = panelFrame.maxY - notchHeight
         return NSRect(

@@ -368,28 +368,36 @@ struct IntegrationSettingsView: View {
         do {
             try hookInstaller.install(for: cli)
             refreshStatuses()
-        } catch {}
+        } catch {
+            Log("installHook(\(cli.name)) failed: \(error)", tag: "Settings")
+        }
     }
 
     private func uninstallHook(_ cli: CLIHookConfig) {
         do {
             try hookInstaller.uninstall(for: cli)
             refreshStatuses()
-        } catch {}
+        } catch {
+            Log("uninstallHook(\(cli.name)) failed: \(error)", tag: "Settings")
+        }
     }
 
     private func installExtension(_ target: IDEExtensionInstaller.IDETarget) {
         do {
             try IDEExtensionInstaller.install(for: target)
             refreshStatuses()
-        } catch {}
+        } catch {
+            Log("installExtension(\(target.id)) failed: \(error)", tag: "Settings")
+        }
     }
 
     private func uninstallExtension(_ target: IDEExtensionInstaller.IDETarget) {
         do {
             try IDEExtensionInstaller.uninstall(for: target)
             refreshStatuses()
-        } catch {}
+        } catch {
+            Log("uninstallExtension(\(target.id)) failed: \(error)", tag: "Settings")
+        }
     }
 
     private func refreshStatuses() {
@@ -527,55 +535,109 @@ private struct KeyCap: View {
 // MARK: - 关于
 
 struct AboutSettingsView: View {
-    private static let githubURL = URL(string: "https://github.com/yangjie-layer/Notchikko")!
+    private static let githubURL = URL(string: "https://github.com/LLLLLayer/notchikko")!
+    private static let licenseURL = URL(string: "https://github.com/LLLLLayer/notchikko/blob/main/LICENSE")!
+
+    @State private var isIconHovered = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3"
     }
 
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
-    }
-
     var body: some View {
-        VStack(alignment: .center, spacing: 18) {
-            // 使用 NSApplication.shared.applicationIconImage 以直接拿到 Assets 里的 AppIcon（不依赖图标名称常量）
-            Image(nsImage: NSApplication.shared.applicationIconImage)
-                .resizable()
-                .frame(width: 96, height: 96)
-                .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+        VStack(spacing: 0) {
+            // 身份
+            VStack(spacing: 12) {
+                // 使用 NSApplication.shared.applicationIconImage 以直接拿到 Assets 里的 AppIcon（不依赖图标名称常量）
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .shadow(color: .black.opacity(isIconHovered ? 0.28 : 0.18),
+                            radius: isIconHovered ? 10 : 6,
+                            y: isIconHovered ? 4 : 2)
+                    .offset(y: isIconHovered ? -2 : 0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isIconHovered)
+                    .onHover { isIconHovered = $0 }
 
-            VStack(spacing: 4) {
-                Text("Notchikko")
-                    .font(.title.bold())
-                Text("v\(appVersion)\(buildNumber.isEmpty ? "" : " (\(buildNumber))")")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                VStack(spacing: 4) {
+                    Text("Notchikko")
+                        .font(.title.bold())
+                    Text("v\(appVersion)")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+
+                Text(String(localized: "about.tagline"))
+                    .font(.caption)
+                    .italic()
+                    .foregroundStyle(.tertiary)
             }
 
+            Divider()
+                .opacity(0.4)
+                .padding(.horizontal, 60)
+                .padding(.vertical, 18)
+
+            // 资源
             VStack(spacing: 10) {
                 Link(destination: Self.githubURL) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "link")
-                        Text(verbatim: "github.com/yangjie-layer/Notchikko")
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.up.right.square")
+                            .frame(width: 16)
+                        Text(verbatim: "github.com/LLLLLayer/notchikko")
                     }
                     .font(.callout)
                 }
                 .buttonStyle(.link)
 
-                Button(String(localized: "menu.check_for_updates")) {
+                Link(destination: Self.licenseURL) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text")
+                            .frame(width: 16)
+                        Text(String(localized: "about.mit_license"))
+                    }
+                    .font(.callout)
+                }
+                .buttonStyle(.link)
+            }
+
+            Divider()
+                .opacity(0.4)
+                .padding(.horizontal, 60)
+                .padding(.vertical, 18)
+
+            // 操作
+            VStack(spacing: 10) {
+                Button(String(localized: "about.check_for_updates")) {
                     UpdateManager.shared.checkForUpdates()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .disabled(!UpdateManager.shared.canCheckForUpdates)
+
+                Button {
+                    HookOnboardingCoordinator.shared.presentManually()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(String(localized: "about.setup_cli"))
+                        Image(systemName: "arrow.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.callout)
+                }
+                .buttonStyle(.link)
             }
 
             Spacer()
+
+            Text(verbatim: "© 2026 LLLLLayer")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 8)
+        .padding(.top, 16)
     }
 }
 

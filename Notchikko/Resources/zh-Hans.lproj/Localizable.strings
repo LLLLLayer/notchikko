@@ -103,6 +103,12 @@
 "settings.hooks_outdated_body" = "App 升级过，磁盘上的 hook 文件已过期。重装后才能恢复审批和状态追踪。";
 "settings.hooks_reinstall_all" = "全部重装";
 
+/* SettingsWindow - About */
+"about.tagline" = "岛上生物：抬头皆是柔情出处。";
+"about.check_for_updates" = "检查更新";
+"about.mit_license" = "MIT 协议";
+"about.setup_cli" = "CLI 集成设置";
+
 /* ApprovalCardView */
 "approval.deny" = "拒绝";
 "approval.allow_once" = "允许一次";
@@ -112,11 +118,17 @@
 "approval.respond_in_terminal" = "在终端中操作";
 "approval.submit" = "提交";
 
-/* Hook Install Prompt */
-"hook_prompt.title" = "安装 CLI Hooks？";
-"hook_prompt.message" = "Notchikko 检测到：%@\n\n安装 Hook 后 Clawd 就能跟随你的编码会话啦！";
-"hook_prompt.install" = "安装";
-"hook_prompt.later" = "稍后";
+/* Hook Onboarding */
+"onboarding.title" = "让 Clawd 跟随你的 CLI";
+"onboarding.subtitle" = "Notchikko 通过轻量 Hook 监听你的编码会话——安装后 Clawd 会在你调用工具、遇到错误、完成任务时作出反应。";
+"onboarding.subtitle.row_ready" = "可安装";
+"onboarding.install_all" = "一键安装";
+"onboarding.later" = "稍后";
+"onboarding.status.installed" = "已安装";
+"onboarding.status.install" = "安装";
+"onboarding.status.not_detected" = "本机未检测到";
+"onboarding.all_done_title" = "都安装好啦";
+"onboarding.all_done_subtitle" = "本机检测到的 CLI 都已完成 Notchikko Hook 安装。";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "等待中";

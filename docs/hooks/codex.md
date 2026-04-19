@@ -21,8 +21,8 @@ No `PermissionRequest`. No `Elicitation` / `AskUserQuestion`. No `PreCompact` / 
 
 Per upstream docs and tracking issues ([codex#16732](https://github.com/openai/codex/issues/16732), [codex#14754](https://github.com/openai/codex/issues/14754)), **`PreToolUse` / `PostToolUse` currently only fire for the `Bash` tool**. Edits, writes, MCP calls, web searches, and every other tool class run without triggering a hook. From Notchikko's perspective:
 
-- Tool-phase pet transitions (`reading` / `typing` / `building`) only fire when Codex runs shell commands.
-- Any Codex session that's mostly file I/O will look idle to the pet until the next non-tool lifecycle event (`UserPromptSubmit` / `Stop`).
+- Tool-phase Notchikko transitions (`reading` / `typing` / `building`) only fire when Codex runs shell commands.
+- Any Codex session that's mostly file I/O will look idle to Notchikko until the next non-tool lifecycle event (`UserPromptSubmit` / `Stop`).
 - Expect this to change as Codex's hook surface grows; nothing in Notchikko needs to be rewritten when it does (the `handle_standard` path already accepts any tool name).
 
 ### JSON shape
@@ -79,7 +79,7 @@ Example fragment:
 
 Because the schema is Claude-Code-compatible, every event routes through the same `STATUS_MAP` and the same `AgentEvent` conversion. The visible differences are:
 
-- The pet's `source` label reads "OpenAI Codex" with the `📦` icon (from `CLIHookConfig.metadata(for: "codex")`).
+- Notchikko's `source` label reads "OpenAI Codex" with the `📦` icon (from `CLIHookConfig.metadata(for: "codex")`).
 - No approval cards ever appear from Codex — `PermissionRequest` isn't an event Codex emits, so the `needs_blocking` branch in the hook never triggers.
 - The danmaku shows only tool names and prompt text; because only Bash fires tool hooks, danmaku frequency is much lower than for Claude Code sessions.
 
@@ -98,8 +98,8 @@ These are silent stand-ins; if the user hasn't installed the Codex hook, Notchik
 
 ## Caveats
 
-- **Bash-only hook coverage.** Biggest practical caveat. File edits, MCP calls, web searches — none of them fire a hook, so the pet only reacts to shell commands. Users who don't understand this will think Notchikko is broken against a Codex workload that's mostly edits.
+- **Bash-only hook coverage.** Biggest practical caveat. File edits, MCP calls, web searches — none of them fire a hook, so Notchikko only reacts to shell commands. Users who don't understand this will think Notchikko is broken against a Codex workload that's mostly edits.
 - **Large-file hook silent failure.** On Linux / Windows, Codex editing a file over ~100 KB (or ~1500–2000 lines) can exceed OS argv limits and the hook never runs at all ([codex#18067](https://github.com/openai/codex/issues/18067)). macOS has a higher limit but isn't immune.
-- **Schema drift is the biggest other risk.** Codex's hook system has iterated faster than Claude Code's. If upstream renames `hook_event_name` or stops sending `session_id`, the `handle_standard` early-exits silently (fail-open). Symptom: pet looks dead while Codex is obviously running.
+- **Schema drift is the biggest other risk.** Codex's hook system has iterated faster than Claude Code's. If upstream renames `hook_event_name` or stops sending `session_id`, the `handle_standard` early-exits silently (fail-open). Symptom: Notchikko looks dead while Codex is obviously running.
 - **Blocking is available upstream but Notchikko doesn't use it.** Codex's `PreToolUse` can deny Bash commands via `permissionDecision: "deny"` on stdout. Notchikko chooses not to — blocking approval UX is reserved for Claude Code's `PermissionRequest`. A future release could add it.
 - **`matcher` field uses regex.** Per upstream, Codex matchers are regex strings (e.g. `"Bash"`, `"Edit|Write"`, `"startup|resume"`). Notchikko's installer writes `"*"`, which is not a valid regex quantifier; in practice Codex treats it as a fail-closed / match-all depending on version. If a future release tightens regex validation, the installer will need to switch to `".*"` or `""`.

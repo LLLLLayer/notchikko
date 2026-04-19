@@ -84,6 +84,18 @@ final class TranscriptPoller {
         return results
     }
 
+    /// Claude Code 把绝对路径的 `/` 编码成 `-` 当项目目录名（`/Users/a/b` → `-Users-a-b`）。
+    /// 尝试还原；若还原后的路径存在则使用，否则保留原名（含 `-` 的真实目录名无法无损还原）。
+    private nonisolated static func decodeClaudeProjectDir(_ name: String) -> String {
+        guard name.hasPrefix("-") else { return name }
+        let candidate = name.replacingOccurrences(of: "-", with: "/")
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: candidate, isDirectory: &isDir), isDir.boolValue {
+            return candidate
+        }
+        return name
+    }
+
     private nonisolated static func scanClaudeProjects(into results: inout [FileResult]) {
         let dir = claudeProjectsDir
         guard FileManager.default.fileExists(atPath: dir.path) else { return }
@@ -101,12 +113,13 @@ final class TranscriptPoller {
                 at: projectDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
             ) else { continue }
 
+            let decodedCwd = decodeClaudeProjectDir(projectDir.lastPathComponent)
             for file in files where file.pathExtension == "jsonl" {
                 guard isRecentlyModified(file) else { continue }
                 let sessionId = file.deletingPathExtension().lastPathComponent
                 results.append(FileResult(
                     path: file.path, sessionId: sessionId,
-                    source: "claude-code", cwd: projectDir.lastPathComponent
+                    source: "claude-code", cwd: decodedCwd
                 ))
             }
         }

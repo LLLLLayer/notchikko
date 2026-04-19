@@ -103,6 +103,12 @@
 "settings.hooks_outdated_body" = "App updated — hook files on disk are stale. Reinstall to restore approval + state tracking.";
 "settings.hooks_reinstall_all" = "Reinstall all";
 
+/* SettingsWindow - About */
+"about.tagline" = "An island creature: every look upward, a quiet tenderness.";
+"about.check_for_updates" = "Check for Updates";
+"about.mit_license" = "MIT License";
+"about.setup_cli" = "Set up CLI integration";
+
 /* ApprovalCardView */
 "approval.deny" = "Deny";
 "approval.allow_once" = "Allow Once";
@@ -112,11 +118,17 @@
 "approval.respond_in_terminal" = "Go to terminal";
 "approval.submit" = "Submit";
 
-/* Hook Install Prompt */
-"hook_prompt.title" = "Install CLI Hooks?";
-"hook_prompt.message" = "Notchikko detected: %@\n\nInstall hooks so Clawd can react to your coding sessions?";
-"hook_prompt.install" = "Install";
-"hook_prompt.later" = "Later";
+/* Hook Onboarding */
+"onboarding.title" = "Let Clawd follow your CLI";
+"onboarding.subtitle" = "Notchikko watches your coding sessions through tiny CLI hooks — approve them so Clawd can react when you run tools, hit errors, or finish tasks.";
+"onboarding.subtitle.row_ready" = "Ready to install";
+"onboarding.install_all" = "Install All";
+"onboarding.later" = "Not Now";
+"onboarding.status.installed" = "Installed";
+"onboarding.status.install" = "Install";
+"onboarding.status.not_detected" = "Not detected on this Mac";
+"onboarding.all_done_title" = "You're all set!";
+"onboarding.all_done_subtitle" = "Every CLI detected on this Mac already has Notchikko hooks installed.";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "idle";
