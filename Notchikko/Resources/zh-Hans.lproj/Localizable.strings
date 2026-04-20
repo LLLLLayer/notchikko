@@ -130,6 +130,11 @@
 "onboarding.status.not_detected" = "本机未检测到";
 "onboarding.all_done_title" = "都安装好啦";
 "onboarding.all_done_subtitle" = "本机检测到的 CLI 都已完成 Notchikko Hook 安装。";
+"onboarding.install_failed.title" = "Hook 安装失败";
+"onboarding.install_failed.hint" = "你可以稍后在「关于」页点击「配置 CLI Hook」重试，或检查 CLI 配置目录的写入权限。";
+"onboarding.none_detected.title" = "未检测到支持的 CLI";
+"onboarding.none_detected.subtitle" = "请先在本机安装 Claude Code、Codex 或 Trae CLI（会自动创建对应的配置目录），再回来启用 Hook。";
+"onboarding.close" = "关闭";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "等待中";

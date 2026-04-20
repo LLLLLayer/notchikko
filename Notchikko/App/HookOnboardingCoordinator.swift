@@ -9,6 +9,10 @@ final class HookOnboardingCoordinator {
 
     private let installer = HookInstaller()
     private var panel: NSPanel?
+    private var closeObserver: NSObjectProtocol?
+    /// 刚成功安装、需要在 UI 上短暂高亮的 CLI 名称集合。
+    /// 高亮由视图侧的 `.task` 驱动（~1.2s 后淡出），所以这里只负责在下一次 refresh 时传进去。
+    private var recentlyInstalled: Set<String> = []
 
     private init() {}
 
@@ -58,6 +62,18 @@ final class HookOnboardingCoordinator {
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
 
+        // 标题栏 ⊗ 关闭、"稍后"按钮、Cmd+W 都会触发 willClose —— 统一当作 dismiss
+        // 处理，免得下次启动再弹一次。
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handlePanelClosed()
+            }
+        }
+
         rebuildContent(in: panel)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
@@ -69,7 +85,7 @@ final class HookOnboardingCoordinator {
         let items = buildItems()
         let view = HookOnboardingView(
             onClose: { [weak self] in
-                self?.dismiss()
+                self?.panel?.close()
             },
             onInstall: { [weak self] cli in
                 self?.install(cli: cli)
@@ -82,33 +98,78 @@ final class HookOnboardingCoordinator {
         panel.contentView = NSHostingView(rootView: view)
     }
 
-    private func dismiss() {
+    private func handlePanelClosed() {
         PreferencesStore.shared.preferences.hasShownHookPrompt = true
-        panel?.close()
+        if let token = closeObserver {
+            NotificationCenter.default.removeObserver(token)
+            closeObserver = nil
+        }
         panel = nil
+        recentlyInstalled.removeAll()
     }
 
     private func install(cli: CLIHookConfig) {
         do {
             try installer.install(for: cli)
             Log("Installed hook for \(cli.displayName)", tag: "Onboarding")
+            markInstalled([cli.name])
         } catch {
-            Log("Failed to install hook for \(cli.displayName): \(error)", tag: "Onboarding")
+            Log("Failed to install hook for \(cli.displayName): \(error)",
+                tag: "Onboarding", level: .error)
+            refresh()
+            presentInstallError(failures: [(cli, error)])
         }
-        refresh()
     }
 
     private func installAll() {
         let items = buildItems()
+        var installed: [String] = []
+        var failures: [(CLIHookConfig, Error)] = []
         for item in items where item.status == .notInstalled {
             do {
                 try installer.install(for: item.cli)
                 Log("Auto-installed hook for \(item.cli.displayName)", tag: "Onboarding")
+                installed.append(item.cli.name)
             } catch {
-                Log("Failed to install hook for \(item.cli.displayName): \(error)", tag: "Onboarding")
+                Log("Failed to install hook for \(item.cli.displayName): \(error)",
+                    tag: "Onboarding", level: .error)
+                failures.append((item.cli, error))
             }
         }
+        markInstalled(installed)
+        if !failures.isEmpty {
+            presentInstallError(failures: failures)
+        }
+    }
+
+    private func markInstalled(_ names: [String]) {
+        guard !names.isEmpty else {
+            refresh()
+            return
+        }
+        recentlyInstalled.formUnion(names)
         refresh()
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard let self else { return }
+            self.recentlyInstalled.subtract(names)
+            self.refresh()
+        }
+    }
+
+    private func presentInstallError(failures: [(CLIHookConfig, Error)]) {
+        guard !failures.isEmpty else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "onboarding.install_failed.title")
+        let lines = failures.map { "• \($0.0.displayName): \($0.1.localizedDescription)" }
+            .joined(separator: "\n")
+        alert.informativeText = lines + "\n\n" + String(localized: "onboarding.install_failed.hint")
+        if let panel {
+            alert.beginSheetModal(for: panel) { _ in }
+        } else {
+            alert.runModal()
+        }
     }
 
     private func refresh() {
@@ -128,7 +189,11 @@ final class HookOnboardingCoordinator {
             } else {
                 status = .notInstalled
             }
-            return HookOnboardingView.CLIItem(cli: cli, status: status)
+            return HookOnboardingView.CLIItem(
+                cli: cli,
+                status: status,
+                justInstalled: recentlyInstalled.contains(cli.name)
+            )
         }
     }
 }

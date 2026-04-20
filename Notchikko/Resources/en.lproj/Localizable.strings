@@ -130,6 +130,11 @@
 "onboarding.status.not_detected" = "Not detected on this Mac";
 "onboarding.all_done_title" = "You're all set!";
 "onboarding.all_done_subtitle" = "Every CLI detected on this Mac already has Notchikko hooks installed.";
+"onboarding.install_failed.title" = "Hook install failed";
+"onboarding.install_failed.hint" = "Retry later from the About tab's \"Setup CLI Hooks\" button, or check write permissions on the CLI config directory.";
+"onboarding.none_detected.title" = "No supported CLI detected";
+"onboarding.none_detected.subtitle" = "Install Claude Code, Codex, or Trae CLI first (they create their config directories on first run), then come back here to enable hooks.";
+"onboarding.close" = "Close";
 
 /* SessionManager - Phase Display Names */
 "session.phase.idle" = "idle";
