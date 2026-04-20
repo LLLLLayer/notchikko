@@ -5,6 +5,7 @@
 "menu.pin" = "固定";
 "menu.unpin" = "取消固定";
 "menu.jump_to_terminal" = "跳转";
+"menu.auto_approve_session" = "自动批准";
 "menu.close_session" = "关闭";
 "menu.usage" = "用量";
 "menu.usage.input" = "输入:";

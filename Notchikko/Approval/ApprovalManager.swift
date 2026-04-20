@@ -74,9 +74,16 @@ final class ApprovalManager {
             }
         }
 
-        // 如果该 session 已设为"全部允许"，直接放行
+        // 如果该 session 已设为"全部允许"，直接放行。
+        // 带 bypass:true 是为了让 CLI 切到 bypassPermissions 模式后不再发 PermissionRequest
+        // —— 如果当前请求是菜单触发 bypass 后的第一次请求，这次响应会把 CLI 推进 bypass 态；
+        // 如果 CLI 已经在 bypass，下次不会再进这条路径。setMode 是幂等的，重发无副作用。
         if autoApprovedSessions.contains(hookEvent.sessionId) {
-            let response: [String: Any] = ["request_id": requestId, "decision": "allow"]
+            let response: [String: Any] = [
+                "request_id": requestId,
+                "decision": "allow",
+                "bypass": true,
+            ]
             if let data = try? JSONSerialization.data(withJSONObject: response) {
                 socketServer?.respond(requestId: requestId, json: data)
             }
@@ -199,15 +206,32 @@ final class ApprovalManager {
         SoundManager.shared.play(for: "nod")
     }
 
-    /// 自动批准：放行所有待审批 + 立即开 bypassPermissions（会话级）
+    /// 自动批准：放行所有待审批 + 立即开 bypassPermissions（会话级）。
+    /// 供卡片上的 "Auto Approve" 按钮使用，内部委托给 `enableBypass(for:)`。
     func autoApproveSession(requestId: String) {
         guard let req = pendingApprovals[requestId] else { return }
-        let sessionId = req.sessionId
+        enableBypass(for: req.sessionId)
+    }
 
-        Log("autoApproveSession: sid=\(sessionId.prefix(8))", tag: "Approval")
+    /// 会话是否已开启自动批准（菜单勾选 / 卡片"Auto Approve"之后为 true）。
+    func isBypassed(_ sessionId: String) -> Bool {
+        autoApprovedSessions.contains(sessionId)
+    }
+
+    /// 打开会话级自动批准。
+    ///
+    /// 行为：
+    /// 1. 设置 app 侧 flag，后续 `handleApprovalRequest` 走快速放行（附带 `bypass: true`）。
+    /// 2. 把当前同 session 所有阻塞式卡片一次性放行，首条响应带 `bypass: true`
+    ///    把 CLI 推进 bypassPermissions 模式。
+    ///
+    /// 菜单"自动批准"项和卡片"Auto Approve"按钮都走这里。调用时可以没有任何
+    /// 在途请求——这就是菜单路径的用法：flag 先置上，等下一次 PermissionRequest 到来
+    /// 时由快速放行路径把 CLI 切到 bypass。
+    func enableBypass(for sessionId: String) {
+        Log("enableBypass: sid=\(sessionId.prefix(8))", tag: "Approval")
         autoApprovedSessions.insert(sessionId)
 
-        // 单次遍历：放行阻塞式请求 + 收集所有卡片 ID
         var bypassSent = false
         var allIds: [String] = []
         for r in pendingApprovals.values where r.sessionId == sessionId {
@@ -232,6 +256,15 @@ final class ApprovalManager {
         }
 
         SoundManager.shared.play(for: "nod")
+    }
+
+    /// 关闭会话级自动批准。注意：CLI 侧一旦进入 bypassPermissions 模式，只能由用户在
+    /// 终端用 `/permissions` 命令退出；这里只能停止 app 侧的自动放行，如果 CLI 之后
+    /// 真的再发 PermissionRequest（通常不会，它已经 bypass 了），就会重新走卡片流程。
+    func disableBypass(for sessionId: String) {
+        guard autoApprovedSessions.contains(sessionId) else { return }
+        Log("disableBypass: sid=\(sessionId.prefix(8))", tag: "Approval")
+        autoApprovedSessions.remove(sessionId)
     }
 
     // MARK: - 热键查询

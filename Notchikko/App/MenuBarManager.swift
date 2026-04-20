@@ -12,6 +12,11 @@ final class MenuBarManager {
     var onOpenSettings: (() -> Void)?
     var onRemoveSession: ((String) -> Void)?
     var onJumpToSession: ((String) -> Void)?
+    /// 会话级自动批准开关：true = 当前已 bypass，点击关闭；反之打开。
+    /// 由 AppDelegate 路由到 `ApprovalManager.enableBypass` / `disableBypass`。
+    var onToggleAutoApprove: ((String) -> Void)?
+    /// 查询某个 session 当前是否处于自动批准态，菜单项用来显示勾选。
+    var isSessionAutoApproved: ((String) -> Bool)?
     /// 隐身态切换：true = 进入隐身，false = 退出。AppDelegate 负责把它映射到 panel 透明度 + ignoresMouseEvents。
     var onToggleStealth: ((Bool) -> Void)?
 
@@ -97,6 +102,20 @@ final class MenuBarManager {
                     jumpItem.target = self
                     jumpItem.representedObject = session.id
                     sub.addItem(jumpItem)
+
+                    // 会话级自动批准：把整个 session 切到 bypassPermissions，
+                    // 之后该 session 的 PermissionRequest 不再弹卡。再点一次关闭 app 侧
+                    // 的自动放行（CLI 侧 bypass 模式无法由外部回退，需要用户在终端 /permissions）。
+                    let autoApproved = isSessionAutoApproved?(session.id) ?? false
+                    let autoApproveItem = NSMenuItem(
+                        title: NSLocalizedString("menu.auto_approve_session", comment: ""),
+                        action: #selector(toggleAutoApprove(_:)),
+                        keyEquivalent: ""
+                    )
+                    autoApproveItem.target = self
+                    autoApproveItem.representedObject = session.id
+                    autoApproveItem.state = autoApproved ? .on : .off
+                    sub.addItem(autoApproveItem)
 
                     sub.addItem(.separator())
 
@@ -224,6 +243,11 @@ final class MenuBarManager {
     @objc private func closeSession(_ sender: NSMenuItem) {
         guard let sessionId = sender.representedObject as? String else { return }
         onRemoveSession?(sessionId)
+    }
+
+    @objc private func toggleAutoApprove(_ sender: NSMenuItem) {
+        guard let sessionId = sender.representedObject as? String else { return }
+        onToggleAutoApprove?(sessionId)
     }
 
     @objc private func screenSelected(_ sender: NSMenuItem) {

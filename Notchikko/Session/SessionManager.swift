@@ -24,6 +24,16 @@ final class SessionManager {
     private var returnTimer: Task<Void, Never>?
     private var sessionCleanupTasks: [String: Task<Void, Never>] = [:]
 
+    /// 不活跃 session 探活：每 `livenessInterval` 秒扫一遍所有 `.waitingForInput`，
+    /// idle 超 `idleTTL` 或终端 PID 连续 `livenessMissThreshold` 次探活失败 → 合成 sessionEnd。
+    /// Hook 有时漏发 SessionEnd（⌘Q 终端 / kill -9 / 崩溃），靠这条路径兜底清理僵尸。
+    private var livenessTask: Task<Void, Never>?
+    /// 连续探活失败计数（hysteresis 去抖，防一次性 kill syscall 抖动误杀）
+    private var missedLivenessProbes: [String: Int] = [:]
+    private static let livenessInterval: TimeInterval = 60
+    private static let idleTTL: TimeInterval = 1800   // 30 min
+    private static let livenessMissThreshold = 2
+
     /// 有未解决错误的 session。`.error` 入 set，任何前进事件（prompt/tool/compact/stop）清除；
     /// 只有在 set 中 + `.sessionEnd` 到来时才播 error 声——代表报错真的终断了会话。
     private var sessionsWithUnresolvedError: Set<String> = []
@@ -628,6 +638,73 @@ final class SessionManager {
             terminalPid: tPid, pidChain: pChain
         )
         Log("Auto-created session \(sid.prefix(8)), total: \(sessions.count)", tag: "Session")
+    }
+
+    // MARK: - 不活跃探活
+
+    /// 启动周期性探活。AppDelegate 在 applicationDidFinishLaunching 里调一次即可。
+    func startLivenessMonitor() {
+        livenessTask?.cancel()
+        livenessTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.livenessInterval))
+                guard !Task.isCancelled else { return }
+                self?.runLivenessProbe()
+            }
+        }
+    }
+
+    func stopLivenessMonitor() {
+        livenessTask?.cancel()
+        livenessTask = nil
+        missedLivenessProbes.removeAll()
+    }
+
+    /// 扫一遍所有 session：
+    /// - 只检查 `.waitingForInput` 的（工作中 / compacting 的本身在产生事件）
+    /// - `lastEvent` 距今 > idleTTL → 直接判死（tab 被关但终端 app 没死的场景）
+    /// - 有 `terminalPid` 且 `kill(pid, 0)` 返回 ESRCH → 计数 + 1，累计 2 次 → 判死
+    /// 判死走现有 `.sessionEnd` 分支，复用错误音 / 3s 延迟移除 / 自动切换逻辑。
+    private func runLivenessProbe() {
+        guard !sessions.isEmpty else { return }
+        let now = Date()
+        var toEnd: [String] = []
+        for (sid, session) in sessions {
+            guard session.phase == .waitingForInput else {
+                missedLivenessProbes.removeValue(forKey: sid)
+                continue
+            }
+            if now.timeIntervalSince(session.lastEvent) > Self.idleTTL {
+                toEnd.append(sid)
+                continue
+            }
+            guard let pid = session.terminalPid, pid > 0 else {
+                missedLivenessProbes.removeValue(forKey: sid)
+                continue
+            }
+            let alive: Bool
+            if kill(pid_t(pid), 0) == 0 {
+                alive = true
+            } else {
+                // ESRCH 明确不存在；EPERM 代表进程存在但无权 signal（仍算活着）
+                alive = (errno != ESRCH)
+            }
+            if alive {
+                missedLivenessProbes.removeValue(forKey: sid)
+            } else {
+                let misses = (missedLivenessProbes[sid] ?? 0) + 1
+                if misses >= Self.livenessMissThreshold {
+                    toEnd.append(sid)
+                } else {
+                    missedLivenessProbes[sid] = misses
+                }
+            }
+        }
+        for sid in toEnd {
+            Log("liveness: stale session → synthetic sessionEnd sid=\(sid.prefix(8))", tag: "Session")
+            missedLivenessProbes.removeValue(forKey: sid)
+            handleEvent(.sessionEnd(sessionId: sid))
+        }
     }
 
     private func evictOldestSession() {

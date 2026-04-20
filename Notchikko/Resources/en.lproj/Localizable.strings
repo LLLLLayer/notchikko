@@ -5,6 +5,7 @@
 "menu.pin" = "Pin";
 "menu.unpin" = "Unpin";
 "menu.jump_to_terminal" = "Jump";
+"menu.auto_approve_session" = "Auto-approve";
 "menu.close_session" = "Close";
 "menu.usage" = "Usage";
 "menu.usage.input" = "Input:";

@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotchWindow(on: NSScreen.main)
         startAgentListening()
         observeScreenChanges()
+        sessionManager.startLivenessMonitor()
         hookOnboarding.promptIfNeeded()
         updateManager.start()
     }
@@ -51,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyBridge?.deactivate()
         transcriptPoller.stop()
         processDiscovery.stop()
+        sessionManager.stopLivenessMonitor()
         // 关闭 socket server + finish event stream
         adapter?.socketServerRef.stop()
         // 把排队中的日志刷到磁盘，防止最后 N 行丢失
@@ -76,6 +78,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager.onRemoveSession = { [weak self] sessionId in
             // sessionManager.onSessionRemoved 回调会负责调 approvalManager.cleanupSession
             self?.sessionManager.removeSession(sessionId)
+        }
+
+        // 会话级 Bypass：菜单里 Pin 下面那个"自动批准"项。
+        // 注意：approvalManager 在 startAgentListening 里才创建，这里通过 weak self
+        // 惰性访问；菜单弹出时肯定已经初始化好了。
+        menuBarManager.onToggleAutoApprove = { [weak self] sessionId in
+            guard let approval = self?.approvalManager else { return }
+            if approval.isBypassed(sessionId) {
+                approval.disableBypass(for: sessionId)
+            } else {
+                approval.enableBypass(for: sessionId)
+            }
+        }
+        menuBarManager.isSessionAutoApproved = { [weak self] sessionId in
+            self?.approvalManager?.isBypassed(sessionId) ?? false
         }
 
         menuBarManager.onQuit = {
