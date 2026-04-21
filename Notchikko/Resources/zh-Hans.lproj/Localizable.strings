@@ -119,6 +119,7 @@
 "approval.jump_to_terminal" = "跳转到终端";
 "approval.respond_in_terminal" = "在终端中操作";
 "approval.submit" = "提交";
+"approval.multi_select_hint" = "可多选";
 
 /* Hook Onboarding */
 "onboarding.title" = "让 Clawd 跟随你的 CLI";

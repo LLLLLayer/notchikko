@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# notchikko-hook-version: 4
+# notchikko-hook-version: 5
 """
 Notchikko Hook — forwards CLI agent events via Unix socket.
 
@@ -491,9 +491,10 @@ def handle_standard(input_data, source, terminal_pid, pid_chain):
                  source=source, event=hook_event, sid=session_id, req=request_id,
                  dur_ms=int((time.time() - t0) * 1000))
         if needs_blocking:
-            emit_fallback_allow()
-            hook_log("WARN", "emitted fallback allow (socket failed)",
-                     source=source, sid=session_id, req=request_id)
+            emit_fallback_allow(is_ask_user=is_ask_user)
+            hook_log("WARN", "emitted fallback (socket failed)",
+                     source=source, sid=session_id, req=request_id,
+                     ask=(1 if is_ask_user else 0))
 
 
 def handle_blocking_response(sock, tool_input, is_ask_user, source=None, session_id=None, request_id=None):
@@ -504,9 +505,10 @@ def handle_blocking_response(sock, tool_input, is_ask_user, source=None, session
         try:
             chunk = sock.recv(4096)
             if not chunk:
-                hook_log("WARN", "app closed fd before responding — fallback allow",
-                         source=source, sid=session_id, req=request_id)
-                emit_fallback_allow()
+                hook_log("WARN", "app closed fd before responding — fallback",
+                         source=source, sid=session_id, req=request_id,
+                         ask=(1 if is_ask_user else 0))
+                emit_fallback_allow(is_ask_user=is_ask_user)
                 return
             response_data += chunk
             try:
@@ -557,18 +559,34 @@ def handle_blocking_response(sock, tool_input, is_ask_user, source=None, session
                          bypass=(1 if result.get("bypass") else 0))
             return
         except socket.timeout:
-            hook_log("ERROR", "recv timeout — fallback allow",
-                     source=source, sid=session_id, req=request_id)
-            emit_fallback_allow()
+            hook_log("ERROR", "recv timeout — fallback",
+                     source=source, sid=session_id, req=request_id,
+                     ask=(1 if is_ask_user else 0))
+            emit_fallback_allow(is_ask_user=is_ask_user)
             return
 
 
-def emit_fallback_allow():
-    """超时 / socket 错误 → 静默放行（fail-open）"""
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PermissionRequest",
-        "decision": {"behavior": "allow"},
-    }}))
+def emit_fallback_allow(is_ask_user=False):
+    """超时 / socket 错误时的兜底。
+
+    审批工具：fail-open 放行（不阻塞用户流程）。
+    AskUserQuestion：fail-closed 拒绝 —— 发空 answers 反而会触发 Claude 重新调
+    AskUserQuestion（看着像"卡片又弹出来了"），明确 deny 能让模型走异常分支结束当前
+    工具调用，用户流程不会陷入循环。
+    """
+    if is_ask_user:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {
+                "behavior": "deny",
+                "message": "Notchikko: approval card was not answered before timeout/disconnect.",
+            },
+        }}))
+    else:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {"behavior": "allow"},
+        }}))
 
 
 if __name__ == "__main__":

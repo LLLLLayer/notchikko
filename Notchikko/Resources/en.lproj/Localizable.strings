@@ -119,6 +119,7 @@
 "approval.jump_to_terminal" = "Jump to terminal";
 "approval.respond_in_terminal" = "Go to terminal";
 "approval.submit" = "Submit";
+"approval.multi_select_hint" = "multi-select";
 
 /* Hook Onboarding */
 "onboarding.title" = "Let Clawd follow your CLI";

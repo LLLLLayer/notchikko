@@ -53,8 +53,8 @@ final class ApprovalPanelCoordinator {
             onApprove:     { approval.approve(requestId: reqId) },
             onAlwaysAllow: { approval.alwaysAllowTool(requestId: reqId) },
             onAutoApprove: { approval.autoApproveSession(requestId: reqId) },
-            onAnswer:      { questionText, answer in
-                approval.answerQuestion(requestId: reqId, questionText: questionText, answer: answer)
+            onSubmitAnswers: { answers in
+                approval.answerAllQuestions(requestId: reqId, answers: answers)
             },
             onJump: { [weak self] in
                 guard let self,

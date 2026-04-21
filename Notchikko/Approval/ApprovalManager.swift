@@ -41,9 +41,12 @@ final class ApprovalManager {
         /// 是否是可交互的 AskUserQuestion（有 requestId + 有 questions）
         var isAskUser: Bool { !requestId.isEmpty && !questions.isEmpty }
 
-        struct Question {
+        struct Question: Identifiable {
             let text: String
-            let options: [String]      // option labels
+            let options: [String]      // option labels（description 暂未透出给 UI）
+            /// 官方文档: multiSelect=true 时 value 需要用 ", " (逗号+空格) join 多个 label。
+            let multiSelect: Bool
+            var id: String { text }
         }
     }
 
@@ -192,14 +195,22 @@ final class ApprovalManager {
         SoundManager.shared.play(for: "nod")
     }
 
-    /// AskUserQuestion: 用户在卡片上选择了选项
-    func answerQuestion(requestId: String, questionText: String, answer: String) {
+    /// AskUserQuestion: 用户在卡片上为所有问题都选好了答案，一次性提交。
+    ///
+    /// `answers` 的 key 必须是 question 文本（严格匹配），value 是选中 option 的 label
+    /// 字符串。multiSelect 题若选多个，调用方应已用 `", "`（逗号+空格）join 好，因为
+    /// 官方文档明确要求这个格式——详见 ApprovalCardView 里的提交逻辑。
+    ///
+    /// 覆盖所有 req.questions 才算完整；若调用方漏了 key，Claude Code 会重新调
+    /// AskUserQuestion 补齐剩余问题，从用户视角就是"卡片又弹出来"。所以 UI 侧必须
+    /// 先确保 answers 字典覆盖完整（Submit 按钮在凑齐前置灰）。
+    func answerAllQuestions(requestId: String, answers: [String: String]) {
         guard let req = pendingApprovals[requestId] else { return }
-        Log("answerQuestion: q=\(questionText.prefix(40)), a=\(answer), reqId=\(requestId.prefix(8))", tag: "Approval")
+        Log("answerAllQuestions: n=\(answers.count), reqId=\(requestId.prefix(8))", tag: "Approval")
 
         let response: [String: Any] = [
             "request_id": req.requestId,
-            "answers": [questionText: answer],
+            "answers": answers,
         ]
         sendResponse(response, for: req)
         dismiss(requestId: requestId)
@@ -445,7 +456,7 @@ final class ApprovalManager {
     static func parseQuestions(from toolInput: [String: AnyCodableValue]?) -> [ApprovalRequest.Question] {
         guard let toolInput else { return [] }
 
-        // 单问题模式: { question: "...", options: [...] }
+        // 单问题模式（遗留兼容）: { question: "...", options: [...] }
         if case .string(let q) = toolInput["question"] {
             var opts: [String] = []
             if case .array(let options) = toolInput["options"] {
@@ -457,10 +468,15 @@ final class ApprovalManager {
                     }
                 }
             }
-            if !opts.isEmpty { return [.init(text: q, options: opts)] }
+            let multi: Bool = {
+                if case .bool(let b) = toolInput["multiSelect"] { return b }
+                return false
+            }()
+            if !opts.isEmpty { return [.init(text: q, options: opts, multiSelect: multi)] }
         }
 
-        // 多问题模式: { questions: [{ question: "...", options: [...] }] }
+        // 多问题模式（Claude Code AskUserQuestion 正常格式，1–4 个问题，每题 2–4 选项）:
+        // { questions: [{ question, header?, multiSelect?, options: [{label, description?}] }] }
         guard case .array(let questions) = toolInput["questions"] else { return [] }
         var result: [ApprovalRequest.Question] = []
         for q in questions {
@@ -474,7 +490,13 @@ final class ApprovalManager {
                     }
                 }
             }
-            if !opts.isEmpty { result.append(.init(text: text, options: opts)) }
+            let multi: Bool = {
+                if case .bool(let b) = dict["multiSelect"] { return b }
+                return false
+            }()
+            if !opts.isEmpty {
+                result.append(.init(text: text, options: opts, multiSelect: multi))
+            }
         }
         return result
     }

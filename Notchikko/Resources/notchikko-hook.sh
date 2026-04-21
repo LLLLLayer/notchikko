@@ -1,5 +1,5 @@
 #!/bin/bash
-# notchikko-hook-version: 4
+# notchikko-hook-version: 5
 # Notchikko Hook — thin wrapper that forwards stdin to notchikko-hook.py.
 # Usage: notchikko-hook.sh [source]
 #   source: "claude-code" | "codex" | "gemini-cli" | "trae-cli"

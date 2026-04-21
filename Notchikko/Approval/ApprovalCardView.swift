@@ -8,14 +8,17 @@ struct ApprovalCardView: View {
     let onApprove: () -> Void
     let onAlwaysAllow: () -> Void
     let onAutoApprove: () -> Void
-    /// AskUserQuestion: 用户选了某个选项 (questionText, optionLabel)
-    var onAnswer: ((String, String) -> Void)? = nil
+    /// AskUserQuestion: 用户为所有问题都选好后一次性提交。
+    /// key = question 文本；value = 选中 label（multiSelect 题已在卡片内用 ", " join 好）。
+    var onSubmitAnswers: (([String: String]) -> Void)? = nil
     var onJump: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
 
     @State private var isPulsing = false
     @State private var cardScale: CGFloat = 0.88
     @State private var shownAt: Date = .init()
+    /// AskUserQuestion 每题的当前选中 label 集合。单选题最多 1 个；多选题可多个。
+    @State private var askSelections: [String: Set<String>] = [:]
 
     private static let tailHeight: CGFloat = 8
     private static let tailWidth: CGFloat = 16
@@ -71,13 +74,6 @@ struct ApprovalCardView: View {
                     toolRow
                     if !request.input.isEmpty && !request.isAskUser {
                         contentPreview
-                    }
-                    // AskUserQuestion: 显示问题文本
-                    if request.isAskUser, let q = request.questions.first {
-                        Text(q.text)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
                     }
                     actionRow
                 }
@@ -279,36 +275,135 @@ struct ApprovalCardView: View {
 
     // MARK: - AskUserQuestion 选项
 
+    /// 每题渲染一个小节（问题文本 + 选项）。
+    /// - 单选（multiSelect=false）：点一个，清掉之前选的，换成这个。
+    /// - 多选（multiSelect=true）：点 = 切换（选中/取消）。
+    /// 所有问题都有至少一个选中才能点 Submit；Submit 时 multiSelect 题用 `", "` join。
     @ViewBuilder
     private var askUserActionRow: some View {
-        if let question = request.questions.first {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
-                    Button {
-                        onAnswer?(question.text, option)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("\(index + 1)")
-                                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                                .foregroundColor(.primary.opacity(0.5))
-                                .frame(width: 14, height: 14)
-                                .background(Color.primary.opacity(0.1))
-                                .clipShape(Circle())
-                            Text(option)
-                                .font(.system(size: 10.5, weight: .medium))
-                                .lineLimit(2)
-                            Spacer()
-                        }
-                        .foregroundColor(.primary.opacity(0.85))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(request.questions) { question in
+                askQuestionBlock(question)
+            }
+            askSubmitRow
+        }
+    }
+
+    @ViewBuilder
+    private func askQuestionBlock(_ question: ApprovalManager.ApprovalRequest.Question) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // 问题文本 + 多选提示
+            HStack(spacing: 6) {
+                Text(question.text)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.9))
+                    .lineLimit(3)
+                if question.multiSelect {
+                    Text(String(localized: "approval.multi_select_hint"))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Color.primary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                 }
+                Spacer()
+            }
+
+            ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
+                askOptionButton(question: question, option: option, index: index)
             }
         }
+    }
+
+    @ViewBuilder
+    private func askOptionButton(
+        question: ApprovalManager.ApprovalRequest.Question,
+        option: String,
+        index: Int
+    ) -> some View {
+        let isSelected = askSelections[question.text]?.contains(option) ?? false
+        Button {
+            toggleSelection(question: question, option: option)
+        } label: {
+            HStack(spacing: 6) {
+                Text("\(index + 1)")
+                    .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.primary.opacity(0.5))
+                    .frame(width: 14, height: 14)
+                    .background(Color.primary.opacity(0.1))
+                    .clipShape(Circle())
+                Image(systemName: isSelected
+                      ? (question.multiSelect ? "checkmark.square.fill" : "largecircle.fill.circle")
+                      : (question.multiSelect ? "square" : "circle"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                Text(option)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .lineLimit(2)
+                Spacer()
+            }
+            .foregroundColor(.primary.opacity(0.85))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(isSelected ? 0.14 : 0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var askSubmitRow: some View {
+        HStack {
+            Spacer()
+            CardButton(
+                label: String(localized: "approval.submit"),
+                icon: "paperplane.fill",
+                style: .primary,
+                action: submitAnswers
+            )
+            .disabled(!allQuestionsAnswered)
+            .opacity(allQuestionsAnswered ? 1.0 : 0.5)
+        }
+    }
+
+    private var allQuestionsAnswered: Bool {
+        request.questions.allSatisfy { q in
+            !(askSelections[q.text]?.isEmpty ?? true)
+        }
+    }
+
+    private func toggleSelection(
+        question: ApprovalManager.ApprovalRequest.Question,
+        option: String
+    ) {
+        var current = askSelections[question.text] ?? []
+        if question.multiSelect {
+            if current.contains(option) {
+                current.remove(option)
+            } else {
+                current.insert(option)
+            }
+        } else {
+            // 单选：清空后只留这一个
+            current = [option]
+        }
+        askSelections[question.text] = current
+    }
+
+    private func submitAnswers() {
+        guard allQuestionsAnswered else { return }
+        var payload: [String: String] = [:]
+        for q in request.questions {
+            let selected = askSelections[q.text] ?? []
+            if q.multiSelect {
+                // 官方要求：多选用 ", "（逗号+空格）join；顺序按 options 里的出现顺序稳定
+                let ordered = q.options.filter { selected.contains($0) }
+                payload[q.text] = ordered.joined(separator: ", ")
+            } else {
+                payload[q.text] = selected.first ?? ""
+            }
+        }
+        onSubmitAnswers?(payload)
     }
 }
 
