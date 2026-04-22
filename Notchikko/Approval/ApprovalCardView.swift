@@ -194,6 +194,8 @@ struct ApprovalCardView: View {
                 Text(request.terminalName)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
             Spacer()
         }
@@ -202,22 +204,23 @@ struct ApprovalCardView: View {
     // MARK: - 内容预览
 
     private var contentPreview: some View {
-        // 阻塞期间禁用文本选择，避免与飞入手势冲突；通知卡可选
-        ScrollView(.vertical, showsIndicators: false) {
-            Group {
-                if request.isNotification {
-                    Text(request.input)
-                        .textSelection(.enabled)
-                } else {
-                    Text(request.input)
-                        .textSelection(.disabled)
-                }
+        // 不用 ScrollView：它没有 intrinsic height，NSHostingView.fittingSize 算整卡高度时会少算，
+        // 导致预览区被夹扁，上下行被裁。改成纯 Text + lineLimit(10) + fixedSize，让 Text 自己上报多行高度。
+        // 超长内容（>10 行的 heredoc 等）用 .middle 省略号提示，完整内容通过"跳到终端"查看。
+        Group {
+            if request.isNotification {
+                Text(request.input).textSelection(.enabled)
+            } else {
+                Text(request.input).textSelection(.disabled)
             }
-            .font(.system(size: 10.5, design: .monospaced))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxHeight: 80)
+        .font(.system(size: 10.5, design: .monospaced))
+        .foregroundStyle(.secondary)
+        .lineLimit(10)
+        .truncationMode(.middle)
+        // 强制按可用宽度 wrap（水平不可伸展，垂直按内容扩张）。
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Color.primary.opacity(0.04))
@@ -481,6 +484,10 @@ private struct ToolPill: View {
                 .font(.system(size: 8.5, weight: .semibold))
             Text(name)
                 .font(.system(size: 10.5, weight: .semibold))
+                // 长 MCP 工具名（mcp__plugin_..._..._...）会把 HStack 撑出 340pt 卡片宽度，
+                // 被外层 bubble clipShape 一刀切 → 视觉上"右侧被裁"。截断在 pill 内部解决。
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .foregroundColor(color)
         .padding(.horizontal, 7)
@@ -531,7 +538,11 @@ private struct CardButton: View {
                     .font(.system(size: 9, weight: fontWeight))
                 Text(label)
                     .font(.system(size: 10.5, weight: fontWeight))
-                    .fixedSize()
+                    // 不用 .fixedSize() —— 三个按钮 Allow Once / Always Allow / Auto Approve 同时显示时
+                    // 理想总宽 > 340pt 卡宽，之前靠 bubbleShape clip 把右边盖住才看不出；
+                    // 让 text 单行 + 轻微收缩（至 80%），在窄空间下自然挤一下就能全部 fit 在一行里。
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundColor(fgColor)
             .padding(.horizontal, 9)

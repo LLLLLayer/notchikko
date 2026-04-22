@@ -94,10 +94,19 @@ final class ApprovalManager {
             return
         }
 
-        let toolInput = hookEvent.toolInput?.values.first.flatMap { value -> String? in
-            if case .string(let s) = value { return s }
-            return nil
-        } ?? ""
+        // 按有意义的 key 优先提取工具输入的主体，避免 Dictionary 无序导致 `.values.first` 随机拿到
+        // description/metadata 而不是实际的 command/file_path。fallback 保留老行为（拿第一个 string）。
+        let toolInput: String = {
+            guard let input = hookEvent.toolInput else { return "" }
+            let preferredKeys = ["command", "file_path", "content", "new_string", "query", "pattern", "prompt"]
+            for key in preferredKeys {
+                if case .string(let s) = input[key] { return s }
+            }
+            return input.values.first.flatMap { value -> String? in
+                if case .string(let s) = value { return s }
+                return nil
+            } ?? ""
+        }()
 
         // 解析 AskUserQuestion 的结构化问题
         let questions: [ApprovalRequest.Question] = Self.parseQuestions(from: hookEvent.toolInput)

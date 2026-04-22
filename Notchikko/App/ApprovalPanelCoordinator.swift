@@ -67,12 +67,15 @@ final class ApprovalPanelCoordinator {
             }
         )
 
-        let hostingView = NSHostingView(rootView: cardView)
+        // 420pt 给三个 action 按钮（Allow Once / Always Allow / Auto Approve）留够空间完整显示文本。
+        let cardWidth: CGFloat = 420
+        // 在 SwiftUI 层锁死宽度再喂给 NSHostingView —— 外面改 frame 不会让 SwiftUI 重新布局（缓存），
+        // 只有 `.frame(width:)` 才让 SwiftUI 真按 340pt 算 Text wrap 行数，fittingSize.height 才准。
+        // alignment: .topLeading 阻止内容居中，贴左上对齐，避免 bubble 背景和内容因居中错位。
+        let hostingView = NSHostingView(rootView: cardView.frame(width: cardWidth, alignment: .topLeading))
         hostingView.translatesAutoresizingMaskIntoConstraints = false
-
-        let cardWidth: CGFloat = 340
         let fittingSize = hostingView.fittingSize
-        let cardHeight: CGFloat = min(max(fittingSize.height, 60), 240)
+        let cardHeight: CGFloat = min(max(fittingSize.height, 60), 320)
 
         // 气泡尾巴从 Notchikko 底部探出，微量重叠确保视觉连接
         let petSize = 80 * PreferencesStore.shared.preferences.petScale
