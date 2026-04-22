@@ -401,6 +401,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let request = approval.pendingApprovals[requestId] {
                 if !isSubagent {
                     self.sessionManager.overrideState(.approving)
+                    // 阻塞 PermissionRequest 路径不经过 SessionManager.enterApproving()，这里补一次提示音；
+                    // SoundManager 2s 冷却会自动去重连发的审批。subagent 不发声，避免嵌套 session 的多重叠加。
+                    SoundManager.shared.play(for: "approving")
                 }
                 self.approvalPanelCoordinator?.show(request: request)
             }
