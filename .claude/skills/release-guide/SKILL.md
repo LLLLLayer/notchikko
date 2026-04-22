@@ -219,6 +219,26 @@ Upload all four assets together:
 - `Notchikko{build}-{prevBuild}.delta` — Sparkle incremental update (e.g. `Notchikko2-1.delta`)
 - `appcast.xml` — update metadata
 
+#### Release Notes Format
+
+**Every release note MUST be bilingual: English first, then 中文, separated by a `---` divider.** The app ships with English and Simplified Chinese UI, and the two-section layout keeps the releases page consistent across versions. When editing past releases to add the missing language, preserve the existing structure/links; only translate the prose.
+
+Template:
+
+```markdown
+## Highlights
+
+<English bullets / sections>
+
+---
+
+## 更新亮点
+
+<对应中文内容>
+```
+
+For v1.0-style "feature overview" releases, use `## What's in X.Y` / `## X.Y 包含` as the top-level heading instead of `Highlights / 更新亮点`. Keep headings symmetric between the two sections so diffs stay readable.
+
 ```bash
 # Write release notes to a file to avoid shell-escaping Chinese/Markdown headaches
 gh release create v1.1 \
