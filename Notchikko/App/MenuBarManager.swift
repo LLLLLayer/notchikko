@@ -17,6 +17,10 @@ final class MenuBarManager {
     var onToggleAutoApprove: ((String) -> Void)?
     /// 查询某个 session 当前是否处于自动批准态，菜单项用来显示勾选。
     var isSessionAutoApproved: ((String) -> Bool)?
+    /// 查询某个 session 是否正在等用户决断（blocking approval / AskUserQuestion）—— 红点用。
+    var sessionHasPendingApproval: ((String) -> Bool)?
+    /// 查询某个 session 上次工具失败是否尚未复位 —— 红点用。
+    var sessionHasError: ((String) -> Bool)?
     /// 隐身态切换：true = 进入隐身，false = 退出。AppDelegate 负责把它映射到 panel 透明度 + ignoresMouseEvents。
     var onToggleStealth: ((Bool) -> Void)?
 
@@ -81,8 +85,10 @@ final class MenuBarManager {
                     let isPinned = session.id == sm.pinnedSessionId
 
                     // 主菜单项（自定义 view）—— 点击主行默认跳转到对应终端
+                    let needsAttention = (sessionHasPendingApproval?(session.id) ?? false)
+                        || (sessionHasError?(session.id) ?? false)
                     let item = NSMenuItem()
-                    let view = SessionMenuItemView(session: session, isPinned: isPinned)
+                    let view = SessionMenuItemView(session: session, isPinned: isPinned, needsAttention: needsAttention)
                     item.view = view
                     item.target = self
                     item.action = #selector(jumpToSession(_:))
@@ -333,15 +339,18 @@ final class MenuBarManager {
 private final class SessionMenuItemView: NSView {
     private let session: SessionManager.SessionInfo
     private let isPinned: Bool
+    /// 红点：该 session 当前正在等用户决断，或上次工具失败未复位。压过 phase 颜色。
+    private let needsAttention: Bool
 
     private static let viewWidth: CGFloat = 300
     private static let viewHeight: CGFloat = 44
     private static let hPadding: CGFloat = 20
     private static let vPadding: CGFloat = 4
 
-    init(session: SessionManager.SessionInfo, isPinned: Bool) {
+    init(session: SessionManager.SessionInfo, isPinned: Bool, needsAttention: Bool) {
         self.session = session
         self.isPinned = isPinned
+        self.needsAttention = needsAttention
         super.init(frame: NSRect(x: 0, y: 0, width: Self.viewWidth, height: Self.viewHeight))
         setAccessibilityRole(.menuItem)
         let agentName = Self.agentName(for: session.source)
@@ -355,6 +364,17 @@ private final class SessionMenuItemView: NSView {
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: Self.viewWidth, height: Self.viewHeight)
+    }
+
+    /// NSMenu 对不使用 AutoLayout 的 custom view 不一定触发 `layout()`，但 draw 前肯定会走 `viewWillDraw`。
+    /// 跟 superview 同宽即可 —— 那是 NSMenu 给 item 内容区预留的宽度（和普通 item 的文字右边缘对齐）。
+    /// 不用 `menu.size.width`：它会把自己算进去形成正反馈，把菜单越撑越宽。
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        guard let sv = superview else { return }
+        if sv.bounds.width > frame.size.width + 0.5 {
+            frame.size.width = sv.bounds.width
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -378,7 +398,8 @@ private final class SessionMenuItemView: NSView {
         let agentName = Self.agentName(for: session.source)
         let terminalName = session.matchedTerminal?.appName ?? ""
         let terminalSuffix = terminalName.isEmpty ? "" : " · \(terminalName)"
-        let statusDot = Self.statusDot(for: session.phase)
+        // 红点压过 phase：有待决断的审批或未复位的工具错误时，统一显示 🔴
+        let statusDot = needsAttention ? "🔴" : Self.statusDot(for: session.phase)
         let phaseName = session.phaseDisplayName
 
         let mainText = "\(pinMark)\(agentIcon) \(agentName)\(terminalSuffix)"
@@ -437,9 +458,10 @@ private final class SessionMenuItemView: NSView {
 
     private static func statusDot(for phase: SessionManager.SessionPhase) -> String {
         switch phase {
-        case .processing, .runningTool: return "🟢"
-        case .waitingForInput: return "🟡"
-        case .compacting: return "🟠"
+        // 运行中 = 🟡（processing / 工具执行 / 压缩都属于 agent 在干活）
+        case .processing, .runningTool, .compacting: return "🟡"
+        // 等待输入 = 🟢
+        case .waitingForInput: return "🟢"
         case .ended: return "⚪"
         }
     }

@@ -42,6 +42,11 @@ final class SessionManager {
     /// 订阅者应清理自己持有的 session 级状态（e.g. ApprovalManager.autoApprovedSessions）
     var onSessionRemoved: ((String) -> Void)?
 
+    /// 菜单渲染红点用：该 session 上次 tool 执行是否失败且尚未通过后续事件复位。
+    func hasUnresolvedError(for sessionId: String) -> Bool {
+        sessionsWithUnresolvedError.contains(sessionId)
+    }
+
     struct SessionInfo {
         let id: String
         let cwd: String

@@ -229,6 +229,11 @@ final class ApprovalManager {
         autoApprovedSessions.contains(sessionId)
     }
 
+    /// 菜单渲染红点用：该 session 当前是否有卡片在等用户决断（blocking approval 或 AskUserQuestion）。
+    func hasPending(for sessionId: String) -> Bool {
+        pendingApprovals.values.contains { $0.sessionId == sessionId && !$0.requestId.isEmpty }
+    }
+
     /// 打开会话级自动批准。
     ///
     /// 行为：

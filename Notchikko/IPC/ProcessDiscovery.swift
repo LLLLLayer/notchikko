@@ -21,7 +21,7 @@ final class ProcessDiscovery {
     private static let scanInterval: TimeInterval = 60
 
     /// 已知 Agent 进程名（精确匹配 lastPathComponent）
-    private static let agentNames: [String: String] = [
+    private nonisolated static let agentNames: [String: String] = [
         "claude": "claude-code",
         "codex": "codex",
         "gemini": "gemini-cli",
@@ -81,9 +81,19 @@ final class ProcessDiscovery {
     }
 
     /// 精确匹配进程名是否为已知 Agent
-    private static func matchAgent(_ proc: ProcessInfo) -> String? {
+    private nonisolated static func matchAgent(_ proc: ProcessInfo) -> String? {
         let comm = (proc.comm as NSString).lastPathComponent.lowercased()
         return agentNames[comm]
+    }
+
+    /// 当前 ps 中活跃的 Agent source 集合（供 TranscriptPoller 做 pid 校验）。
+    /// nonisolated：可在后台线程调用，避免阻塞主线程。
+    nonisolated static func liveAgentSources() -> Set<String> {
+        var sources: Set<String> = []
+        for proc in listProcesses() {
+            if let source = matchAgent(proc) { sources.insert(source) }
+        }
+        return sources
     }
 
     // MARK: - 进程列表

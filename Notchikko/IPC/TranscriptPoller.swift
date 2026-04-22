@@ -19,9 +19,17 @@ final class TranscriptPoller {
     /// Hook 管理的 session IDs（跳过这些，由 AppDelegate 同步）
     var hookSessionIds: Set<String> = []
 
-    private static let pollInterval: TimeInterval = 5
-    /// 只处理近 5 分钟内修改的文件
-    private nonisolated static let recentThreshold: TimeInterval = 300
+    /// 启动后立刻扫一次；之后先等 initialDelay，再进入 pollInterval 稳态。
+    /// 节奏：t=0, 30, 90, 150, 210, ... —— 除 t=0 外全部和 ProcessDiscovery(60/120/180) 错 30s，避免双扫撞在一起。
+    private static let initialDelay: TimeInterval = 30
+    private static let pollInterval: TimeInterval = 60
+    /// 扫描窗口：只处理近 90s 内修改的 jsonl。略大于 pollInterval 保证相邻两次扫描窗口无缝衔接。
+    /// 超过此窗口的文件完全不看，避免 cold start 把上午已结束的会话复活成 .transcript 占位。
+    private nonisolated static let recentThreshold: TimeInterval = 90
+    /// 首次发现闸门：jsonl 必须在最近 75s 内被写过，才允许建新 session。
+    /// 比扫描窗口更严 —— 75s~90s 的文件会被扫描但不会新建 session（可能处于 turn 结束后的余温期）。
+    /// 略大于 pollInterval 保证两次相邻扫描之间新建的 session 不会被漏。
+    private nonisolated static let discoveryThreshold: TimeInterval = 75
 
     private nonisolated static var claudeProjectsDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -38,9 +46,11 @@ final class TranscriptPoller {
         Log("TranscriptPoller started", tag: "Transcript")
 
         pollTask = Task {
+            var nextSleep = Self.initialDelay
             while !Task.isCancelled {
                 await scanAndProcess()
-                try? await Task.sleep(for: .seconds(Self.pollInterval))
+                try? await Task.sleep(for: .seconds(nextSleep))
+                nextSleep = Self.pollInterval
             }
         }
     }
@@ -63,10 +73,18 @@ final class TranscriptPoller {
         // 在后台线程扫描文件系统（避免阻塞主线程）
         let results = await Task.detached { Self.scanFiles() }.value
 
+        // 过滤掉 hook 已接管的 session
+        let candidates = results.filter { !hookSessionIds.contains($0.sessionId) }
+
+        // 只有存在"未知且待建"的 session 时，才付出 ps 扫描成本
+        let needsLivenessCheck = candidates.contains { !knownTranscriptSessions.contains($0.sessionId) }
+        let liveSources: Set<String> = needsLivenessCheck
+            ? await Task.detached { ProcessDiscovery.liveAgentSources() }.value
+            : []
+
         // 回到 MainActor 处理结果
-        for result in results {
-            guard !hookSessionIds.contains(result.sessionId) else { continue }
-            processJsonlResult(result)
+        for result in candidates {
+            processJsonlResult(result, liveSources: liveSources)
         }
 
         // 清理不再活跃的文件偏移（超过 recentThreshold 的文件已不再扫描）
@@ -155,7 +173,7 @@ final class TranscriptPoller {
 
     // MARK: - JSONL 处理（MainActor）
 
-    private func processJsonlResult(_ result: FileResult) {
+    private func processJsonlResult(_ result: FileResult, liveSources: Set<String>) {
         let path = result.path
 
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
@@ -172,8 +190,23 @@ final class TranscriptPoller {
 
         guard fileSize > lastOffset else { return }
 
-        // 新 session → emit sessionStart
+        // 新 session 需要同时满足两个条件才建会话，避免 cold start 复活僵尸
         if !knownTranscriptSessions.contains(result.sessionId) {
+            // Gate 1: source 必须有活进程（防止 agent 根本没跑）
+            guard liveSources.contains(result.source) else {
+                Log("Transcript session skipped (no live \(result.source) process): \(result.sessionId.prefix(8))", tag: "Transcript")
+                fileOffsets[path] = fileSize
+                return
+            }
+            // Gate 2: jsonl 必须"正在被写" —— mtime 在最近 discoveryThreshold 内
+            // （空闲 session 会在下一次 hook 事件到来时直接走 .hook 通道，不需要靠这里）
+            let modDate = (attrs[.modificationDate] as? Date) ?? .distantPast
+            let age = Date().timeIntervalSince(modDate)
+            guard age < Self.discoveryThreshold else {
+                Log("Transcript session skipped (stale mtime \(Int(age))s): \(result.sessionId.prefix(8))", tag: "Transcript")
+                fileOffsets[path] = fileSize
+                return
+            }
             knownTranscriptSessions.insert(result.sessionId)
             onEvent?(.sessionStart(sessionId: result.sessionId, cwd: result.cwd,
                                    source: result.source, terminalPid: nil, pidChain: nil))

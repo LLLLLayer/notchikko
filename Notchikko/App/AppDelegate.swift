@@ -94,6 +94,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager.isSessionAutoApproved = { [weak self] sessionId in
             self?.approvalManager?.isBypassed(sessionId) ?? false
         }
+        menuBarManager.sessionHasPendingApproval = { [weak self] sessionId in
+            self?.approvalManager?.hasPending(for: sessionId) ?? false
+        }
+        menuBarManager.sessionHasError = { [weak self] sessionId in
+            self?.sessionManager.hasUnresolvedError(for: sessionId) ?? false
+        }
 
         menuBarManager.onQuit = {
             NSApp.terminate(nil)
@@ -397,7 +403,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 3. 每个 hook 事件都可能携带的终端 PID/tty/pidChain/permissionMode 更新
     private func wireAdapterMetadata(adapter: ClaudeCodeAdapter) {
         adapter.onTerminalPidUpdate = { [weak self] sessionId, pid in
-            self?.sessionManager.setTerminalPid(pid, for: sessionId)
+            guard let self else { return }
+            self.sessionManager.setTerminalPid(pid, for: sessionId)
+            self.resolveAndCacheTerminal(sessionId: sessionId, pid: pid)
         }
         adapter.onTerminalTtyUpdate = { [weak self] sessionId, tty in
             self?.sessionManager.setTerminalTty(tty, for: sessionId)
@@ -429,11 +437,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 terminalPid: nil, pidChain: nil
             ))
             self.sessionManager.setDetection(.discovered, for: sessionId)
+            // 从 CLI 进程 PID 往上走找 GUI 终端，供菜单/卡片展示
+            self.resolveAndCacheTerminal(sessionId: sessionId, pid: pid)
         }
         processDiscovery.onProcessExited = { [weak self] sessionId in
             self?.sessionManager.handleEvent(.sessionEnd(sessionId: sessionId))
         }
         processDiscovery.start()
+    }
+
+    /// 从 PID 往上走进程树找终端 GUI app，写入 session 的 matchedTerminal。
+    /// 只在 matchedTerminal 还没填时做，避免覆盖用户点击 Clawd 后 TerminalJumper 已缓存的精确结果。
+    private func resolveAndCacheTerminal(sessionId: String, pid: Int) {
+        guard sessionManager.sessions[sessionId]?.matchedTerminal == nil else { return }
+        guard let match = terminalJumper.resolveTerminal(from: pid) else { return }
+        sessionManager.setTerminalMatch(match, for: sessionId)
     }
 
     /// 5. adapter.eventStream 每个 AgentEvent 到达时执行：session 更新 + 跨模块同步 + 通知卡弹出决策

@@ -11,6 +11,19 @@ final class TerminalJumper {
     /// 终端匹配回调（AppDelegate 注入，缓存到 session）
     var onTerminalMatched: ((String, SessionManager.TerminalMatch) -> Void)?
 
+    /// 从 PID 解析出终端匹配结果。不需要 Accessibility 权限，只走进程树 + NSRunningApplication。
+    /// 供 AppDelegate 在 session 刚拿到 PID 时提前调用，避免等到用户点 Clawd 才填充 matchedTerminal。
+    func resolveTerminal(from pid: Int) -> SessionManager.TerminalMatch? {
+        guard let app = findGUIApp(from: pid), let bundleId = app.bundleIdentifier else {
+            return nil
+        }
+        let terminal = KnownTerminal(rawValue: bundleId)
+        return SessionManager.TerminalMatch(
+            bundleId: bundleId,
+            appName: terminal?.displayName ?? app.localizedName ?? bundleId
+        )
+    }
+
     /// 跳转到 session 对应的终端
     /// 优先级：terminalPid 直接激活 → cwd 标题匹配 → CGWindowList 跨桌面
     func jumpToSession(session: SessionManager.SessionInfo) {
