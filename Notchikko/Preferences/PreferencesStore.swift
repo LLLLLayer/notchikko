@@ -73,6 +73,21 @@ enum NotchDetectionMode: String, Codable, CaseIterable {
     case forceOff
 }
 
+enum AppLanguage: String, Codable, CaseIterable {
+    case system
+    case en
+    case zhHans = "zh-Hans"
+
+    /// `nil` → remove AppleLanguages override, fall back to system locale.
+    var appleLanguagesValue: [String]? {
+        switch self {
+        case .system: return nil
+        case .en: return ["en"]
+        case .zhHans: return ["zh-Hans"]
+        }
+    }
+}
+
 struct NotchikkoPreferences: Codable, Equatable {
     var petScale: CGFloat = 1.5
     var soundVolume: Float = 0.3          // 0.0 = 静音, 1.0 = 最大
@@ -85,6 +100,32 @@ struct NotchikkoPreferences: Codable, Equatable {
     var notchDetectionMode: NotchDetectionMode = .auto
     var danmakuEnabled: Bool = true
     var hasShownHookPrompt: Bool = false
+    var language: AppLanguage = .system
+}
+
+// MARK: - 语言覆盖（提前于 PreferencesStore 初始化调用）
+
+/// 写 UserDefaults 的 AppleLanguages 来强制 App 使用指定语言。
+/// 切回 .system 会移除覆盖，让系统 locale 接管。
+func applyAppLanguage(_ language: AppLanguage) {
+    if let value = language.appleLanguagesValue {
+        UserDefaults.standard.set(value, forKey: "AppleLanguages")
+    } else {
+        UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+    }
+}
+
+/// 直接从磁盘读 preferences.json 取出 language 并应用。
+/// 绕过 @MainActor PreferencesStore，供 NotchikkoApp.init 在任何 SwiftUI 字符串解析之前调用。
+func applyAppLanguageFromDisk() {
+    let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("notchikko")
+    let url = dir.appendingPathComponent("preferences.json")
+    guard let data = try? Data(contentsOf: url),
+          let prefs = try? JSONDecoder().decode(NotchikkoPreferences.self, from: data) else {
+        return
+    }
+    applyAppLanguage(prefs.language)
 }
 
 /// 声音主题

@@ -112,12 +112,45 @@ struct DisplaySettingsView: View {
                     Toggle("", isOn: danmakuBinding)
                         .toggleStyle(.switch)
                 }
+
+                Divider()
+
+                settingsRow(String(localized: "settings.language")) {
+                    Picker("", selection: languageBinding) {
+                        Text(String(localized: "settings.language_system")).tag(AppLanguage.system)
+                        Text(String(localized: "settings.language_en")).tag(AppLanguage.en)
+                        Text(String(localized: "settings.language_zh_hans")).tag(AppLanguage.zhHans)
+                    }
+                }
             }
             .padding(4)
 
             Spacer()
         }
         .onAppear { themes = ThemeProvider.shared.availableThemes }
+    }
+
+    private func handleLanguageChange(to newLang: AppLanguage) {
+        PreferencesStore.shared.preferences.language = newLang
+        applyAppLanguage(newLang)
+
+        let alert = NSAlert()
+        alert.messageText = String(localized: "settings.language_restart_title")
+        alert.informativeText = String(localized: "settings.language_restart_msg")
+        alert.addButton(withTitle: String(localized: "settings.language_restart_now"))
+        alert.addButton(withTitle: String(localized: "settings.language_restart_later"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            relaunchApp()
+        }
+    }
+
+    private func relaunchApp() {
+        let path = Bundle.main.bundlePath
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+        proc.arguments = ["-c", "sleep 0.4; /usr/bin/open \"\(path)\""]
+        try? proc.run()
+        NSApplication.shared.terminate(nil)
     }
 
     private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -157,6 +190,17 @@ struct DisplaySettingsView: View {
         Binding(
             get: { PreferencesStore.shared.preferences.danmakuEnabled },
             set: { PreferencesStore.shared.preferences.danmakuEnabled = $0 }
+        )
+    }
+
+    private var languageBinding: Binding<AppLanguage> {
+        Binding(
+            get: { PreferencesStore.shared.preferences.language },
+            set: { newValue in
+                let old = PreferencesStore.shared.preferences.language
+                guard newValue != old else { return }
+                handleLanguageChange(to: newValue)
+            }
         )
     }
 }

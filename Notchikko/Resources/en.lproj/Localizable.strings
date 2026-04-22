@@ -56,6 +56,14 @@
 "settings.danmaku" = "Tool danmaku";
 "settings.import_theme" = "Import Theme...";
 "settings.import_theme_msg" = "Select a theme folder containing theme.json and SVG files";
+"settings.language" = "Language";
+"settings.language_system" = "System Default";
+"settings.language_en" = "English";
+"settings.language_zh_hans" = "简体中文";
+"settings.language_restart_title" = "Restart required";
+"settings.language_restart_msg" = "Language changes take effect after Notchikko restarts.";
+"settings.language_restart_now" = "Restart Now";
+"settings.language_restart_later" = "Later";
 
 /* SettingsWindow - Sound */
 "settings.volume" = "Volume";
@@ -139,10 +147,10 @@
 "onboarding.close" = "Close";
 
 /* SessionManager - Phase Display Names */
-"session.phase.idle" = "idle";
-"session.phase.thinking" = "thinking";
-"session.phase.sweeping" = "sweeping";
-"session.phase.ended" = "ended";
+"session.phase.idle" = "Idle";
+"session.phase.thinking" = "Thinking";
+"session.phase.sweeping" = "Sweeping";
+"session.phase.ended" = "Ended";
 
 /* PreferencesStore - SoundVolume */
 "sound.volume.mute" = "Mute";

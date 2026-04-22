@@ -56,6 +56,14 @@
 "settings.danmaku" = "工具弹幕";
 "settings.import_theme" = "导入主题...";
 "settings.import_theme_msg" = "选择包含 theme.json 和 SVG 文件的主题文件夹";
+"settings.language" = "语言";
+"settings.language_system" = "跟随系统";
+"settings.language_en" = "English";
+"settings.language_zh_hans" = "简体中文";
+"settings.language_restart_title" = "需要重启";
+"settings.language_restart_msg" = "语言切换将在 Notchikko 重启后生效。";
+"settings.language_restart_now" = "立即重启";
+"settings.language_restart_later" = "稍后";
 
 /* SettingsWindow - Sound */
 "settings.volume" = "音量";
