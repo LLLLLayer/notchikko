@@ -101,6 +101,9 @@ struct NotchikkoPreferences: Codable, Equatable {
     var danmakuEnabled: Bool = true
     var hasShownHookPrompt: Bool = false
     var language: AppLanguage = .system
+    /// 用户明确选过的屏幕（localizedName）。nil = 跟随主屏。
+    /// 用 localizedName 而非 CGDirectDisplayID：后者跨重启/重连会变，前者稳定。
+    var preferredScreenName: String? = nil
 }
 
 // MARK: - 语言覆盖（提前于 PreferencesStore 初始化调用）

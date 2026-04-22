@@ -366,14 +366,16 @@ private final class SessionMenuItemView: NSView {
         NSSize(width: Self.viewWidth, height: Self.viewHeight)
     }
 
-    /// NSMenu 对不使用 AutoLayout 的 custom view 不一定触发 `layout()`，但 draw 前肯定会走 `viewWillDraw`。
-    /// 跟 superview 同宽即可 —— 那是 NSMenu 给 item 内容区预留的宽度（和普通 item 的文字右边缘对齐）。
-    /// 不用 `menu.size.width`：它会把自己算进去形成正反馈，把菜单越撑越宽。
+    /// NSMenu 对不用 AutoLayout 的 custom view 不一定触发 `layout()`；但 draw 前保证会走 `viewWillDraw`。
+    /// 用 `menu.size.width - 36` 作 target：菜单总宽扣掉左右系统 item 边距。
+    /// 36 这个固定偏移是不动点 —— 虽然 menu.size 会把自己算进去，但减掉 36 后的值永远小于原 menu.size，
+    /// 不会正反馈把菜单撑得越来越宽；`superview.bounds.width` 在 `viewWillDraw` 里等于菜单窗口的全宽（含阴影），不可用。
     override func viewWillDraw() {
         super.viewWillDraw()
-        guard let sv = superview else { return }
-        if sv.bounds.width > frame.size.width + 0.5 {
-            frame.size.width = sv.bounds.width
+        guard let menu = enclosingMenuItem?.menu else { return }
+        let target = max(Self.viewWidth, menu.size.width - 36)
+        if abs(target - frame.size.width) > 0.5 {
+            frame.size.width = target
         }
     }
 

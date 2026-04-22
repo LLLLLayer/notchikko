@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 后台预热音频系统，让首次 session-start 不在主线程被 CoreAudio HAL 冷启拖住
         SoundManager.shared.prewarm()
         setupMenuBar()
-        setupNotchWindow(on: NSScreen.main)
+        setupNotchWindow(on: resolvePreferredScreen() ?? NSScreen.main)
         startAgentListening()
         observeScreenChanges()
         sessionManager.startLivenessMonitor()
@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager.setup(sessionManager: sessionManager)
 
         menuBarManager.onSwitchScreen = { [weak self] screen in
+            PreferencesStore.shared.preferences.preferredScreenName = screen.localizedName
             self?.setupNotchWindow(on: screen)
         }
 
@@ -131,13 +132,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshNotchWindow() {
         // 拖拽期间不重建窗口，避免产生重复 panel
         guard !sessionManager.isDragging else { return }
-        // 如果当前屏幕已断开（不在 screens 列表中），回退到主屏幕
-        let target: NSScreen? = if let cur = currentScreen, NSScreen.screens.contains(cur) {
-            cur
-        } else {
-            NSScreen.main
-        }
+        // 优先把用户记过的屏幕接回来（外接重插后自动归位）；
+        // 再退当前屏（若仍连着）；最后兜底主屏。
+        let target: NSScreen? = resolvePreferredScreen()
+            ?? (currentScreen.flatMap { NSScreen.screens.contains($0) ? $0 : nil })
+            ?? NSScreen.main
         setupNotchWindow(on: target)
+    }
+
+    /// 按 `preferredScreenName` 在当前连接的屏里找匹配项。找不到（未设置 / 外接已断开）返回 nil。
+    private func resolvePreferredScreen() -> NSScreen? {
+        guard let name = PreferencesStore.shared.preferences.preferredScreenName else { return nil }
+        return NSScreen.screens.first { $0.localizedName == name }
     }
 
     private func setupNotchWindow(on screen: NSScreen?) {
@@ -258,8 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.sessionManager.endDrag()
                 }
             } else {
-                // 跨屏：无飞回动画，直接解冻状态并重建到目标屏幕
+                // 跨屏：无飞回动画，直接解冻状态并重建到目标屏幕。
+                // 记住用户的选择，重启后回到同一屏。
                 self.sessionManager.endDrag()
+                PreferencesStore.shared.preferences.preferredScreenName = landingScreen.localizedName
                 self.setupNotchWindow(on: landingScreen)
             }
         }
