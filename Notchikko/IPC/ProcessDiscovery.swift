@@ -19,6 +19,10 @@ final class ProcessDiscovery {
     var hookSessionIds: Set<String> = []
 
     private static let scanInterval: TimeInterval = 60
+    /// 冷启动静默窗口。首扫延后到 initialDelay 之后，让 hook session 优先建立，
+    /// 避免把后台 tmux / MCP wrapper / 遗留进程都当成 placeholder session 吞进来。
+    /// 设 60s 让节奏保持在 t=60, 120, 180, ...，和 TranscriptPoller(t=30,90,150,...) 错开 30s。
+    private static let initialDelay: TimeInterval = 60
 
     /// 已知 Agent 进程名（精确匹配 lastPathComponent）
     private nonisolated static let agentNames: [String: String] = [
@@ -35,9 +39,12 @@ final class ProcessDiscovery {
         Log("ProcessDiscovery started", tag: "Discovery")
 
         scanTask = Task {
+            var nextSleep = Self.initialDelay
             while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(nextSleep))
+                guard !Task.isCancelled else { return }
                 await scan()
-                try? await Task.sleep(for: .seconds(Self.scanInterval))
+                nextSleep = Self.scanInterval
             }
         }
     }

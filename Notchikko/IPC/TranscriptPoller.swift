@@ -19,8 +19,9 @@ final class TranscriptPoller {
     /// Hook 管理的 session IDs（跳过这些，由 AppDelegate 同步）
     var hookSessionIds: Set<String> = []
 
-    /// 启动后立刻扫一次；之后先等 initialDelay，再进入 pollInterval 稳态。
-    /// 节奏：t=0, 30, 90, 150, 210, ... —— 除 t=0 外全部和 ProcessDiscovery(60/120/180) 错 30s，避免双扫撞在一起。
+    /// 启动后先等 initialDelay 再首扫，之后进入 pollInterval 稳态。
+    /// 节奏：t=30, 90, 150, 210, ... —— 和 ProcessDiscovery(60/120/180) 永远错 30s，避免双扫撞在一起；
+    /// 冷启动 30s 静默窗口让 hook 优先接管 session，避免把 30s 前刚结束的 jsonl 复活成僵尸 session。
     private static let initialDelay: TimeInterval = 30
     private static let pollInterval: TimeInterval = 60
     /// 扫描窗口：只处理近 90s 内修改的 jsonl。略大于 pollInterval 保证相邻两次扫描窗口无缝衔接。
@@ -48,8 +49,9 @@ final class TranscriptPoller {
         pollTask = Task {
             var nextSleep = Self.initialDelay
             while !Task.isCancelled {
-                await scanAndProcess()
                 try? await Task.sleep(for: .seconds(nextSleep))
+                guard !Task.isCancelled else { return }
+                await scanAndProcess()
                 nextSleep = Self.pollInterval
             }
         }

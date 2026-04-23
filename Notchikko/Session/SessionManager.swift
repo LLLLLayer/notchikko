@@ -116,20 +116,31 @@ final class SessionManager {
 
     // MARK: - 当前活跃 session
 
-    /// 当前展示的 session（pinned 优先 → 正在工作的 → 最近活跃的）
+    /// 当前展示的 session。优先级：
+    /// 1) pinned（用户显式绑定）
+    /// 2) detection 分层：hook > transcript > discovered
+    ///    每层内先选正在工作的（phase != waitingForInput），否则选最近活跃的
+    ///
+    /// Why 分层：hook 是真实用户 session；transcript/discovered 是兜底，
+    /// 启动时会把一堆后台 tmux / 已结束但 mtime 仍新的 jsonl 当会话吃进来，
+    /// 不分层会让这些 placeholder 抢走 active，Clawd 显示的就是"没用的会话"。
     var activeSessionId: String? {
         if let pinned = pinnedSessionId, sessions[pinned] != nil,
            sessions[pinned]?.phase != .ended {
             return pinned
         }
         let alive = sessions.values.filter { $0.phase != .ended }
-        // 优先选正在工作的 session（processing / runningTool / compacting）
-        if let working = alive.filter({ $0.phase != .waitingForInput })
-            .max(by: { $0.lastEvent < $1.lastEvent }) {
-            return working.id
+        for tier in [SessionDetection.hook, .transcript, .discovered] {
+            let inTier = alive.filter { $0.detection == tier }
+            if let working = inTier.filter({ $0.phase != .waitingForInput })
+                .max(by: { $0.lastEvent < $1.lastEvent }) {
+                return working.id
+            }
+            if let recent = inTier.max(by: { $0.lastEvent < $1.lastEvent }) {
+                return recent.id
+            }
         }
-        // 都在等待输入则选最近活跃的
-        return alive.max(by: { $0.lastEvent < $1.lastEvent })?.id
+        return nil
     }
 
     /// 活跃 session 列表（供右键菜单用，按最近活跃排序）
